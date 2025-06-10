@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -110,6 +111,7 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       activityStatus: data.activityStatus,
       stepGoal: finalStepGoal,
       profileComplete: true,
+      currentSteps: userProfile?.currentSteps ?? 0, // Ensure currentSteps is included
     };
 
     try {
@@ -119,8 +121,18 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
         await incrementParticipantCount();
       }
       // Update local auth context state
-      const updatedProfile = { ...userProfile, ...profileUpdateData, uid: user.uid, email: user.email } as UserProfile;
-      setUserProfileState(updatedProfile);
+      // Ensure all necessary fields for UserProfile are present
+      const updatedProfileData = { 
+        ...userProfile, // spread existing profile first
+        ...profileUpdateData, // then updated fields
+        uid: user.uid, // ensure uid
+        email: user.email, // ensure email
+        // ensure inviteLink is preserved or initialized
+        inviteLink: userProfile?.inviteLink || `${process.env.NEXT_PUBLIC_APP_URL || ''}/profile/${user.uid}`,
+      } as UserProfile; // Cast to UserProfile to satisfy type, assuming all fields are now compliant
+
+      setUserProfileState(updatedProfileData);
+
 
       toast({ title: 'Profile Updated!', description: 'Your Monarch Miles profile is ready.' });
       router.push('/'); // Redirect to dashboard

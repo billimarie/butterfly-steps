@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { UserProfile } from '@/types';
@@ -26,7 +27,7 @@ export default function UserProgressCard({ userProfile }: UserProgressCardProps)
     );
   }
 
-  const { currentSteps, stepGoal } = userProfile;
+  const { currentSteps = 0, stepGoal } = userProfile; // Default currentSteps to 0
   const progressPercentage = stepGoal ? (currentSteps / stepGoal) * 100 : 0;
 
   return (
@@ -61,3 +62,4 @@ export default function UserProgressCard({ userProfile }: UserProgressCardProps)
     </Card>
   );
 }
+

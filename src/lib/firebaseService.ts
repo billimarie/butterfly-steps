@@ -1,3 +1,4 @@
+
 import { db } from './firebase';
 import { doc, getDoc, setDoc, updateDoc, increment, runTransaction } from 'firebase/firestore';
 import type { UserProfile, ActivityStatus, CommunityStats } from '@/types';
@@ -35,7 +36,8 @@ export async function createUserProfile(firebaseUser: FirebaseUser, additionalDa
 
 export async function updateUserProfile(uid: string, data: Partial<UserProfile>): Promise<void> {
   const userRef = doc(db, USERS_COLLECTION, uid);
-  await updateDoc(userRef, data);
+  // Use setDoc with merge: true to create the document if it doesn't exist, or update it if it does.
+  await setDoc(userRef, data, { merge: true });
 }
 
 export async function submitSteps(uid: string, steps: number): Promise<void> {
@@ -85,3 +87,4 @@ export async function incrementParticipantCount(): Promise<void> {
         await updateDoc(communityStatsRef, { totalParticipants: increment(1) });
     }
 }
+

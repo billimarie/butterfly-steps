@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { User as FirebaseUser, AuthError } from 'firebase/auth';
@@ -52,8 +53,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserProfile = async (uid: string) => {
     try {
-      const profile = await getUserProfile(uid);
-      setUserProfile(profile);
+      const profileDataFromDb = await getUserProfile(uid);
+      if (profileDataFromDb) {
+        // Ensure all required fields of UserProfile are present and correctly typed
+        const validatedProfile: UserProfile = {
+          uid: profileDataFromDb.uid,
+          email: profileDataFromDb.email,
+          displayName: profileDataFromDb.displayName,
+          activityStatus: profileDataFromDb.activityStatus,
+          stepGoal: profileDataFromDb.stepGoal,
+          currentSteps: typeof profileDataFromDb.currentSteps === 'number' ? profileDataFromDb.currentSteps : 0,
+          profileComplete: !!profileDataFromDb.profileComplete,
+          inviteLink: profileDataFromDb.inviteLink,
+        };
+        setUserProfile(validatedProfile);
+      } else {
+        setUserProfile(null);
+      }
     } catch (e) {
       console.error("Failed to fetch user profile:", e);
       setUserProfile(null); // Explicitly set to null on error
@@ -93,3 +109,4 @@ export const useAuth = () => {
   }
   return context;
 };
+

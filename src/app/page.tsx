@@ -1,8 +1,10 @@
+
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
+import { useRouter, usePathname } from 'next/navigation';
 import CountdownTimer from '@/components/dashboard/CountdownTimer';
 import UserProgressCard from '@/components/dashboard/UserProgressCard';
 import CommunityProgressCard from '@/components/dashboard/CommunityProgressCard';
@@ -16,23 +18,32 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, Footprints, Users, Gift } from 'lucide-react';
+import Logo from '@/components/ui/Logo';
 
 
 function Dashboard({ userProfile, initialCommunityStats }: { userProfile: UserProfile, initialCommunityStats: CommunityStats | null }) {
   const [communityStats, setCommunityStats] = useState<CommunityStats | null>(initialCommunityStats);
+  const { fetchUserProfile } = useAuth(); // Get fetchUserProfile to refresh user stats
 
   const refreshDashboardData = useCallback(async () => {
-    // User profile is managed by AuthContext, this will refresh community stats
-    // And could potentially re-fetch user profile if AuthContext's fetchUserProfile is called
     const stats = await getCommunityStats();
     setCommunityStats(stats);
-    // To refresh user stats, you might need to call fetchUserProfile from useAuth() here if not automatically updated.
-    // For now, AuthContext handles userProfile state, and this function updates community stats.
-  }, []);
+    // Refresh user profile data as well, as step submission updates it
+    if (userProfile?.uid) {
+      await fetchUserProfile(userProfile.uid);
+    }
+  }, [userProfile?.uid, fetchUserProfile]);
+
 
   useEffect(() => {
-    refreshDashboardData(); // Initial fetch and for subsequent programmatic refreshes
-  }, [refreshDashboardData]);
+    // If initialCommunityStats are provided (e.g. from SSR or initial fetch), use them.
+    // Otherwise, or if a refresh is needed, fetch them.
+    if (!initialCommunityStats) {
+        refreshDashboardData();
+    } else {
+        setCommunityStats(initialCommunityStats);
+    }
+  }, [initialCommunityStats, refreshDashboardData]);
 
   const userProgress = userProfile.stepGoal ? (userProfile.currentSteps / userProfile.stepGoal) * 100 : 0;
   const communityProgress = communityStats ? (communityStats.totalSteps / 3_600_000) * 100 : 0;
@@ -51,7 +62,7 @@ function Dashboard({ userProfile, initialCommunityStats }: { userProfile: UserPr
           <StepSubmissionForm onStepSubmit={refreshDashboardData} />
         </div>
       </div>
-      {userProfile.profileComplete && <ButterflyAnimation progress={userProgress} type="user" />}
+      {userProfile.profileComplete && userProfile.stepGoal && <ButterflyAnimation progress={userProgress} type="user" />}
       
       <Card className="shadow-lg">
         <CardHeader>
@@ -141,68 +152,83 @@ function LandingPage() {
 }
 
 export default function HomePage() {
-  const { user, userProfile, loading } = useAuth();
-  // This hook handles redirection logic
-  useAuthRedirect({ requireAuth: false }); // Allow access for non-authed users to see LandingPage
+  const { user, userProfile, loading: authLoading } = useAuth();
+  useAuthRedirect({ requireAuth: false }); 
   
   const [initialCommunityStats, setInitialCommunityStats] = useState<CommunityStats | null>(null);
-  const [dataLoading, setDataLoading] = useState(true);
+  const [communityStatsLoading, setCommunityStatsLoading] = useState(true);
+
+  const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    async function fetchInitialData() {
+    if (!authLoading && user && (!userProfile || !userProfile.profileComplete) && pathname !== '/profile') {
+      router.push('/profile');
+    }
+  }, [user, userProfile, authLoading, router, pathname]);
+
+  const fetchInitialCommunityData = useCallback(async () => {
+    if (user && userProfile?.profileComplete) {
+      setCommunityStatsLoading(true);
       try {
         const stats = await getCommunityStats();
         setInitialCommunityStats(stats);
       } catch (error) {
         console.error("Failed to fetch initial community stats:", error);
+        setInitialCommunityStats(null); // Ensure state is cleared on error
       } finally {
-        setDataLoading(false);
+        setCommunityStatsLoading(false);
       }
-    }
-    if (user && userProfile?.profileComplete) { // Only fetch if user is likely to see dashboard
-        fetchInitialData();
     } else {
-        setDataLoading(false); // No data needed for landing page
+      setCommunityStatsLoading(false); 
     }
   }, [user, userProfile?.profileComplete]);
 
+  useEffect(() => {
+    fetchInitialCommunityData();
+  }, [fetchInitialCommunityData]);
 
-  if (loading || (user && userProfile?.profileComplete && dataLoading)) {
+  if (authLoading) {
     return (
-      <div className="space-y-8">
-        <Skeleton className="h-40 w-full rounded-lg" />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <Skeleton className="h-64 w-full rounded-lg" />
-            <Skeleton className="h-32 w-full rounded-lg" />
-          </div>
-          <div className="space-y-6">
-            <Skeleton className="h-48 w-full rounded-lg" />
-            <Skeleton className="h-56 w-full rounded-lg" />
-          </div>
-        </div>
+      <div className="flex flex-col justify-center items-center min-h-[calc(100vh-20rem)] text-center">
+        <div className="mb-4"> <Logo /> </div>
+        <p className="text-xl font-semibold text-foreground mb-2">Loading Application...</p>
+        <Skeleton className="h-32 w-1/2 rounded-lg" />
       </div>
     );
   }
 
-  if (user && userProfile?.profileComplete) {
-    return <Dashboard userProfile={userProfile} initialCommunityStats={initialCommunityStats} />;
-  }
-
-  // If user exists but profile is not complete, useAuthRedirect will handle redirection to /profile.
-  // So, if we reach here and user is not null, it means redirection is about to happen or profile is incomplete.
-  // The landing page should show if no user or if user exists but profile not complete (before redirect).
-  // However, useAuthRedirect should have already pushed to /profile if needed.
-  // This ensures LandingPage is shown only if truly not authenticated.
-  if (!user) {
+  if (user) {
+    if (!userProfile || !userProfile.profileComplete) {
+      return (
+        <div className="flex flex-col justify-center items-center min-h-[calc(100vh-20rem)] text-center">
+          <div className="mb-4"> <Logo /> </div>
+          <p className="text-xl font-semibold text-foreground mb-2">Finalizing your setup...</p>
+          <p className="text-muted-foreground">Redirecting to your profile to complete setup.</p>
+          <Skeleton className="h-8 w-48 mt-4" /> 
+        </div>
+      );
+    } else { 
+      if (communityStatsLoading) {
+        return ( 
+          <div className="space-y-8">
+            <CountdownTimer /> 
+            <Skeleton className="h-64 w-full rounded-lg lg:col-span-2" />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                 {/* Placeholder for community progress skeleton if needed, or remove if above skeleton is enough */}
+              </div>
+              <div className="space-y-6">
+                <Skeleton className="h-48 w-full rounded-lg" />
+                <Skeleton className="h-56 w-full rounded-lg" />
+              </div>
+            </div>
+          </div>
+        );
+      }
+      return <Dashboard userProfile={userProfile} initialCommunityStats={initialCommunityStats} />;
+    }
+  } else { 
      return <LandingPage />;
   }
-  
-  // Fallback for cases where user exists, but profile might be in an intermediate state before redirect
-  // or if logic in useAuthRedirect needs a cycle. Displaying a loader here is safer.
-  return (
-    <div className="flex justify-center items-center h-64">
-        <Skeleton className="h-32 w-1/2 rounded-lg" />
-    </div>
-  );
 }
