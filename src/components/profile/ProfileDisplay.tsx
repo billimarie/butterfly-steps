@@ -7,17 +7,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
-import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIcon, Users as TeamIcon, LogOut } from 'lucide-react';
+import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIcon, Users as TeamIcon, LogOut, PlusCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ALL_BADGES, type BadgeData } from '@/lib/badges';
 import type { BadgeId } from '@/lib/badges';
-import { leaveTeam } from '@/lib/firebaseService'; // Import leaveTeam
-import { useState } from 'react'; // For loading state on leave team
+import { leaveTeam } from '@/lib/firebaseService';
+import { useState } from 'react';
+import StepSubmissionForm from '@/components/dashboard/StepSubmissionForm';
+import { Separator } from '@/components/ui/separator';
 
 
 export default function ProfileDisplay() {
-  const { user, userProfile, fetchUserProfile } = useAuth(); // Add user and fetchUserProfile
+  const { user, userProfile, fetchUserProfile } = useAuth();
   const { toast } = useToast();
   const [leavingTeam, setLeavingTeam] = useState(false);
 
@@ -54,11 +56,17 @@ export default function ProfileDisplay() {
     try {
       await leaveTeam(user.uid, userProfile.teamId, userProfile.currentSteps);
       toast({ title: 'Left Team', description: `You have left ${userProfile.teamName}.` });
-      await fetchUserProfile(user.uid); // Refresh profile data
+      await fetchUserProfile(user.uid); 
     } catch (error) {
       toast({ title: 'Error Leaving Team', description: (error as Error).message, variant: 'destructive' });
     } finally {
       setLeavingTeam(false);
+    }
+  };
+
+  const handleStepSubmit = async () => {
+    if (user) {
+      await fetchUserProfile(user.uid);
     }
   };
 
@@ -94,21 +102,34 @@ export default function ProfileDisplay() {
           <p className="text-muted-foreground">{userProfile.activityStatus || 'Not set'}</p>
         </div>
         
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold flex items-center"><Target className="mr-2 h-5 w-5 text-primary" />Step Goal</h3>
-          <p className="text-2xl font-bold text-primary">{userProfile.stepGoal?.toLocaleString() || 'Not set'} steps</p>
+        {/* Step Goal and Current Steps side-by-side */}
+        <div className="flex flex-col md:flex-row gap-6">
+            {/* Step Goal Section */}
+            <div className="md:w-1/3 space-y-2">
+              <h3 className="text-lg font-semibold flex items-center"><Target className="mr-2 h-5 w-5 text-primary" />Step Goal</h3>
+              <p className="text-2xl font-bold text-primary">{userProfile.stepGoal?.toLocaleString() || 'Not set'} steps</p>
+            </div>
+
+            {/* Current Steps Section */}
+            <div className="md:w-2/3 flex-grow space-y-2">
+              <h3 className="text-lg font-semibold flex items-center"><Footprints className="mr-2 h-5 w-5 text-primary" />Current Steps</h3>
+              <p className="text-4xl font-bold text-accent">{userProfile.currentSteps.toLocaleString()} steps</p>
+              {userProfile.stepGoal && userProfile.stepGoal > 0 && (
+                <>
+                  <Progress value={progressPercentage} className="w-full h-3 mt-2" />
+                  <p className="text-sm text-muted-foreground text-right">{Math.min(100, Math.round(progressPercentage))}% of your goal</p>
+                </>
+              )}
+            </div>
+        </div>
+        
+        <Separator className="my-6" />
+
+        <div>
+          <StepSubmissionForm onStepSubmit={handleStepSubmit} />
         </div>
 
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold flex items-center"><Footprints className="mr-2 h-5 w-5 text-primary" />Current Steps</h3>
-          <p className="text-4xl font-bold text-accent">{userProfile.currentSteps.toLocaleString()} steps</p>
-          {userProfile.stepGoal && (
-            <>
-              <Progress value={progressPercentage} className="w-full h-3 mt-2" />
-              <p className="text-sm text-muted-foreground text-right">{Math.min(100, Math.round(progressPercentage))}% of your goal</p>
-            </>
-          )}
-        </div>
+        <Separator className="my-6" />
 
         <div className="space-y-3">
           <h3 className="text-lg font-semibold flex items-center"><TeamIcon className="mr-2 h-5 w-5 text-primary" /> Team Information</h3>
@@ -137,7 +158,6 @@ export default function ProfileDisplay() {
             </div>
           )}
         </div>
-
 
         <div className="space-y-2">
           <h3 className="text-lg font-semibold flex items-center">
