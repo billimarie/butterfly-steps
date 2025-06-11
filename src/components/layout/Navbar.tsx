@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -13,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, Settings, LayoutDashboard, Gift } from 'lucide-react';
+import { User, LogOut, Settings, LayoutDashboard, Gift, Users } from 'lucide-react'; // Added Users for Teams
 
 export default function Navbar() {
   const { user, userProfile, logout, loading } = useAuth();
@@ -27,15 +28,18 @@ export default function Navbar() {
     <header className="bg-background/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
       <nav className="container mx-auto px-4 py-3 flex justify-between items-center">
         <Logo />
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2 md:space-x-4">
           {loading ? (
             <div className="h-8 w-20 bg-muted rounded animate-pulse"></div>
           ) : user ? (
             <>
-              <Button variant="ghost" asChild>
+              <Button variant="ghost" asChild className="hidden sm:inline-flex">
                 <Link href="/">Dashboard</Link>
               </Button>
-              <Button variant="ghost" asChild>
+              <Button variant="ghost" asChild className="hidden sm:inline-flex">
+                <Link href="/teams">Teams</Link>
+              </Button>
+              <Button variant="ghost" asChild className="hidden md:inline-flex">
                 <Link href="/invite">Generate Invite</Link>
               </Button>
               <DropdownMenu>
@@ -63,8 +67,11 @@ export default function Navbar() {
                   <DropdownMenuItem asChild>
                     <Link href="/profile"><User className="mr-2 h-4 w-4" />Profile</Link>
                   </DropdownMenuItem>
+                   <DropdownMenuItem asChild>
+                    <Link href="/teams"><Users className="mr-2 h-4 w-4" />Teams</Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/invite"><Gift className="mr-2 h-4 w-4" />Generate Invite</Link>
+                    <Link href="/invite"><Gift className="mr-2 h-4 w-4" />Invite Message</Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={logout}>
@@ -76,6 +83,9 @@ export default function Navbar() {
             </>
           ) : (
             <>
+              <Button variant="ghost" asChild>
+                <Link href="/feed">Our Steps</Link>
+              </Button>
               <Button variant="ghost" asChild>
                 <Link href="/login">Login</Link>
               </Button>

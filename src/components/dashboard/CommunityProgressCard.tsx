@@ -21,7 +21,7 @@ export default function CommunityProgressCard({ communityStats }: CommunityProgr
     <Card className="shadow-lg overflow-hidden">
       <div className="relative h-40">
         <Image 
-          src="https://placehold.co/600x240.png" 
+          src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1738520667/Donors/IMG_7534_jy4pvi.jpg" 
           alt="Monarch butterflies migrating" 
           layout="fill"
           objectFit="cover"

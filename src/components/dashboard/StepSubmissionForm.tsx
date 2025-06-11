@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -11,7 +12,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { submitSteps } from '@/lib/firebaseService';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Footprints } from 'lucide-react';
+import { PlusCircle, Footprints } from 'lucide-react'; // Removed Award as it's part of badge.icon
+import type { BadgeData } from '@/lib/badges';
+import { useRouter } from 'next/navigation';
+import { ToastAction } from "@/components/ui/toast";
 
 const stepSubmissionSchema = z.object({
   steps: z.preprocess(
@@ -30,6 +34,7 @@ export default function StepSubmissionForm({ onStepSubmit }: StepSubmissionFormP
   const { user, userProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
   const { register, handleSubmit, reset, formState: { errors } } = useForm<StepSubmissionFormInputs>({
     resolver: zodResolver(stepSubmissionSchema),
   });
@@ -41,10 +46,33 @@ export default function StepSubmissionForm({ onStepSubmit }: StepSubmissionFormP
     }
     setLoading(true);
     try {
-      await submitSteps(user.uid, data.steps);
+      const newlyAwardedBadges: BadgeData[] = await submitSteps(user.uid, data.steps);
       toast({ title: 'Steps Submitted!', description: `${data.steps.toLocaleString()} steps added to your total.` });
-      reset(); // Reset form after successful submission
-      onStepSubmit?.(); // Trigger data refresh
+      
+      if (newlyAwardedBadges && newlyAwardedBadges.length > 0) {
+        newlyAwardedBadges.forEach(badge => {
+          toast({ 
+            title: 'Badge Unlocked!', 
+            description: (
+              <div className="flex items-center">
+                <badge.icon className="mr-2 h-5 w-5 text-primary" />
+                <span>You've earned the "{badge.name}" badge!</span>
+              </div>
+            ),
+            action: (
+              <ToastAction
+                altText="View on Profile"
+                onClick={() => router.push('/profile')}
+              >
+                View on Profile
+              </ToastAction>
+            ),
+          });
+        });
+      }
+
+      reset(); 
+      onStepSubmit?.(); 
     } catch (error) {
       console.error('Step submission error:', error);
       toast({ title: 'Submission Failed', description: (error as Error).message || 'Could not submit steps. Please try again.', variant: 'destructive' });

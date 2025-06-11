@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -25,7 +26,11 @@ const signupSchema = z.object({
 
 type SignupFormInputs = z.infer<typeof signupSchema>;
 
-export default function SignupForm() {
+interface SignupFormProps {
+  invitedTeamId?: string | null;
+}
+
+export default function SignupForm({ invitedTeamId }: SignupFormProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -41,14 +46,18 @@ export default function SignupForm() {
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const firebaseUser = userCredential.user;
       
-      // Create user profile in Firestore
       await createUserProfile(firebaseUser, { displayName: data.displayName });
       
-      // Manually trigger profile fetch for AuthContext as onAuthStateChanged might be slow
       await fetchUserProfile(firebaseUser.uid);
 
       toast({ title: 'Account Created!', description: "Welcome to Monarch Miles! Let's set up your profile." });
-      router.push('/profile'); // Redirect to profile setup
+      
+      let profileRedirectUrl = '/profile';
+      if (invitedTeamId) {
+        profileRedirectUrl += `?invitedTeamId=${invitedTeamId}`;
+      }
+      router.push(profileRedirectUrl);
+
     } catch (error) {
       const authError = error as AuthError;
       console.error('Signup error:', authError);

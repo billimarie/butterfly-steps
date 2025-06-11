@@ -1,3 +1,4 @@
+
 'use client';
 
 import ProfileSetupForm from '@/components/profile/ProfileSetupForm';
@@ -9,10 +10,11 @@ import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 
 export default function ProfilePage() {
   const { user, userProfile, loading } = useAuth();
-  useAuthRedirect({ requireAuth: true }); // No need for requireProfileComplete here as this IS the profile page
+  useAuthRedirect({ requireAuth: true }); 
   
   const searchParams = useSearchParams();
   const editMode = searchParams.get('edit') === 'true';
+  const invitedTeamId = searchParams.get('invitedTeamId');
 
   if (loading || !user) {
     return (
@@ -34,7 +36,7 @@ export default function ProfilePage() {
 
   // If user is loaded, and (profile is not complete OR explicitly in edit mode)
   if (user && (!userProfile?.profileComplete || editMode)) {
-    return <ProfileSetupForm isUpdate={!!userProfile?.profileComplete && editMode} />;
+    return <ProfileSetupForm isUpdate={!!userProfile?.profileComplete && editMode} invitedTeamId={invitedTeamId} />;
   }
   
   // If profile is complete and not in edit mode
@@ -43,6 +45,5 @@ export default function ProfilePage() {
   }
   
   // Fallback, though ideally covered by loading state or redirection.
-  // This could happen if user exists, profile fetch failed or is in an unexpected state.
-  return <ProfileSetupForm isUpdate={false} />;
+  return <ProfileSetupForm isUpdate={false} invitedTeamId={invitedTeamId} />;
 }

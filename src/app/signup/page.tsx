@@ -1,12 +1,16 @@
+
 'use client';
 
 import SignupForm from '@/components/auth/SignupForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 import Logo from '@/components/ui/Logo';
+import { useSearchParams } from 'next/navigation';
 
 export default function SignupPage() {
   useAuthRedirect({ redirectIfAuthenticated: '/' });
+  const searchParams = useSearchParams();
+  const invitedTeamId = searchParams.get('teamInvite');
 
   return (
     <div className="flex min-h-[calc(100vh-15rem)] items-center justify-center py-12">
@@ -19,7 +23,7 @@ export default function SignupPage() {
           <CardDescription>Create your Monarch Miles account to start tracking your steps.</CardDescription>
         </CardHeader>
         <CardContent>
-          <SignupForm />
+          <SignupForm invitedTeamId={invitedTeamId} />
         </CardContent>
       </Card>
     </div>

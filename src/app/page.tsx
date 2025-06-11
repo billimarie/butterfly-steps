@@ -85,9 +85,31 @@ function Dashboard({ userProfile, initialCommunityStats }: { userProfile: UserPr
 }
 
 function LandingPage() {
+  const [communityStats, setCommunityStats] = useState<CommunityStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  const fetchLandingPageStats = useCallback(async () => {
+    setStatsLoading(true);
+    try {
+      const stats = await getCommunityStats();
+      setCommunityStats(stats);
+    } catch (error) {
+      console.error("Failed to fetch community stats for landing page:", error);
+      setCommunityStats(null);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLandingPageStats();
+  }, [fetchLandingPageStats]);
+
+  const communityProgressPercentage = communityStats ? (communityStats.totalSteps / 3_600_000) * 100 : 0;
+
   return (
-    <div className="text-center py-12">
-      <div className="relative w-full h-72 md:h-96 rounded-xl overflow-hidden shadow-2xl mb-12">
+    <div className="text-center py-12 space-y-12">
+      <div className="relative w-full h-72 md:h-96 rounded-xl overflow-hidden shadow-2xl">
         <Image 
             src="https://placehold.co/1200x400.png" 
             alt="Monarch butterflies on milkweed" 
@@ -106,7 +128,27 @@ function LandingPage() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-8 mb-12 text-left">
+      <div className="space-y-8 container mx-auto px-4">
+        <h2 className="text-4xl font-headline text-primary">Our Community's Journey</h2>
+        {statsLoading ? (
+          <div className="space-y-6">
+            <Skeleton className="h-56 w-full rounded-lg" />
+            <Skeleton className="h-24 w-full rounded-lg" />
+          </div>
+        ) : communityStats ? (
+          <div className="space-y-6">
+            <CommunityProgressCard communityStats={communityStats} />
+            <ButterflyAnimation progress={communityProgressPercentage} type="community" />
+          </div>
+        ) : (
+          <Card className="text-center">
+            <CardHeader><CardTitle className="font-headline">Community Progress Unavailable</CardTitle></CardHeader>
+            <CardContent><p className="text-muted-foreground">Could not load community progress at this time. Please check back later.</p></CardContent>
+          </Card>
+        )}
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-8 text-left container mx-auto px-4">
         <Card className="shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader>
                 <Footprints className="h-12 w-12 text-primary mb-3"/>
@@ -135,6 +177,23 @@ function LandingPage() {
             </CardContent>
         </Card>
       </div>
+      
+      <Card className="shadow-lg container mx-auto px-4 py-8 bg-card">
+        <CardHeader className="text-center">
+            <CardTitle className="font-headline text-3xl">Support the Monarchs</CardTitle>
+            <CardDescription>Your steps and sponsorships make a real difference for monarch butterfly conservation.</CardDescription>
+        </CardHeader>
+        <CardContent className="text-center">
+            <p className="mb-6 max-w-xl mx-auto">
+                Help ForEveryStarATree.org plant native milkweed and restore vital habitats for these beautiful creatures. Every contribution counts towards their survival.
+            </p>
+            <Button asChild size="lg">
+                <a href="https://foreveryStaratree.org/donate" target="_blank" rel="noopener noreferrer">
+                    <Gift className="mr-2 h-5 w-5"/> Donate to ForEveryStarATree.org
+                </a>
+            </Button>
+        </CardContent>
+      </Card>
 
       <div className="space-x-4">
         <Button size="lg" asChild>
@@ -142,6 +201,9 @@ function LandingPage() {
         </Button>
         <Button size="lg" variant="outline" asChild>
           <Link href="/login">Login</Link>
+        </Button>
+         <Button size="lg" variant="ghost" asChild>
+          <Link href="/feed">View Full Community Feed</Link>
         </Button>
       </div>
       <p className="mt-8 text-muted-foreground">
@@ -232,3 +294,4 @@ export default function HomePage() {
      return <LandingPage />;
   }
 }
+

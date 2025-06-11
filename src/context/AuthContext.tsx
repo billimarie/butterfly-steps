@@ -2,11 +2,11 @@
 'use client';
 
 import type { User as FirebaseUser, AuthError } from 'firebase/auth';
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import type { UserProfile } from '@/types';
-import { getUserProfile } from '@/lib/firebaseService'; // Will be created
+import { getUserProfile } from '@/lib/firebaseService';
 import { useRouter } from 'next/navigation';
 
 
@@ -29,6 +29,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<AuthError | null>(null);
   const router = useRouter();
 
+  const fetchUserProfile = useCallback(async (uid: string) => {
+    try {
+      const profileDataFromDb = await getUserProfile(uid);
+      if (profileDataFromDb) {
+        const validatedProfile: UserProfile = {
+          uid: profileDataFromDb.uid,
+          email: profileDataFromDb.email,
+          displayName: profileDataFromDb.displayName,
+          activityStatus: profileDataFromDb.activityStatus,
+          stepGoal: profileDataFromDb.stepGoal,
+          currentSteps: typeof profileDataFromDb.currentSteps === 'number' ? profileDataFromDb.currentSteps : 0,
+          profileComplete: !!profileDataFromDb.profileComplete,
+          inviteLink: profileDataFromDb.inviteLink,
+          badgesEarned: Array.isArray(profileDataFromDb.badgesEarned) ? profileDataFromDb.badgesEarned : [],
+          teamId: profileDataFromDb.teamId || null,
+          teamName: profileDataFromDb.teamName || null,
+        };
+        setUserProfile(validatedProfile);
+      } else {
+        setUserProfile(null);
+      }
+    } catch (e) {
+      console.error("Failed to fetch user profile:", e);
+      setUserProfile(null);
+    }
+  }, []);
+  
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
@@ -49,32 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, []);
-
-  const fetchUserProfile = async (uid: string) => {
-    try {
-      const profileDataFromDb = await getUserProfile(uid);
-      if (profileDataFromDb) {
-        // Ensure all required fields of UserProfile are present and correctly typed
-        const validatedProfile: UserProfile = {
-          uid: profileDataFromDb.uid,
-          email: profileDataFromDb.email,
-          displayName: profileDataFromDb.displayName,
-          activityStatus: profileDataFromDb.activityStatus,
-          stepGoal: profileDataFromDb.stepGoal,
-          currentSteps: typeof profileDataFromDb.currentSteps === 'number' ? profileDataFromDb.currentSteps : 0,
-          profileComplete: !!profileDataFromDb.profileComplete,
-          inviteLink: profileDataFromDb.inviteLink,
-        };
-        setUserProfile(validatedProfile);
-      } else {
-        setUserProfile(null);
-      }
-    } catch (e) {
-      console.error("Failed to fetch user profile:", e);
-      setUserProfile(null); // Explicitly set to null on error
-    }
-  };
+  }, [fetchUserProfile]);
   
   const setUserProfileState = (profile: UserProfile | null) => {
     setUserProfile(profile);
@@ -109,4 +111,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
