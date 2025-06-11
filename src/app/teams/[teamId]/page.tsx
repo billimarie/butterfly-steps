@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Users, Footprints, User as UserIcon, Crown, ShieldCheck, LogIn, LogOut, PlusCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import TeamMemberListItem from '@/components/teams/TeamMemberListItem';
+// import TeamMemberListItem from '@/components/teams/TeamMemberListItem'; // Included in TeamDetailsDisplay
 import TeamDetailsDisplay from '@/components/teams/TeamDetailsDisplay';
 
 
@@ -36,7 +36,7 @@ export default function TeamDetailsPage() {
         setTeam(fetchedTeam);
         if (fetchedTeam && fetchedTeam.memberUids.length > 0) {
           const fetchedMembers = await getTeamMembersProfiles(fetchedTeam.memberUids);
-          setMembers(fetchedMembers.sort((a,b) => b.currentSteps - a.currentSteps)); // Sort by steps desc
+          setMembers(fetchedMembers.sort((a,b) => b.currentSteps - a.currentSteps)); 
         } else {
           setMembers([]);
         }
@@ -48,16 +48,16 @@ export default function TeamDetailsPage() {
       }
     }
     loadTeamData();
-  }, [teamId, toast]);
+  }, [teamId, toast, userProfile]); // Added userProfile to dependency array
 
   const handleJoinTeam = async () => {
     if (!user || !userProfile || !team) return;
     setActionLoading(true);
     try {
-      await joinTeam(user.uid, team.id, userProfile.currentSteps);
-      toast({ title: 'Joined Team!', description: `You are now a member of ${team.name}.` });
-      await fetchUserProfile(user.uid); // Refresh auth context
-      // Re-fetch team data to update member list and total steps on this page
+      const result = await joinTeam(user.uid, team.id, userProfile.currentSteps);
+      toast({ title: 'Joined Team!', description: `You are now a member of ${result?.teamName || team.name}.` });
+      if(user?.uid) await fetchUserProfile(user.uid); 
+      
       const updatedTeam = await getTeam(team.id);
       setTeam(updatedTeam);
       if (updatedTeam) {
@@ -78,8 +78,8 @@ export default function TeamDetailsPage() {
     try {
       await leaveTeam(user.uid, team.id, userProfile.currentSteps);
       toast({ title: 'Left Team', description: `You have left ${team.name}.` });
-      await fetchUserProfile(user.uid); // Refresh auth context
-       // Re-fetch team data to update member list and total steps on this page
+      if(user?.uid) await fetchUserProfile(user.uid); 
+      
       const updatedTeam = await getTeam(team.id);
       setTeam(updatedTeam);
        if (updatedTeam) {
@@ -121,7 +121,7 @@ export default function TeamDetailsPage() {
   }
   
   const isUserMember = userProfile?.teamId === team.id;
-  const canJoin = user && userProfile && userProfile.teamId !== team.id; // User is logged in, profile exists, and not already on this team
+  const canJoin = user && userProfile && userProfile.profileComplete && userProfile.teamId !== team.id && !userProfile.teamId ;
   const isCreator = team.creatorUid === user?.uid;
 
 
@@ -130,7 +130,7 @@ export default function TeamDetailsPage() {
         team={team}
         members={members}
         isUserMember={isUserMember}
-        canJoin={canJoin}
+        canJoin={!!canJoin} // Ensure boolean
         isCreator={isCreator}
         onJoinTeam={handleJoinTeam}
         onLeaveTeam={handleLeaveTeam}

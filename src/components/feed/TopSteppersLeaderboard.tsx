@@ -47,8 +47,8 @@ export default function TopSteppersLeaderboard({ count }: TopSteppersLeaderboard
       <h2 className="text-3xl font-headline text-primary mb-6 text-center">Top Steppers</h2>
       {loadingTopUsers ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(Math.min(count, 3))].map((_, i) => ( // Show up to 3 skeletons initially
-            <Card key={i} className="shadow-lg">
+          {[...Array(Math.min(count, 3))].map((_, i) => ( 
+            <Card key={`skeleton-${i}`} className="shadow-lg">
               <CardHeader className="flex flex-row items-center space-x-3 pb-2">
                 <Skeleton className="h-10 w-10 rounded-full" />
                 <div className="space-y-1">

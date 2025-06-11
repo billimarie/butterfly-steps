@@ -9,8 +9,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 
 function ProfilePageSkeleton() {
-  // This skeleton is defined in the parent page for Suspense fallback
-  // but can be duplicated here if this component were to be used elsewhere without Suspense
   return (
     <div className="space-y-4 max-w-2xl mx-auto">
       <Skeleton className="h-12 w-1/2" />
@@ -34,21 +32,21 @@ export default function ProfilePageContent() {
   
   const searchParams = useSearchParams();
   const editMode = searchParams.get('edit') === 'true';
-  const invitedTeamId = searchParams.get('invitedTeamId');
+  // const invitedTeamId = searchParams.get('invitedTeamId'); // Read, but not passed down
 
   if (loading || !user) {
     return <ProfilePageSkeleton />;
   }
 
+  // invitedTeamId prop removed from ProfileSetupForm
   if (user && (!userProfile?.profileComplete || editMode)) {
-    return <ProfileSetupForm isUpdate={!!userProfile?.profileComplete && editMode} invitedTeamId={invitedTeamId} />;
+    return <ProfileSetupForm isUpdate={!!userProfile?.profileComplete && editMode} />;
   }
   
   if (userProfile?.profileComplete && !editMode) {
     return <ProfileDisplay />;
   }
   
-  // Default fallback, though useAuthRedirect should handle most cases.
-  // This can also be a redirect or a more specific message if needed.
-  return <ProfileSetupForm isUpdate={false} invitedTeamId={invitedTeamId} />;
+  // invitedTeamId prop removed from ProfileSetupForm
+  return <ProfileSetupForm isUpdate={false} />;
 }

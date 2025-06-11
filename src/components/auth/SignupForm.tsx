@@ -26,11 +26,8 @@ const signupSchema = z.object({
 
 type SignupFormInputs = z.infer<typeof signupSchema>;
 
-interface SignupFormProps {
-  invitedTeamId?: string | null;
-}
-
-export default function SignupForm({ invitedTeamId }: SignupFormProps) {
+// invitedTeamId prop removed
+export default function SignupForm() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -48,14 +45,10 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
       
       await createUserProfile(firebaseUser, { displayName: data.displayName });
       
-      await fetchUserProfile(firebaseUser.uid);
-
-      toast({ title: 'Account Created!', description: "Welcome to Mojave Monarch Challenge! Let's set up your profile." });
+      toast({ title: 'Account Created!', description: "Welcome to Monarch Miles! Let's set up your profile." });
       
-      let profileRedirectUrl = '/profile';
-      if (invitedTeamId) {
-        profileRedirectUrl += `?invitedTeamId=${invitedTeamId}`;
-      }
+      // Redirect URL no longer appends invitedTeamId
+      const profileRedirectUrl = '/profile';
       router.push(profileRedirectUrl);
 
     } catch (error) {

@@ -5,12 +5,12 @@ import SignupForm from '@/components/auth/SignupForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 import Logo from '@/components/ui/Logo';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation'; // Keep for potential future use, but not passed to SignupForm
 
 export default function SignupPageContent() {
   useAuthRedirect({ redirectIfAuthenticated: '/' });
   const searchParams = useSearchParams();
-  const invitedTeamId = searchParams.get('teamInvite');
+  // const invitedTeamId = searchParams.get('teamInvite'); // Read, but not passed down
 
   return (
     <div className="flex min-h-[calc(100vh-15rem)] items-center justify-center py-12">
@@ -23,7 +23,8 @@ export default function SignupPageContent() {
           <CardDescription>Create your Monarch Miles account to start tracking your steps.</CardDescription>
         </CardHeader>
         <CardContent>
-          <SignupForm invitedTeamId={invitedTeamId} />
+          {/* invitedTeamId prop removed from SignupForm */}
+          <SignupForm />
         </CardContent>
       </Card>
     </div>
