@@ -1,13 +1,15 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/AuthContext';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
+import StreakDisplayModal from '@/components/dashboard/StreakDisplayModal'; // Import the modal
 
 export const metadata: Metadata = {
-  title: 'Mojave Monarch Challenge',
-  description: 'Inspired by Monarch Joint Venture "Miles for Monarchs", the "Mojave Monarch Challenge" is a Steps Challenge for the Mojave Desert Butterfly Garden at ForEveryStarATree.org',
+  title: 'Monarch Miles',
+  description: 'Stepping For Monarchs Migration Challenge by ForEveryStarATree.org',
 };
 
 export default function RootLayout({
@@ -31,6 +33,7 @@ export default function RootLayout({
           </main>
           <Footer />
           <Toaster />
+          <StreakDisplayModal /> {/* Render the modal globally */}
         </AuthProvider>
       </body>
     </html>

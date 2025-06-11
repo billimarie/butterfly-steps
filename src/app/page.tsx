@@ -11,7 +11,7 @@ import CommunityProgressCard from '@/components/dashboard/CommunityProgressCard'
 import StepSubmissionForm from '@/components/dashboard/StepSubmissionForm';
 import ButterflyAnimation from '@/components/dashboard/ButterflyAnimation';
 import InteractiveMap from '@/components/dashboard/InteractiveMap';
-import StreakDisplay from '@/components/dashboard/StreakDisplay'; // Added import
+// StreakDisplay is now a global modal, remove import and usage here
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { getCommunityStats } from '@/lib/firebaseService';
@@ -31,7 +31,8 @@ function Dashboard({ userProfile, initialCommunityStats }: { userProfile: UserPr
     const stats = await getCommunityStats();
     setCommunityStats(stats);
     if (userProfile?.uid) {
-      await fetchUserProfile(userProfile.uid); // Will re-run streak logic if initialLogin flag is managed
+      // Pass false for initialLogin to prevent re-triggering modal on manual refresh
+      await fetchUserProfile(userProfile.uid, false); 
     }
   }, [userProfile?.uid, fetchUserProfile]);
 
@@ -47,7 +48,7 @@ function Dashboard({ userProfile, initialCommunityStats }: { userProfile: UserPr
   return (
     <div className="space-y-8">
       <CountdownTimer />
-      <StreakDisplay /> {/* Added StreakDisplay */}
+      {/* StreakDisplay component removed from here, it's now a global modal */}
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -246,7 +247,7 @@ export default function HomePage() {
         setCommunityStatsLoading(false);
       }
     } else {
-      setCommunityStatsLoading(false);
+      setCommunityStatsLoading(false); // No user or profile incomplete, so no specific dashboard stats to load
     }
   }, [user, userProfile?.profileComplete]);
 
@@ -275,11 +276,11 @@ export default function HomePage() {
         </div>
       );
     } else {
-      if (communityStatsLoading && !initialCommunityStats) { // Check initialCommunityStats as well
+      if (communityStatsLoading && !initialCommunityStats) { 
         return (
           <div className="space-y-8">
             <CountdownTimer />
-            <Skeleton className="h-40 w-full rounded-lg" /> {/* StreakDisplay Skeleton */}
+            {/* Skeleton for StreakDisplay removed as it's a modal now */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                     <Skeleton className="h-56 w-full rounded-lg" /> 

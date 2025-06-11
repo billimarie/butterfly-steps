@@ -40,3 +40,14 @@ export interface AppUser extends FirebaseUser {
   profile?: UserProfile;
 }
 
+export interface AuthContextType {
+  user: FirebaseUser | null;
+  userProfile: UserProfile | null;
+  loading: boolean;
+  error: AuthError | null;
+  logout: () => Promise<void>;
+  fetchUserProfile: (uid: string, initialLogin?: boolean) => Promise<void>; // Added optional initialLogin
+  setUserProfileState: (profile: UserProfile | null) => void;
+  showStreakModal: boolean;
+  setShowStreakModal: (show: boolean) => void;
+}
