@@ -59,9 +59,10 @@ type ProfileSetupFormInputs = z.infer<typeof profileSetupSchema>;
 
 interface ProfileSetupFormProps {
   isUpdate?: boolean;
+  invitedTeamId?: string | null;
 }
 
-export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormProps) {
+export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: ProfileSetupFormProps) {
   const { user, userProfile, fetchUserProfile, setUserProfileState } = useAuth();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -108,14 +109,24 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
         setValue('stepGoalOption', undefined);
         setValue('customStepGoal', undefined);
       }
-      if (userProfile.teamId) {
+      
+      if (invitedTeamId && !userProfile.teamId) {
+        setValue('teamAction', 'join');
+        setValue('joinTeamId', invitedTeamId);
+      } else if (userProfile.teamId) {
         setValue('teamAction', 'none'); 
+      } else {
+        setValue('teamAction', 'none');
       }
 
     } else if (user) {
         setValue('displayName', user.email?.split('@')[0] || '');
+        if (invitedTeamId) {
+            setValue('teamAction', 'join');
+            setValue('joinTeamId', invitedTeamId);
+        }
     }
-  }, [userProfile, user, setValue]);
+  }, [userProfile, user, setValue, invitedTeamId]);
 
 
   const onSubmit: SubmitHandler<ProfileSetupFormInputs> = async (data) => {
@@ -146,29 +157,31 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       let teamUpdate: { teamId: string | null; teamName: string | null } = { teamId: userProfile?.teamId || null, teamName: userProfile?.teamName || null };
       let awardedTeamBadgeData: BadgeData | undefined = undefined;
 
-      if (data.teamAction === 'create' && data.newTeamName && !userProfile?.teamId) {
-        const result = await createTeam(user.uid, data.newTeamName, currentSteps);
-        teamUpdate = { teamId: result.teamId, teamName: result.teamName };
-        awardedTeamBadgeData = result.awardedTeamBadge;
-        toast({ title: 'Team Created!', description: `You've created and joined "${result.teamName}".` });
-      } else if (data.teamAction === 'join' && data.joinTeamId && !userProfile?.teamId) {
-        const result = await joinTeam(user.uid, data.joinTeamId, currentSteps);
-        if (result) {
-            teamUpdate = { teamId: result.teamId, teamName: result.teamName };
-            awardedTeamBadgeData = result.awardedTeamBadge;
-            toast({ title: 'Team Joined!', description: `You've joined "${result.teamName}".` });
-        } else {
-            toast({ title: 'Failed to join team', description: 'Please check the Team ID and try again.', variant: 'destructive'});
-            setLoading(false);
-            return;
+      // Handle team action only if the user is not already on a team OR they are leaving their current team (handled by handleLeaveTeam separately)
+      // The main scenario here is for new users or users not on a team yet.
+      if (!userProfile?.teamId) {
+        if (data.teamAction === 'create' && data.newTeamName) {
+          const result = await createTeam(user.uid, data.newTeamName, currentSteps);
+          teamUpdate = { teamId: result.teamId, teamName: result.teamName };
+          awardedTeamBadgeData = result.awardedTeamBadge;
+          toast({ title: 'Team Created!', description: `You've created and joined "${result.teamName}".` });
+        } else if (data.teamAction === 'join' && data.joinTeamId) {
+          const result = await joinTeam(user.uid, data.joinTeamId, currentSteps);
+          if (result) {
+              teamUpdate = { teamId: result.teamId, teamName: result.teamName };
+              awardedTeamBadgeData = result.awardedTeamBadge;
+              toast({ title: 'Team Joined!', description: `You've joined "${result.teamName}".` });
+          } else {
+              toast({ title: 'Failed to join team', description: 'Please check the Team ID and try again.', variant: 'destructive'});
+              setLoading(false);
+              return;
+          }
         }
       }
       
       profileUpdateData.teamId = teamUpdate.teamId;
       profileUpdateData.teamName = teamUpdate.teamName;
-      // If a team badge was awarded, ensure it's included in the profile update
-      // This is now handled within createTeam/joinTeam directly writing to user profile badges.
-
+      
       await updateUserProfile(user.uid, profileUpdateData);
       
       if (!isUpdate && !userProfile?.profileComplete) { 
@@ -177,9 +190,7 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       
       const updatedFullProfile = await getUserProfile(user.uid);
       if (updatedFullProfile) {
-        setUserProfileState(updatedFullProfile); // This ensures AuthContext has the latest badges
-        // Check if the team badge was newly awarded by comparing with initial profile state
-        // This is a bit tricky if the component re-renders. The createTeam/joinTeam return is more reliable.
+        setUserProfileState(updatedFullProfile); 
         if (awardedTeamBadgeData) {
              const badge = awardedTeamBadgeData;
              toast({
@@ -218,6 +229,9 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
     try {
       await leaveTeam(user.uid, userProfile.teamId, userProfile.currentSteps);
       toast({ title: 'Left Team', description: `You have left ${userProfile.teamName}.` });
+      setValue('teamAction', 'none'); // Reset team action selection
+      setValue('joinTeamId', '');
+      setValue('newTeamName','');
       await fetchUserProfile(user.uid); 
     } catch (error) {
       toast({ title: 'Error Leaving Team', description: (error as Error).message, variant: 'destructive' });
@@ -351,7 +365,18 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
                   control={control}
                   render={({ field }) => (
                     <RadioGroup
-                      onValueChange={(value) => field.onChange(value as 'none' | 'create' | 'join')}
+                      onValueChange={(value) => {
+                        field.onChange(value as 'none' | 'create' | 'join');
+                         if (value === 'join' && invitedTeamId) {
+                            setValue('joinTeamId', invitedTeamId);
+                        } else if (value !== 'join') {
+                            // Clear invitedTeamId from field if user chooses 'none' or 'create'
+                            // This ensures if they switch away from a pre-filled invite, it doesn't stick.
+                            if (field.value === 'join' && watch('joinTeamId') === invitedTeamId) {
+                                setValue('joinTeamId', '');
+                            }
+                        }
+                      }}
                       value={field.value}
                       className="space-y-2"
                     >
@@ -389,10 +414,23 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
                      <Controller
                         name="joinTeamId"
                         control={control}
-                        render={({ field }) => <Input id="joinTeamId" placeholder="Enter Team ID" {...field} />}
+                        render={({ field }) => (
+                            <Input 
+                                id="joinTeamId" 
+                                placeholder="Enter Team ID" 
+                                {...field} 
+                                readOnly={!!(invitedTeamId && field.value === invitedTeamId)}
+                                className={!!(invitedTeamId && field.value === invitedTeamId) ? "bg-muted/50" : ""}
+                            />
+                        )}
                     />
                     {errors.joinTeamId && <p className="text-sm text-destructive">{errors.joinTeamId.message}</p>}
-                    <p className="text-xs text-muted-foreground">Ask the team creator for the Team ID.</p>
+                    {invitedTeamId && watch('joinTeamId') === invitedTeamId && (
+                        <p className="text-xs text-muted-foreground">Joining team from invite. You can choose a different action if you wish.</p>
+                    )}
+                    {!invitedTeamId && selectedTeamAction === 'join' && (
+                         <p className="text-xs text-muted-foreground">Ask the team creator for the Team ID.</p>
+                    )}
                   </div>
                 )}
               </>
