@@ -212,7 +212,7 @@ function LandingPage() {
         </Button>
       </div>
       <p className="mt-8 text-muted-foreground">
-        A fundraising initiative by <a href="https://foreveryStaratree.org" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">ForEveryStarATree.org</a>.
+        "Butterfly Steps" is a fundraising initiative by the nonprofit ecofarm, <a href="https://foreveryStaratree.org" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">For Every Star, A Tree</a>. It was inspired by Pollinator Partnership's Pollinator Week as well as Monarch Joint Venture's Miles for Monarchs.
       </p>
     </div>
   );

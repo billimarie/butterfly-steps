@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { getAllTeams, getTeamMembersProfiles } from '@/lib/firebaseService'; // Updated import
+import { getAllTeams, getTeamMembersProfiles } from '@/lib/firebaseService';
 import type { Team, UserProfile } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -20,6 +20,7 @@ export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [creatorProfiles, setCreatorProfiles] = useState<Record<string, UserProfile | undefined>>({});
   const [loading, setLoading] = useState(true);
+  const [showJoinForm, setShowJoinForm] = useState(false); // State to toggle join form
   const { toast } = useToast();
   const router = useRouter();
 
@@ -28,15 +29,15 @@ export default function TeamsPage() {
       setLoading(true);
       try {
         const fetchedTeams = await getAllTeams();
-        setTeams(fetchedTeams);
+        setTeams(fetchedTeams); // Already ordered by totalSteps desc from firebaseService
 
         if (fetchedTeams.length > 0) {
-          const creatorUids = Array.from(new Set(fetchedTeams.map(team => team.creatorUid)));
+          const creatorUids = Array.from(new Set(fetchedTeams.map(team => team.creatorUid).filter(uid => !!uid)));
           if (creatorUids.length > 0) {
             const profiles = await getTeamMembersProfiles(creatorUids);
             const profilesMap: Record<string, UserProfile | undefined> = {};
             profiles.forEach(profile => {
-              profilesMap[profile.uid] = profile;
+              if (profile) profilesMap[profile.uid] = profile;
             });
             setCreatorProfiles(profilesMap);
           }
@@ -80,38 +81,42 @@ export default function TeamsPage() {
             Join an existing team or create your own to track progress together!
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           {!userProfile?.teamId ? (
-            <>
-             <div className="p-4 border rounded-lg bg-card">
-                 <h3 className="text-xl font-semibold mb-3">Create a New Team</h3>
-                 <p className="text-muted-foreground mb-3">Start a new journey with your friends or colleagues.</p>
-                <Button asChild>
-                    <Link href="/teams/create">
-                    <PlusCircle className="mr-2 h-5 w-5" /> Create New Team
-                    </Link>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button asChild className="flex-1">
+                <Link href="/teams/create">
+                  <PlusCircle className="mr-2 h-5 w-5" /> Create New Team
+                </Link>
+              </Button>
+              
+              {!showJoinForm ? (
+                <Button onClick={() => setShowJoinForm(true)} className="flex-1">
+                  <LogIn className="mr-2 h-4 w-4" /> Join an Existing Team
                 </Button>
-             </div>
-             <div className="p-4 border rounded-lg bg-card">
-                <h3 className="text-xl font-semibold mb-3">Join an Existing Team</h3>
-                <JoinTeamForm
+              ) : (
+                <div className="flex-1 p-4 border rounded-lg bg-card">
+                  <h3 className="text-xl font-semibold mb-3">Enter Team ID to Join</h3>
+                  <JoinTeamForm
                     onTeamJoined={async () => {
-                        await fetchUserProfile(user.uid); 
-                        router.refresh(); 
+                      if (user?.uid) await fetchUserProfile(user.uid);
+                      setShowJoinForm(false); // Hide form after successful join
+                      router.refresh(); 
                     }}
-                />
-             </div>
-            </>
+                  />
+                  <Button variant="outline" onClick={() => setShowJoinForm(false)} className="mt-2 w-full">
+                    Cancel
+                  </Button>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="p-4 border rounded-lg bg-accent/20 text-center">
               <p className="text-lg">
                 You are currently part of team: <strong className="text-accent-foreground">{userProfile.teamName}</strong>
               </p>
-              <Button asChild variant="link" className="mt-1">
+              <Button asChild variant="outline" size="sm" className="mt-1">
                 <Link href={`/teams/${userProfile.teamId}`}>View Your Team</Link>
-              </Button>
-               <Button asChild variant="outline" size="sm" className="mt-2 ml-2">
-                <Link href="/profile?edit=true">Manage Team Membership (Leave)</Link>
               </Button>
             </div>
           )}
