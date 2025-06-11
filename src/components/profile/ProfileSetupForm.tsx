@@ -126,7 +126,7 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
             setValue('joinTeamId', invitedTeamId);
         }
     }
-  }, [userProfile, user, setValue, invitedTeamId]);
+  }, [user, userProfile, setValue, invitedTeamId]);
 
 
   const onSubmit: SubmitHandler<ProfileSetupFormInputs> = async (data) => {
@@ -154,11 +154,14 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
     };
 
     try {
-      let teamUpdate: { teamId: string | null; teamName: string | null } = { teamId: userProfile?.teamId || null, teamName: userProfile?.teamName || null };
+      let teamUpdate: { teamId: string | null; teamName: string | null } = { 
+        teamId: userProfile?.teamId || null, 
+        teamName: userProfile?.teamName || null 
+      };
       let awardedTeamBadgeData: BadgeData | undefined = undefined;
 
-      // Handle team action only if the user is not already on a team OR they are leaving their current team (handled by handleLeaveTeam separately)
-      // The main scenario here is for new users or users not on a team yet.
+      // Handle team action logic
+      // This condition allows joining/creating a team if the user is not currently on one.
       if (!userProfile?.teamId) {
         if (data.teamAction === 'create' && data.newTeamName) {
           const result = await createTeam(user.uid, data.newTeamName, currentSteps);
@@ -172,9 +175,10 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
               awardedTeamBadgeData = result.awardedTeamBadge;
               toast({ title: 'Team Joined!', description: `You've joined "${result.teamName}".` });
           } else {
-              toast({ title: 'Failed to join team', description: 'Please check the Team ID and try again.', variant: 'destructive'});
+              // joinTeam returns null if team ID is invalid or other specific handled failures
+              toast({ title: 'Failed to join team', description: 'Please check the Team ID and try again, or the team may no longer exist.', variant: 'destructive'});
               setLoading(false);
-              return;
+              return; // Stop processing if join failed expectedly
           }
         }
       }
@@ -182,16 +186,23 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
       profileUpdateData.teamId = teamUpdate.teamId;
       profileUpdateData.teamName = teamUpdate.teamName;
       
+      // If a team badge was awarded, ensure it's part of the profile update
+      if (awardedTeamBadgeData && !profileUpdateData.badgesEarned?.includes(awardedTeamBadgeData.id)) {
+        profileUpdateData.badgesEarned = [...(profileUpdateData.badgesEarned || []), awardedTeamBadgeData.id];
+      }
+      
       await updateUserProfile(user.uid, profileUpdateData);
       
       if (!isUpdate && !userProfile?.profileComplete) { 
         await incrementParticipantCount();
       }
       
+      // Fetch the latest profile to update context, including potentially new team info and badges
       const updatedFullProfile = await getUserProfile(user.uid);
       if (updatedFullProfile) {
         setUserProfileState(updatedFullProfile); 
-        if (awardedTeamBadgeData) {
+        // Display badge toast only if it was awarded in this transaction and not for other reasons
+        if (awardedTeamBadgeData) { 
              const badge = awardedTeamBadgeData;
              toast({
                 title: 'Badge Unlocked!',
@@ -215,7 +226,7 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
 
       toast({ title: 'Profile Updated!', description: 'Your Monarch Miles profile is ready.' });
       router.push('/');
-    } catch (error) {
+    } catch (error) { // This catches errors from createTeam, joinTeam (if they throw), updateUserProfile, etc.
       console.error('Profile update/team action error:', error);
       toast({ title: 'Update Failed', description: (error as Error).message || 'Could not update profile or team. Please try again.', variant: 'destructive' });
     } finally {
@@ -229,10 +240,11 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
     try {
       await leaveTeam(user.uid, userProfile.teamId, userProfile.currentSteps);
       toast({ title: 'Left Team', description: `You have left ${userProfile.teamName}.` });
-      setValue('teamAction', 'none'); // Reset team action selection
+      // Reset team-related form fields as user is no longer on a team
+      setValue('teamAction', 'none'); 
       setValue('joinTeamId', '');
       setValue('newTeamName','');
-      await fetchUserProfile(user.uid); 
+      await fetchUserProfile(user.uid); // Refresh context userProfile which will re-trigger useEffect
     } catch (error) {
       toast({ title: 'Error Leaving Team', description: (error as Error).message, variant: 'destructive' });
     } finally {
@@ -365,19 +377,31 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
                   control={control}
                   render={({ field }) => (
                     <RadioGroup
-                      onValueChange={(value) => {
-                        field.onChange(value as 'none' | 'create' | 'join');
-                         if (value === 'join' && invitedTeamId) {
+                      onValueChange={(newTeamActionValue) => {
+                        field.onChange(newTeamActionValue as 'none' | 'create' | 'join');
+                        
+                        if (newTeamActionValue === 'join') {
+                          // If user selects 'join', and there was an original invite,
+                          // ensure the joinTeamId field is (re)set to that invite.
+                          // User can still manually type if no invite was present.
+                          if (invitedTeamId) {
                             setValue('joinTeamId', invitedTeamId);
-                        } else if (value !== 'join') {
-                            // Clear invitedTeamId from field if user chooses 'none' or 'create'
-                            // This ensures if they switch away from a pre-filled invite, it doesn't stick.
-                            if (field.value === 'join' && watch('joinTeamId') === invitedTeamId) {
-                                setValue('joinTeamId', '');
-                            }
+                          }
+                        } else {
+                          // If user selects 'create' or 'none',
+                          // and if the joinTeamId field currently holds the invitedTeamId, clear it.
+                          // This means they are opting out of the specific invite.
+                          if (watch('joinTeamId') === invitedTeamId) {
+                            setValue('joinTeamId', '');
+                          }
+                        }
+                        // If 'create' is selected, newTeamName field is separate and not cleared here.
+                        // If 'none' is selected, newTeamName should also be cleared if it was from a previous 'create' thought.
+                        if (newTeamActionValue !== 'create') {
+                            setValue('newTeamName', '');
                         }
                       }}
-                      value={field.value}
+                      value={field.value} // This is the current value from RHF state
                       className="space-y-2"
                     >
                       <div className="flex items-center space-x-2">
@@ -446,3 +470,4 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
     </Card>
   );
 }
+
