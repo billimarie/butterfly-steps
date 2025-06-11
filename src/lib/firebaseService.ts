@@ -2,6 +2,7 @@
 import { db } from './firebase';
 import {
   doc,
+  documentId, // Added documentId
   getDoc,
   setDoc,
   updateDoc,
@@ -33,16 +34,22 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) {
     const data = docSnap.data();
-    const badgesEarned = Array.isArray(data.badgesEarned) ? data.badgesEarned : [];
+    // Ensure all fields are correctly typed and defaulted if necessary
     return {
-      ...data,
-      uid,
-      badgesEarned,
+      uid: docSnap.id, // Use document ID as the canonical UID
+      email: data.email || null,
+      displayName: data.displayName || null,
+      activityStatus: data.activityStatus || null,
+      stepGoal: data.stepGoal || null,
+      currentSteps: typeof data.currentSteps === 'number' ? data.currentSteps : 0,
+      profileComplete: !!data.profileComplete,
+      inviteLink: data.inviteLink, // Can be undefined
+      badgesEarned: Array.isArray(data.badgesEarned) ? data.badgesEarned : [],
       teamId: data.teamId || null,
       teamName: data.teamName || null,
-      currentStreak: data.currentStreak || 0,
+      currentStreak: typeof data.currentStreak === 'number' ? data.currentStreak : 0,
       lastStreakLoginDate: data.lastStreakLoginDate || null,
-      lastLoginTimestamp: data.lastLoginTimestamp || null,
+      lastLoginTimestamp: data.lastLoginTimestamp instanceof Timestamp ? data.lastLoginTimestamp : null,
     } as UserProfile;
   }
   return null;
@@ -51,7 +58,7 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 export async function createUserProfile(firebaseUser: FirebaseUser, additionalData: Partial<UserProfile> = {}): Promise<UserProfile> {
   const userProfileRef = doc(db, USERS_COLLECTION, firebaseUser.uid);
   const profileData: UserProfile = {
-    uid: firebaseUser.uid,
+    uid: firebaseUser.uid, // This field is stored in the document
     email: firebaseUser.email,
     displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Anonymous User',
     activityStatus: null,
@@ -68,12 +75,18 @@ export async function createUserProfile(firebaseUser: FirebaseUser, additionalDa
     ...additionalData,
   };
   await setDoc(userProfileRef, profileData);
-  return profileData;
+  // Return a fully constructed UserProfile, using the doc ID as the canonical uid
+  return {
+    ...profileData, // contains the 'uid' field from above
+    uid: firebaseUser.uid, // Explicitly ensure the returned object's uid is the doc ID
+  };
 }
 
 export async function updateUserProfile(uid: string, data: Partial<UserProfile>): Promise<void> {
   const userRef = doc(db, USERS_COLLECTION, uid);
-  await setDoc(userRef, data, { merge: true });
+  // Prepare data for update, ensuring the 'uid' field within the document is also updated to match the document ID.
+  const updatePayload = { ...data, uid: uid };
+  await setDoc(userRef, updatePayload, { merge: true });
 }
 
 export async function updateUserStreakOnLogin(uid: string): Promise<{
@@ -93,7 +106,8 @@ export async function updateUserStreakOnLogin(uid: string): Promise<{
          transaction.set(userRef, {
             currentStreak: 1,
             lastStreakLoginDate: todayDateString,
-            lastLoginTimestamp: Timestamp.fromDate(now)
+            lastLoginTimestamp: Timestamp.fromDate(now),
+            uid: uid // ensure uid field is set if creating new
         }, { merge: true });
         return {
             updatedStreakCount: 1,
@@ -124,31 +138,34 @@ export async function updateUserStreakOnLogin(uid: string): Promise<{
           newStreakCount = currentStreak + 1;
           newLastStreakLoginDate = todayDateString;
         } else if (diffDays === 0) {
-          newStreakCount = currentStreak;
-          newLastStreakLoginDate = todayDateString;
+          // Already logged in today and streak counted
+          newStreakCount = currentStreak; 
+          newLastStreakLoginDate = todayDateString; // Keep it as today
         } else if (diffDays > 1) {
-          if (lastLoginFirestoreTimestamp) {
+          // Check grace period only if more than 1 calendar day missed
+          if (lastLoginFirestoreTimestamp && lastLoginFirestoreTimestamp instanceof Timestamp) {
             const lastLoginActualTime = lastLoginFirestoreTimestamp.toDate().getTime();
             const currentTime = now.getTime();
             const hoursSinceLastLogin = (currentTime - lastLoginActualTime) / (1000 * 60 * 60);
 
-            if (hoursSinceLastLogin < 47.99) {
+            if (hoursSinceLastLogin < 47.99) { // within grace period
               newStreakCount = currentStreak + 1;
               newLastStreakLoginDate = todayDateString;
-            } else {
+            } else { // grace period missed
               newStreakCount = 1;
               newLastStreakLoginDate = todayDateString;
             }
-          } else {
+          } else { // No last login timestamp, treat as fresh start for streak
             newStreakCount = 1;
             newLastStreakLoginDate = todayDateString;
           }
-        } else {
+        } else { // Edge case (e.g. date from future? system clock changed?) - reset streak
           newStreakCount = 1;
           newLastStreakLoginDate = todayDateString;
         }
       }
 
+      // If streak was 0, and they log in, it should become 1.
       if (newStreakCount === 0 && newLastStreakLoginDate === todayDateString) {
           newStreakCount = 1;
       }
@@ -173,7 +190,7 @@ export async function updateUserStreakOnLogin(uid: string): Promise<{
     return {
         updatedStreakCount: fallbackProfile?.currentStreak || 0,
         updatedLastStreakLoginDate: fallbackProfile?.lastStreakLoginDate || null,
-        updatedLastLoginTimestamp: fallbackProfile?.lastLoginTimestamp || Timestamp.fromDate(now),
+        updatedLastLoginTimestamp: fallbackProfile?.lastLoginTimestamp instanceof Timestamp ? fallbackProfile.lastLoginTimestamp : Timestamp.fromDate(now),
     };
   }
 }
@@ -221,7 +238,14 @@ export async function submitSteps(uid: string, steps: number): Promise<BadgeData
     if (!userDocSnap.exists()) {
       throw new Error("User profile does not exist.");
     }
-    userProfileDataBeforeUpdate = userDocSnap.data() as UserProfile;
+    const data = userDocSnap.data();
+    userProfileDataBeforeUpdate = { 
+        ...data, 
+        uid: userDocSnap.id, // Ensure uid is doc.id
+        currentSteps: typeof data.currentSteps === 'number' ? data.currentSteps : 0,
+        badgesEarned: Array.isArray(data.badgesEarned) ? data.badgesEarned : [],
+    } as UserProfile;
+
 
     const communityStatsSnap = await transaction.get(communityStatsRef);
 
@@ -245,7 +269,7 @@ export async function submitSteps(uid: string, steps: number): Promise<BadgeData
     }
   });
 
-  const updatedUserProfile = await getUserProfile(uid);
+  const updatedUserProfile = await getUserProfile(uid); 
   if (!updatedUserProfile || typeof updatedUserProfile.currentSteps !== 'number') {
     console.error("Failed to get updated user profile or currentSteps after step submission.");
     return [];
@@ -287,7 +311,7 @@ export async function createTeam(creatorUserId: string, teamName: string, creato
     if (!userProfileSnap.exists()) {
       throw new Error("User profile not found for createTeam operation.");
     }
-    const userProfileData = userProfileSnap.data() as UserProfile;
+    const userProfileData = { ...userProfileSnap.data(), uid: userProfileSnap.id } as UserProfile;
 
     if (userProfileData?.teamId) {
       throw new Error("User is already in a team. Please leave the current team before creating a new one.");
@@ -308,7 +332,9 @@ export async function createTeam(creatorUserId: string, teamName: string, creato
       userProfileUpdates.badgesEarned = [...currentBadges, 'team-player'];
       awardedTeamBadge = getBadgeDataById('team-player');
     }
+    
     transaction.update(userProfileDocRef, userProfileUpdates);
+
 
     return { teamId: newTeamDocRef.id, teamName: teamName, awardedTeamBadge };
   });
@@ -324,7 +350,7 @@ export async function joinTeam(userId: string, teamIdToJoin: string, userCurrent
     if (!userProfileSnap.exists()) {
       throw new Error("User profile not found for joinTeam operation.");
     }
-    const userProfileData = userProfileSnap.data() as UserProfile;
+    const userProfileData = { ...userProfileSnap.data(), uid: userProfileSnap.id } as UserProfile;
 
     const newTeamSnap = await transaction.get(newTeamDocRef);
     if (!newTeamSnap.exists()) {
@@ -342,14 +368,14 @@ export async function joinTeam(userId: string, teamIdToJoin: string, userCurrent
       if (oldTeamSnap.exists()) {
         transaction.update(oldTeamDocRef, {
           memberUids: arrayRemove(userId),
-          totalSteps: increment(-userProfileData.currentSteps),
+          totalSteps: increment(-(userProfileData.currentSteps || 0)),
         });
       }
     }
 
     transaction.update(newTeamDocRef, {
       memberUids: arrayUnion(userId),
-      totalSteps: increment(userProfileData.currentSteps),
+      totalSteps: increment(userProfileData.currentSteps || 0),
     });
 
     const currentBadges = userProfileData.badgesEarned || [];
@@ -359,6 +385,7 @@ export async function joinTeam(userId: string, teamIdToJoin: string, userCurrent
        userProfileUpdates.badgesEarned = [...currentBadges, 'team-player'];
        awardedTeamBadge = getBadgeDataById('team-player');
     }
+    
     transaction.update(userDocRef, userProfileUpdates);
 
     return { teamId: teamIdToJoin, teamName: newTeamData.name, awardedTeamBadge };
@@ -372,7 +399,7 @@ export async function leaveTeam(userId: string, teamId: string, userCurrentSteps
   await runTransaction(db, async (transaction) => {
     const userSnap = await transaction.get(userDocRef);
     if (!userSnap.exists()) throw new Error("User not found for leaveTeam.");
-    const userData = userSnap.data() as UserProfile;
+    const userData = { ...userSnap.data(), uid: userSnap.id } as UserProfile;
 
     const teamSnap = await transaction.get(teamDocRef);
     if (!teamSnap.exists()) {
@@ -412,14 +439,33 @@ export async function getTeamMembersProfiles(memberUids: string[]): Promise<User
   if (!memberUids || memberUids.length === 0) return [];
 
   const profiles: UserProfile[] = [];
-  const CHUNK_SIZE = 30;
+  const CHUNK_SIZE = 30; 
   for (let i = 0; i < memberUids.length; i += CHUNK_SIZE) {
       const chunk = memberUids.slice(i, i + CHUNK_SIZE);
       if (chunk.length > 0) {
         const usersRef = collection(db, USERS_COLLECTION);
-        const q = query(usersRef, where('uid', 'in', chunk));
+        // Query by document ID directly, which is more robust.
+        const q = query(usersRef, where(documentId(), 'in', chunk));
         const querySnapshot = await getDocs(q);
-        querySnapshot.docs.forEach(doc => profiles.push(doc.data() as UserProfile));
+        querySnapshot.docs.forEach(docSnap => {
+            const data = docSnap.data();
+            profiles.push({
+                uid: docSnap.id, // Use the document ID as the canonical UserProfile.uid
+                email: data.email || null,
+                displayName: data.displayName || null,
+                activityStatus: data.activityStatus || null,
+                stepGoal: data.stepGoal || null,
+                currentSteps: typeof data.currentSteps === 'number' ? data.currentSteps : 0,
+                profileComplete: !!data.profileComplete,
+                inviteLink: data.inviteLink,
+                badgesEarned: Array.isArray(data.badgesEarned) ? data.badgesEarned : [],
+                teamId: data.teamId || null,
+                teamName: data.teamName || null,
+                currentStreak: typeof data.currentStreak === 'number' ? data.currentStreak : 0,
+                lastStreakLoginDate: data.lastStreakLoginDate || null,
+                lastLoginTimestamp: data.lastLoginTimestamp instanceof Timestamp ? data.lastLoginTimestamp : null,
+            } as UserProfile);
+        });
       }
   }
   return profiles;
@@ -439,13 +485,13 @@ export async function getTopUsers(count: number): Promise<UserProfile[]> {
       stepGoal: data.stepGoal || null,
       currentSteps: typeof data.currentSteps === 'number' ? data.currentSteps : 0,
       profileComplete: !!data.profileComplete,
-      inviteLink: data.inviteLink, // Can be undefined
+      inviteLink: data.inviteLink, 
       badgesEarned: Array.isArray(data.badgesEarned) ? data.badgesEarned : [],
       teamId: data.teamId || null,
       teamName: data.teamName || null,
       currentStreak: typeof data.currentStreak === 'number' ? data.currentStreak : 0,
       lastStreakLoginDate: data.lastStreakLoginDate || null,
-      lastLoginTimestamp: data.lastLoginTimestamp || null, // This is a Firestore Timestamp
+      lastLoginTimestamp: data.lastLoginTimestamp instanceof Timestamp ? data.lastLoginTimestamp : null,
     } as UserProfile;
   });
 }

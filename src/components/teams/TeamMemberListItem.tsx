@@ -28,7 +28,6 @@ export default function TeamMemberListItem({ member, isCreator }: TeamMemberList
             {member.displayName || 'Unnamed User'}
             {isCreator && <Crown className="ml-2 h-4 w-4 text-yellow-500" titleAccess="Team Creator"/>}
           </p>
-          <p className="text-xs text-muted-foreground">UID: ...{member.uid.slice(-6)}</p>
         </div>
       </div>
       <div className="flex items-center text-sm">
