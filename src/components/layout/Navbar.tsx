@@ -84,9 +84,6 @@ export default function Navbar() {
           ) : (
             <>
               <Button variant="ghost" asChild>
-                <Link href="/feed">Our Steps</Link>
-              </Button>
-              <Button variant="ghost" asChild>
                 <Link href="/login">Login</Link>
               </Button>
               <Button asChild>

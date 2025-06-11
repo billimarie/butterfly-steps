@@ -8,8 +8,8 @@ import Footer from '@/components/layout/Footer';
 import StreakDisplayModal from '@/components/dashboard/StreakDisplayModal'; // Import the modal
 
 export const metadata: Metadata = {
-  title: 'Monarch Miles',
-  description: 'Stepping For Monarchs Migration Challenge by ForEveryStarATree.org',
+  title: 'Butterfly Steps',
+  description: 'Butterfly Steps is a fundraising walking challenge by the nonprofit ecofarm, For Every Star, A Tree.',
 };
 
 export default function RootLayout({

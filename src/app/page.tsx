@@ -111,27 +111,40 @@ function LandingPage() {
   }, [fetchLandingPageStats]);
 
   return (
-    <div className="text-center py-12 space-y-12">
-      <div className="relative w-full h-72 md:h-96 rounded-xl overflow-hidden shadow-2xl">
-        <Image
-            src="https://placehold.co/1200x400.png"
-            alt="Monarch butterflies on milkweed"
-            layout="fill"
-            objectFit="cover"
-            data-ai-hint="monarch butterfly milkweed"
-            priority
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex flex-col items-center justify-end p-8">
-            <h1 className="font-headline text-5xl md:text-7xl font-bold text-white mb-4">
-                Monarch Miles
+    <div className="text-center pb-12 space-b-12">
+      <div className="relative w-full h-screen justify-center items-center flex">
+        <div className="mx-auto p-8 relative z-10 mb-24">
+            <h1 className="text-5xl p-4 text-center font-bold from-orange-700 to-amber-400 bg-gradient-to-r bg-clip-text text-transparent
+             font-headline md:text-7xl font-bold mb-4">
+                Butterfly Steps
             </h1>
-            <p className="text-xl md:text-2xl text-slate-100 mb-8 max-w-3xl">
-                Join the "Stepping For Monarchs" migration challenge. Track your steps, raise funds, and help save the monarch butterfly!
+            <p className="text-xl md:text-2xl mb-24 max-w-3xl text-neutral-600 uppercase mx-auto">
+                3.6 million steps<br />by October 31st, 2025
             </p>
+        </div>
+
+        <div className="stage absolute">
+          <div className="mariposa">
+            <div className="mariposa-turn">
+              <div className="mariposa-flutter"></div>
+            </div>
+          </div>
+
+          <div className="mariposa">
+            <div className="mariposa-turn">
+              <div className="mariposa-flutter"></div>
+            </div>
+          </div>
+
+          <div className="mariposa">
+            <div className="mariposa-turn">
+              <div className="mariposa-flutter"></div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-8 container mx-auto px-4">
+      <div className="p-8 space-y-8 container mx-auto px-4">
         <h2 className="text-4xl font-headline text-primary">Our Community's Journey</h2>
         {statsLoading ? (
           <div className="space-y-6">
