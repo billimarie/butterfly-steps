@@ -6,7 +6,7 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import type { UserProfile } from '@/types';
-import { getUserProfile } from '@/lib/firebaseService';
+import { getUserProfile, updateUserStreakOnLogin } from '@/lib/firebaseService';
 import { useRouter } from 'next/navigation';
 
 
@@ -29,9 +29,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<AuthError | null>(null);
   const router = useRouter();
 
-  const fetchUserProfile = useCallback(async (uid: string) => {
+  const fetchUserProfile = useCallback(async (uid: string, initialLogin: boolean = false) => {
     try {
-      const profileDataFromDb = await getUserProfile(uid);
+      let profileDataFromDb = await getUserProfile(uid);
+
+      if (initialLogin) {
+        const streakUpdateResults = await updateUserStreakOnLogin(uid);
+        // If profile was somehow null but streak update happened (e.g., initialized fields)
+        if (!profileDataFromDb && streakUpdateResults.updatedLastStreakLoginDate) {
+            profileDataFromDb = await getUserProfile(uid); // Re-fetch to get potentially initialized base profile
+        }
+
+        if (profileDataFromDb) {
+          profileDataFromDb = {
+            ...profileDataFromDb,
+            currentStreak: streakUpdateResults.updatedStreakCount,
+            lastStreakLoginDate: streakUpdateResults.updatedLastStreakLoginDate,
+            lastLoginTimestamp: streakUpdateResults.updatedLastLoginTimestamp,
+          };
+        }
+      }
+      
       if (profileDataFromDb) {
         const validatedProfile: UserProfile = {
           uid: profileDataFromDb.uid,
@@ -45,16 +63,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           badgesEarned: Array.isArray(profileDataFromDb.badgesEarned) ? profileDataFromDb.badgesEarned : [],
           teamId: profileDataFromDb.teamId || null,
           teamName: profileDataFromDb.teamName || null,
+          currentStreak: profileDataFromDb.currentStreak || 0,
+          lastStreakLoginDate: profileDataFromDb.lastStreakLoginDate || null,
+          lastLoginTimestamp: profileDataFromDb.lastLoginTimestamp || null,
         };
         setUserProfile(validatedProfile);
       } else {
         setUserProfile(null);
       }
     } catch (e) {
-      console.error("Failed to fetch user profile:", e);
+      console.error("Failed to fetch/update user profile:", e);
       setUserProfile(null);
     }
-  }, []);
+  }, []); 
   
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -62,7 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setError(null);
       if (firebaseUser) {
         setUser(firebaseUser);
-        await fetchUserProfile(firebaseUser.uid);
+        await fetchUserProfile(firebaseUser.uid, true); // Pass true for initialLogin
       } else {
         setUser(null);
         setUserProfile(null);

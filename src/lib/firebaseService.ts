@@ -40,6 +40,9 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
       badgesEarned,
       teamId: data.teamId || null,
       teamName: data.teamName || null,
+      currentStreak: data.currentStreak || 0,
+      lastStreakLoginDate: data.lastStreakLoginDate || null,
+      lastLoginTimestamp: data.lastLoginTimestamp || null,
     } as UserProfile;
   }
   return null;
@@ -59,6 +62,9 @@ export async function createUserProfile(firebaseUser: FirebaseUser, additionalDa
     badgesEarned: [],
     teamId: null,
     teamName: null,
+    currentStreak: 0,
+    lastStreakLoginDate: null,
+    lastLoginTimestamp: null,
     ...additionalData,
   };
   await setDoc(userProfileRef, profileData);
@@ -69,6 +75,109 @@ export async function updateUserProfile(uid: string, data: Partial<UserProfile>)
   const userRef = doc(db, USERS_COLLECTION, uid);
   await setDoc(userRef, data, { merge: true });
 }
+
+export async function updateUserStreakOnLogin(uid: string): Promise<{
+  updatedStreakCount: number;
+  updatedLastStreakLoginDate: string | null;
+  updatedLastLoginTimestamp: Timestamp;
+}> {
+  const userRef = doc(db, USERS_COLLECTION, uid);
+  const now = new Date();
+  const todayDateString = now.toISOString().split('T')[0]; // YYYY-MM-DD for today
+
+  try {
+    const result = await runTransaction(db, async (transaction) => {
+      const userSnap = await transaction.get(userRef);
+      if (!userSnap.exists()) {
+        console.warn(`User profile ${uid} not found during streak update.`);
+         transaction.set(userRef, {
+            currentStreak: 1,
+            lastStreakLoginDate: todayDateString,
+            lastLoginTimestamp: Timestamp.fromDate(now)
+        }, { merge: true });
+        return {
+            updatedStreakCount: 1,
+            updatedLastStreakLoginDate: todayDateString,
+            updatedLastLoginTimestamp: Timestamp.fromDate(now),
+        };
+      }
+
+      const userProfile = userSnap.data() as UserProfile;
+      let currentStreak = userProfile.currentStreak || 0;
+      const lastStreakLoginDateStr = userProfile.lastStreakLoginDate;
+      const lastLoginFirestoreTimestamp = userProfile.lastLoginTimestamp;
+
+      let newStreakCount = currentStreak;
+      let newLastStreakLoginDate = lastStreakLoginDateStr;
+
+      if (!lastStreakLoginDateStr) {
+        newStreakCount = 1;
+        newLastStreakLoginDate = todayDateString;
+      } else {
+        const lastStreakDate = new Date(lastStreakLoginDateStr + 'T00:00:00Z');
+        const todayAtMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+        const diffTime = todayAtMidnight.getTime() - lastStreakDate.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 1) {
+          newStreakCount = currentStreak + 1;
+          newLastStreakLoginDate = todayDateString;
+        } else if (diffDays === 0) {
+          newStreakCount = currentStreak;
+          newLastStreakLoginDate = todayDateString;
+        } else if (diffDays > 1) {
+          if (lastLoginFirestoreTimestamp) {
+            const lastLoginActualTime = lastLoginFirestoreTimestamp.toDate().getTime();
+            const currentTime = now.getTime();
+            const hoursSinceLastLogin = (currentTime - lastLoginActualTime) / (1000 * 60 * 60);
+
+            if (hoursSinceLastLogin < 47.99) {
+              newStreakCount = currentStreak + 1;
+              newLastStreakLoginDate = todayDateString;
+            } else {
+              newStreakCount = 1;
+              newLastStreakLoginDate = todayDateString;
+            }
+          } else {
+            newStreakCount = 1;
+            newLastStreakLoginDate = todayDateString;
+          }
+        } else {
+          newStreakCount = 1;
+          newLastStreakLoginDate = todayDateString;
+        }
+      }
+
+      if (newStreakCount === 0 && newLastStreakLoginDate === todayDateString) {
+          newStreakCount = 1;
+      }
+
+      const newLastLoginTimestamp = Timestamp.fromDate(now);
+      transaction.update(userRef, {
+        currentStreak: newStreakCount,
+        lastStreakLoginDate: newLastStreakLoginDate,
+        lastLoginTimestamp: newLastLoginTimestamp,
+      });
+
+      return {
+        updatedStreakCount: newStreakCount,
+        updatedLastStreakLoginDate: newLastStreakLoginDate,
+        updatedLastLoginTimestamp: newLastLoginTimestamp,
+      };
+    });
+    return result;
+  } catch (error) {
+    console.error("Transaction failed for streak update: ", error);
+    const fallbackProfile = await getUserProfile(uid);
+    return {
+        updatedStreakCount: fallbackProfile?.currentStreak || 0,
+        updatedLastStreakLoginDate: fallbackProfile?.lastStreakLoginDate || null,
+        updatedLastLoginTimestamp: fallbackProfile?.lastLoginTimestamp || Timestamp.fromDate(now),
+    };
+  }
+}
+
 
 export async function checkAndAwardBadges(
   uid: string,
@@ -102,26 +211,27 @@ export async function submitSteps(uid: string, steps: number): Promise<BadgeData
 
   const userDocRef = doc(db, USERS_COLLECTION, uid);
   const communityStatsRef = doc(db, COMMUNITY_COLLECTION, COMMUNITY_STATS_DOC);
-  
+  let teamDocRef: DocumentReference | undefined;
+  let userProfileDataBeforeUpdate: UserProfile | null = null;
+
+
   await runTransaction(db, async (transaction) => {
-    // --- All READS first ---
+    // Perform all reads first
     const userDocSnap = await transaction.get(userDocRef);
     if (!userDocSnap.exists()) {
       throw new Error("User profile does not exist.");
     }
-    const userProfileData = userDocSnap.data() as UserProfile;
+    userProfileDataBeforeUpdate = userDocSnap.data() as UserProfile;
 
     const communityStatsSnap = await transaction.get(communityStatsRef);
 
-    let teamDocSnap: DocumentSnapshot | undefined = undefined;
-    let teamDocRef: DocumentReference | undefined = undefined;
-
-    if (userProfileData.teamId) {
-      teamDocRef = doc(db, TEAMS_COLLECTION, userProfileData.teamId);
+    let teamDocSnap: DocumentSnapshot | undefined;
+    if (userProfileDataBeforeUpdate.teamId) {
+      teamDocRef = doc(db, TEAMS_COLLECTION, userProfileDataBeforeUpdate.teamId);
       teamDocSnap = await transaction.get(teamDocRef); // Read team doc
     }
 
-    // --- All WRITES next ---
+    // Now perform all writes
     transaction.update(userDocRef, { currentSteps: increment(steps) });
 
     if (!communityStatsSnap.exists()) {
@@ -156,7 +266,7 @@ export async function getCommunityStats(): Promise<CommunityStats> {
 
 export async function incrementParticipantCount(): Promise<void> {
     const communityStatsRef = doc(db, COMMUNITY_COLLECTION, COMMUNITY_STATS_DOC);
-    
+
     await runTransaction(db, async (transaction) => {
         const communityStatsDoc = await transaction.get(communityStatsRef);
         if (!communityStatsDoc.exists()) {
@@ -199,7 +309,7 @@ export async function createTeam(creatorUserId: string, teamName: string, creato
       awardedTeamBadge = getBadgeDataById('team-player');
     }
     transaction.update(userProfileDocRef, userProfileUpdates);
-    
+
     return { teamId: newTeamDocRef.id, teamName: teamName, awardedTeamBadge };
   });
 }
@@ -223,7 +333,7 @@ export async function joinTeam(userId: string, teamIdToJoin: string, userCurrent
     const newTeamData = newTeamSnap.data() as Team;
 
     if (userProfileData.teamId === teamIdToJoin) {
-      return { teamId: userProfileData.teamId, teamName: userProfileData.teamName! }; 
+      return { teamId: userProfileData.teamId, teamName: userProfileData.teamName! };
     }
 
     if (userProfileData.teamId) {
@@ -236,12 +346,12 @@ export async function joinTeam(userId: string, teamIdToJoin: string, userCurrent
         });
       }
     }
-    
+
     transaction.update(newTeamDocRef, {
       memberUids: arrayUnion(userId),
       totalSteps: increment(userProfileData.currentSteps),
     });
-    
+
     const currentBadges = userProfileData.badgesEarned || [];
     const userProfileUpdates: Partial<UserProfile> = { teamId: teamIdToJoin, teamName: newTeamData.name };
 
@@ -270,7 +380,7 @@ export async function leaveTeam(userId: string, teamId: string, userCurrentSteps
         console.warn(`User ${userId} tried to leave team ${teamId} which was not found. Clearing user's team info.`);
         return;
     }
-    
+
     const stepsToDecrement = typeof userData.currentSteps === 'number' ? userData.currentSteps : userCurrentSteps;
 
     transaction.update(teamDocRef, {
@@ -300,9 +410,9 @@ export async function getAllTeams(): Promise<Team[]> {
 
 export async function getTeamMembersProfiles(memberUids: string[]): Promise<UserProfile[]> {
   if (!memberUids || memberUids.length === 0) return [];
-  
+
   const profiles: UserProfile[] = [];
-  const CHUNK_SIZE = 30; 
+  const CHUNK_SIZE = 30;
   for (let i = 0; i < memberUids.length; i += CHUNK_SIZE) {
       const chunk = memberUids.slice(i, i + CHUNK_SIZE);
       if (chunk.length > 0) {
@@ -319,5 +429,24 @@ export async function getTopUsers(count: number): Promise<UserProfile[]> {
   const usersRef = collection(db, USERS_COLLECTION);
   const q = query(usersRef, orderBy('currentSteps', 'desc'), firestoreLimit(count));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => doc.data() as UserProfile);
+  return querySnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      uid: doc.id, // Use the document ID as the uid
+      email: data.email || null,
+      displayName: data.displayName || null,
+      activityStatus: data.activityStatus || null,
+      stepGoal: data.stepGoal || null,
+      currentSteps: typeof data.currentSteps === 'number' ? data.currentSteps : 0,
+      profileComplete: !!data.profileComplete,
+      inviteLink: data.inviteLink, // Can be undefined
+      badgesEarned: Array.isArray(data.badgesEarned) ? data.badgesEarned : [],
+      teamId: data.teamId || null,
+      teamName: data.teamName || null,
+      currentStreak: typeof data.currentStreak === 'number' ? data.currentStreak : 0,
+      lastStreakLoginDate: data.lastStreakLoginDate || null,
+      lastLoginTimestamp: data.lastLoginTimestamp || null, // This is a Firestore Timestamp
+    } as UserProfile;
+  });
 }
+

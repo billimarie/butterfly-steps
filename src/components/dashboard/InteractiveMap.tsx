@@ -92,7 +92,7 @@ export default function InteractiveMap({ totalCommunitySteps, className }: Inter
 
   return (
     <TooltipProvider>
-      <div className={cn("relative w-full aspect-[1.77] max-w-4xl mx-auto shadow-xl rounded-lg overflow-hidden", className)}>
+      <div className={cn("relative w-full aspect-square max-w-4xl mx-auto", className)}>
         <Image
           src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1749629242/Maps/steps-for-monarchs_mqqw8h.png"
           alt="Monarch Migration Map"
@@ -104,54 +104,56 @@ export default function InteractiveMap({ totalCommunitySteps, className }: Inter
           data-ai-hint="migration map"
         />
 
-        {mapReady && milestones.map((milestone) => {
-          const IconComponent = milestone.icon || MapPin;
-          const isReached = totalCommunitySteps >= milestone.steps;
-          return (
-            <Tooltip key={milestone.name} delayDuration={100}>
-              <TooltipTrigger asChild>
-                <div
-                  className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer"
-                  style={{
-                    left: `${milestone.coords.x}%`,
-                    top: `${milestone.coords.y}%`,
-                    zIndex: 10,
-                  }}
-                >
-                  <IconComponent className={cn(
-                    "h-6 w-6 sm:h-8 sm:w-8",
-                    isReached ? "text-primary animate-pulse" : "text-gray-400",
-                     milestone.name.includes('(Start)') || milestone.name.includes('(Destination)') ? "text-accent" : ""
-                  )} />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent className="bg-background border-primary">
-                <p className="font-semibold">{milestone.name}</p>
-                <p className="text-sm text-muted-foreground">{milestone.steps.toLocaleString()} steps</p>
-                {isReached && milestone.steps > 0 && <p className="text-xs text-green-500">Reached!</p>}
-              </TooltipContent>
-            </Tooltip>
-          );
-        })}
+        <div className="relative w-full h-full mx-auto">
+          {mapReady && milestones.map((milestone) => {
+            const IconComponent = milestone.icon || MapPin;
+            const isReached = totalCommunitySteps >= milestone.steps;
+            return (
+              <Tooltip key={milestone.name} delayDuration={100}>
+                <TooltipTrigger asChild>
+                  <div
+                    className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer"
+                    style={{
+                      left: `${milestone.coords.x}%`,
+                      top: `${milestone.coords.y}%`,
+                      zIndex: 10,
+                    }}
+                  >
+                    <IconComponent className={cn(
+                      "h-6 w-6 sm:h-8 sm:w-8",
+                      isReached ? "text-primary animate-pulse" : "text-gray-400",
+                      milestone.name.includes('(Start)') || milestone.name.includes('(Destination)') ? "text-accent" : ""
+                    )} />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="bg-background border-primary">
+                  <p className="font-semibold">{milestone.name}</p>
+                  <p className="text-sm text-muted-foreground">{milestone.steps.toLocaleString()} steps</p>
+                  {isReached && milestone.steps > 0 && <p className="text-xs text-green-500">Reached!</p>}
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
 
-        {mapReady && currentProgressMarkerPosition.visible && (
-          <div
-            className="absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-1000 ease-out"
-            style={{
-              left: `${currentProgressMarkerPosition.x}%`,
-              top: `${currentProgressMarkerPosition.y}%`,
-              zIndex: 20,
-            }}
-            title={`Current community progress: ${totalCommunitySteps.toLocaleString()} steps`}
-          >
-            <Leaf className="h-8 w-8 text-orange-500 animate-bounce" data-ai-hint="butterfly monarch" />
-          </div>
-        )}
-         {!mapReady && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/50">
-            <p className="text-foreground">Loading map...</p>
-          </div>
-        )}
+          {mapReady && currentProgressMarkerPosition.visible && (
+            <div
+              className="absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-1000 ease-out"
+              style={{
+                left: `${currentProgressMarkerPosition.x}%`,
+                top: `${currentProgressMarkerPosition.y}%`,
+                zIndex: 20,
+              }}
+              title={`Current community progress: ${totalCommunitySteps.toLocaleString()} steps`}
+            >
+              <Leaf className="h-8 w-8 text-orange-500 animate-bounce" data-ai-hint="butterfly monarch" />
+            </div>
+          )}
+          {!mapReady && (
+            <div className="absolute inset-0 flex items-center justify-center bg-background/50">
+              <p className="text-foreground">Loading map...</p>
+            </div>
+          )}
+        </div>
       </div>
     </TooltipProvider>
   );
