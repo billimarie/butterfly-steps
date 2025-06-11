@@ -10,6 +10,7 @@ import UserProgressCard from '@/components/dashboard/UserProgressCard';
 import CommunityProgressCard from '@/components/dashboard/CommunityProgressCard';
 import StepSubmissionForm from '@/components/dashboard/StepSubmissionForm';
 import ButterflyAnimation from '@/components/dashboard/ButterflyAnimation';
+import InteractiveMap from '@/components/dashboard/InteractiveMap'; // Added import
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { getCommunityStats } from '@/lib/firebaseService';
@@ -50,6 +51,7 @@ function Dashboard({ userProfile, initialCommunityStats }: { userProfile: UserPr
         <div className="lg:col-span-2 space-y-6">
           <CommunityProgressCard communityStats={communityStats} />
            {communityStats && <ButterflyAnimation type="community" totalCommunitySteps={communityStats.totalSteps} />}
+           {communityStats && <InteractiveMap totalCommunitySteps={communityStats.totalSteps} className="mt-6" />} {/* Added InteractiveMap */}
         </div>
         <div className="space-y-6">
           <UserProgressCard userProfile={userProfile} />
@@ -132,11 +134,13 @@ function LandingPage() {
           <div className="space-y-6">
             <Skeleton className="h-56 w-full rounded-lg" />
             <Skeleton className="h-24 w-full rounded-lg" />
+            <Skeleton className="h-64 w-full rounded-lg" /> {/* Skeleton for map */}
           </div>
         ) : communityStats ? (
           <div className="space-y-6">
             <CommunityProgressCard communityStats={communityStats} />
             <ButterflyAnimation type="community" totalCommunitySteps={communityStats.totalSteps} />
+            <InteractiveMap totalCommunitySteps={communityStats.totalSteps} className="mt-6" /> {/* Added InteractiveMap to Landing Page */}
           </div>
         ) : (
           <Card className="text-center">
@@ -273,14 +277,16 @@ export default function HomePage() {
         return (
           <div className="space-y-8">
             <CountdownTimer />
-            <Skeleton className="h-64 w-full rounded-lg lg:col-span-2" />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-              </div>
-              <div className="space-y-6">
-                <Skeleton className="h-48 w-full rounded-lg" />
-                <Skeleton className="h-56 w-full rounded-lg" />
-              </div>
+                <div className="lg:col-span-2 space-y-6">
+                    <Skeleton className="h-56 w-full rounded-lg" /> {/* CommunityProgressCard Skeleton */}
+                    <Skeleton className="h-24 w-full rounded-lg" /> {/* ButterflyAnimation Skeleton */}
+                    <Skeleton className="h-64 w-full rounded-lg mt-6" /> {/* InteractiveMap Skeleton */}
+                </div>
+                <div className="space-y-6">
+                    <Skeleton className="h-48 w-full rounded-lg" /> {/* UserProgressCard Skeleton */}
+                    <Skeleton className="h-56 w-full rounded-lg" /> {/* StepSubmissionForm Skeleton */}
+                </div>
             </div>
           </div>
         );
