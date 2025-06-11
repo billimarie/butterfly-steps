@@ -77,17 +77,13 @@ export default function ProfileDisplay() {
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
-      <CardHeader>
+      <CardHeader className="mb-6">
         <div className="flex justify-between items-start">
           <div>
             <CardTitle className="font-headline text-3xl flex items-center">
               <User className="mr-3 h-8 w-8 text-primary" />
               {userProfile.displayName || 'Your Profile'}
             </CardTitle>
-            <CardDescription className="flex items-center mt-1">
-              <Mail className="mr-2 h-4 w-4 text-muted-foreground" />
-              {userProfile.email}
-            </CardDescription>
           </div>
           <Button variant="outline" size="sm" asChild>
             <Link href="/profile?edit=true">
@@ -96,12 +92,9 @@ export default function ProfileDisplay() {
           </Button>
         </div>
       </CardHeader>
+
       <CardContent className="space-y-6">
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold flex items-center"><Activity className="mr-2 h-5 w-5 text-primary" />Activity Status</h3>
-          <p className="text-muted-foreground">{userProfile.activityStatus || 'Not set'}</p>
-        </div>
-        
+
         {/* Step Goal and Current Steps side-by-side */}
         <div className="flex flex-col md:flex-row gap-6">
             {/* Step Goal Section */}
@@ -113,7 +106,7 @@ export default function ProfileDisplay() {
             {/* Current Steps Section */}
             <div className="md:w-2/3 flex-grow space-y-2">
               <h3 className="text-lg font-semibold flex items-center"><Footprints className="mr-2 h-5 w-5 text-primary" />Current Steps</h3>
-              <p className="text-4xl font-bold text-accent">{userProfile.currentSteps.toLocaleString()} steps</p>
+              <p className="text-2xl font-bold text-accent">{userProfile.currentSteps.toLocaleString()} steps</p>
               {userProfile.stepGoal && userProfile.stepGoal > 0 && (
                 <>
                   <Progress value={progressPercentage} className="w-full h-3 mt-2" />
@@ -123,7 +116,6 @@ export default function ProfileDisplay() {
             </div>
         </div>
         
-        <Separator className="my-6" />
 
         <div>
           <StepSubmissionForm onStepSubmit={handleStepSubmit} />
