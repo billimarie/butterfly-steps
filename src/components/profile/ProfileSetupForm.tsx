@@ -68,7 +68,12 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
   const { toast } = useToast();
   const router = useRouter();
 
-  const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<ProfileSetupFormInputs>({
+  const [invitedTeamDetailsLoading, setInvitedTeamDetailsLoading] = useState(false);
+  const [fetchedInvitedTeamName, setFetchedInvitedTeamName] = useState<string | null>(null);
+  const [fetchedInvitedTeamCreatorDisplayName, setFetchedInvitedTeamCreatorDisplayName] = useState<string | null>(null);
+
+
+  const { control, handleSubmit, watch, setValue, formState: { errors }, resetField } = useForm<ProfileSetupFormInputs>({
     resolver: zodResolver(profileSetupSchema),
     defaultValues: {
       displayName: '',
@@ -126,7 +131,7 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
             setValue('joinTeamId', invitedTeamId);
         }
     }
-  }, [user, userProfile, setValue, invitedTeamId]);
+  }, [user, userProfile, setValue, invitedTeamId, fetchInvitedTeamDetails]);
 
 
   const onSubmit: SubmitHandler<ProfileSetupFormInputs> = async (data) => {
@@ -160,18 +165,22 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
       };
       let awardedTeamBadgeData: BadgeData | undefined = undefined;
 
-      if (!userProfile?.teamId) { // Only allow team actions if user is not already on a team
+      // Only allow team actions if user is not already on a team OR if they are leaving their current team (handled by dedicated button now)
+      if (!userProfile?.teamId) { 
         if (data.teamAction === 'create' && data.newTeamName) {
           const result = await createTeam(user.uid, data.newTeamName, currentSteps);
           teamUpdate = { teamId: result.teamId, teamName: result.teamName };
           awardedTeamBadgeData = result.awardedTeamBadge;
           toast({ title: 'Team Created!', description: `You've created and joined "${result.teamName}".` });
         } else if (data.teamAction === 'join' && data.joinTeamId) {
+          // If it was an invite and details were fetched, use fetchedTeamName, otherwise get from joinTeam result
+          const teamNameToDisplay = fetchedInvitedTeamName && data.joinTeamId === invitedTeamId ? fetchedInvitedTeamName : null;
+          
           const result = await joinTeam(user.uid, data.joinTeamId, currentSteps);
           if (result) {
               teamUpdate = { teamId: result.teamId, teamName: result.teamName };
               awardedTeamBadgeData = result.awardedTeamBadge;
-              toast({ title: 'Team Joined!', description: `You've joined "${result.teamName}".` });
+              toast({ title: 'Team Joined!', description: `You've joined "${teamNameToDisplay || result.teamName}".` });
           } else {
               toast({ title: 'Failed to join team', description: 'Please check the Team ID and try again, or the team may no longer exist.', variant: 'destructive'});
               setLoading(false);
@@ -237,6 +246,8 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
       setValue('teamAction', 'none'); 
       setValue('joinTeamId', '');
       setValue('newTeamName','');
+      setFetchedInvitedTeamName(null); // Clear fetched details as user is no longer tied to an invite scenario
+      setFetchedInvitedTeamCreatorDisplayName(null);
       await fetchUserProfile(user.uid); 
     } catch (error) {
       toast({ title: 'Error Leaving Team', description: (error as Error).message, variant: 'destructive' });
@@ -375,16 +386,32 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
                         field.onChange(action);
                         
                         if (action === 'join') {
-                          if (invitedTeamId && watch('joinTeamId') !== invitedTeamId) {
-                             setValue('joinTeamId', invitedTeamId); // Pre-fill if switching TO join and was invited
+                          setValue('newTeamName', '');
+                          if (invitedTeamId && !userProfile?.teamId) {
+                            setValue('joinTeamId', invitedTeamId);
+                            // Only fetch if joinTeamId actually gets set to invitedTeamId and details aren't already there for this ID
+                            if (!fetchedInvitedTeamName || currentJoinTeamIdValue !== invitedTeamId) {
+                                fetchInvitedTeamDetails(invitedTeamId);
+                            }
+                          } else { // Not an invite or switching to join manually
+                             if(currentJoinTeamIdValue === invitedTeamId && invitedTeamId){
+                                // User manually selected 'join' but was already on the invite context, keep details
+                             } else {
+                                // Switched to join manually, clear any old invite details if ID changed
+                                setValue('joinTeamId', ''); // Clear to allow manual input
+                                setFetchedInvitedTeamName(null);
+                                setFetchedInvitedTeamCreatorDisplayName(null);
+                             }
                           }
-                          setValue('newTeamName', ''); // Clear new team name if joining
                         } else if (action === 'create') {
-                          setValue('joinTeamId', ''); // Clear join ID if creating
-                           // newTeamName will be entered by user
+                          setValue('joinTeamId', '');
+                          setFetchedInvitedTeamName(null);
+                          setFetchedInvitedTeamCreatorDisplayName(null);
                         } else { // action === 'none'
                           setValue('joinTeamId', '');
                           setValue('newTeamName', '');
+                          setFetchedInvitedTeamName(null);
+                          setFetchedInvitedTeamCreatorDisplayName(null);
                         }
                       }}
                       value={field.value} 
@@ -420,26 +447,69 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
 
                 {selectedTeamAction === 'join' && (
                   <div className="space-y-2 pl-6 pt-2">
-                    <Label htmlFor="joinTeamId">Team ID to Join</Label>
-                     <Controller
-                        name="joinTeamId"
-                        control={control}
-                        render={({ field }) => (
-                            <Input 
-                                id="joinTeamId" 
-                                placeholder="Enter Team ID" 
-                                {...field} 
-                                readOnly={!!(invitedTeamId && field.value === invitedTeamId && selectedTeamAction === 'join')}
-                                className={!!(invitedTeamId && field.value === invitedTeamId && selectedTeamAction === 'join') ? "bg-muted/50" : ""}
-                            />
-                        )}
-                    />
-                    {errors.joinTeamId && <p className="text-sm text-destructive">{errors.joinTeamId.message}</p>}
-                    {invitedTeamId && selectedTeamAction === 'join' && watch('joinTeamId') === invitedTeamId && (
-                        <p className="text-xs text-muted-foreground">Joining team from invite. You can choose a different action if you wish (this will clear the invite).</p>
-                    )}
-                    {!invitedTeamId && selectedTeamAction === 'join' && (
-                         <p className="text-xs text-muted-foreground">Ask the team creator for the Team ID.</p>
+                    {/* Conditional rendering for invite details vs manual input */}
+                    {currentJoinTeamIdValue === invitedTeamId && invitedTeamId && !userProfile?.teamId ? (
+                      // This is the specific invite scenario
+                      invitedTeamDetailsLoading ? (
+                        <p className="text-sm text-muted-foreground">Loading team details for invite...</p>
+                      ) : fetchedInvitedTeamName ? (
+                        <div>
+                          <Label>Joining team from invite:</Label>
+                          <div className="p-3 mt-1 border rounded-md bg-muted/30 shadow-sm">
+                            <p className="font-semibold text-primary">{fetchedInvitedTeamName}</p>
+                            {fetchedInvitedTeamCreatorDisplayName && (
+                              <p className="text-xs text-muted-foreground">
+                                Created by: {fetchedInvitedTeamCreatorDisplayName}
+                              </p>
+                            )}
+                          </div>
+                          {/* Hidden input to ensure react-hook-form has the joinTeamId registered and submitted */}
+                          <Controller
+                            name="joinTeamId"
+                            control={control}
+                            defaultValue={invitedTeamId} // ensure it has the value
+                            render={({ field }) => ( <input type="hidden" {...field} /> )}
+                           />
+                        </div>
+                      ) : (
+                        // Invite details failed to load, or team not found after fetch
+                        // Allow manual input as a fallback
+                        <>
+                          <Label htmlFor="joinTeamIdManualFallback">Team ID to Join</Label>
+                          <Controller
+                            name="joinTeamId" // Still controlling joinTeamId
+                            control={control}
+                            defaultValue="" // Start fresh for manual input
+                            render={({ field }) => (
+                                <Input
+                                    id="joinTeamIdManualFallback"
+                                    placeholder="Invited team not found. Enter ID manually."
+                                    {...field}
+                                />
+                            )}
+                          />
+                          {errors.joinTeamId && <p className="text-sm text-destructive">{errors.joinTeamId.message}</p>}
+                        </>
+                      )
+                    ) : (
+                      // Manual "Join Team" scenario (not from a direct invite link effect, or invite cleared)
+                      <>
+                        <Label htmlFor="joinTeamIdManual">Team ID to Join</Label>
+                        <Controller
+                            name="joinTeamId"
+                            control={control}
+                            render={({ field }) => (
+                                <Input
+                                    id="joinTeamIdManual"
+                                    placeholder="Enter Team ID"
+                                    {...field}
+                                    value={field.value || ''} 
+                                />
+                            )}
+                        />
+                        {errors.joinTeamId && <p className="text-sm text-destructive">{errors.joinTeamId.message}</p>}
+                        <p className="text-xs text-muted-foreground">Ask the team creator for the Team ID.</p>
+                      </>
                     )}
                   </div>
                 )}
@@ -448,8 +518,8 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
           </div>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? (isUpdate ? 'Updating...' : 'Saving...') : (<><CheckCircle className="mr-2 h-5 w-5" /> {isUpdate ? 'Update Profile' : 'Save Profile & Start Challenge'}</>)}
+          <Button type="submit" className="w-full" disabled={loading || invitedTeamDetailsLoading}>
+            {(loading || invitedTeamDetailsLoading) ? (isUpdate ? 'Updating...' : 'Saving...') : (<><CheckCircle className="mr-2 h-5 w-5" /> {isUpdate ? 'Update Profile' : 'Save Profile & Start Challenge'}</>)}
           </Button>
         </CardFooter>
       </form>
