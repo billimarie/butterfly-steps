@@ -3,9 +3,9 @@ import type { Metadata } from 'next';
 import FeedContent from '@/components/feed/FeedContent';
 
 export const metadata: Metadata = {
-  title: 'Community Feed | Monarch Miles',
-  description: 'See the collective progress of the Monarch Miles community in the Stepping For Monarchs challenge. Track total steps and support monarch conservation.',
-  keywords: ['monarch miles', 'community feed', 'monarch butterfly', 'conservation', 'step challenge', 'fundraising', 'foreveryStaratree'],
+  title: 'Community Feed | Mojave Monarch Challenge',
+  description: 'See the collective progress of the Mojave Monarch Challenge community in the Stepping For Monarchs challenge. Track total steps and support monarch conservation.',
+  keywords: ['Mojave Monarch Challenge', 'community feed', 'monarch butterfly', 'conservation', 'step challenge', 'fundraising', 'foreveryStaratree'],
 };
 
 export default function FeedPage() {

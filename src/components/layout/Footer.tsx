@@ -3,10 +3,10 @@ export default function Footer() {
   return (
     <footer className="bg-muted/50 py-6 text-center text-sm text-muted-foreground">
       <div className="container mx-auto px-4">
-        <p>&copy; {currentYear} Monarch Miles by ForEveryStarATree.org. All rights reserved.</p>
+        <p>&copy; {currentYear} Mojave Monarch Challenge by ForEveryStarATree.org. All rights reserved.</p>
         <p className="mt-1">
           Support Monarch Butterfly Conservation. 
-          <a href="https://foreveryStaratree.org/donate" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline ml-1">
+          <a href="https://foreveryStaratree.org/donate.html" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline ml-1">
             Donate Now
           </a>
         </p>

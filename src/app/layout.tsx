@@ -6,8 +6,8 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 
 export const metadata: Metadata = {
-  title: 'Monarch Miles',
-  description: 'Stepping For Monarchs Migration Challenge by ForEveryStarATree.org',
+  title: 'Mojave Monarch Challenge',
+  description: 'Inspired by Monarch Joint Venture "Miles for Monarchs", the "Mojave Monarch Challenge" is a Steps Challenge for the Mojave Desert Butterfly Garden at ForEveryStarATree.org',
 };
 
 export default function RootLayout({

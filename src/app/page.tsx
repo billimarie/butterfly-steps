@@ -111,7 +111,7 @@ function LandingPage() {
     <div className="text-center py-12 space-y-12">
       <div className="relative w-full h-72 md:h-96 rounded-xl overflow-hidden shadow-2xl">
         <Image 
-            src="https://placehold.co/1200x400.png" 
+            src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1738520667/Donors/IMG_7534_jy4pvi.jpg" 
             alt="Monarch butterflies on milkweed" 
             layout="fill" 
             objectFit="cover"
@@ -120,10 +120,10 @@ function LandingPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex flex-col items-center justify-end p-8">
             <h1 className="font-headline text-5xl md:text-7xl font-bold text-white mb-4">
-                Monarch Miles
+              Mojave Monarch Challenge
             </h1>
             <p className="text-xl md:text-2xl text-slate-100 mb-8 max-w-3xl">
-                Join the "Stepping For Monarchs" migration challenge. Track your steps, raise funds, and help save the monarch butterfly!
+                Track your steps, raise funds, and help save the monarch butterfly!
             </p>
         </div>
       </div>

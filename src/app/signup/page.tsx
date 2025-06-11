@@ -20,7 +20,7 @@ export default function SignupPage() {
             <Logo />
           </div>
           <CardTitle className="font-headline text-3xl">Join the Migration!</CardTitle>
-          <CardDescription>Create your Monarch Miles account to start tracking your steps.</CardDescription>
+          <CardDescription>Create your Mojave Monarch Challenge account to start tracking your steps.</CardDescription>
         </CardHeader>
         <CardContent>
           <SignupForm invitedTeamId={invitedTeamId} />

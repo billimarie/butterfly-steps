@@ -248,7 +248,7 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
         }
       }
 
-      toast({ title: 'Profile Updated!', description: 'Your Monarch Miles profile is ready.' });
+      toast({ title: 'Profile Updated!', description: 'Your Mojave Monarch Challenge profile is ready.' });
       router.push('/');
     } catch (error) { // This catches errors from createTeam, joinTeam (if they throw), updateUserProfile, etc.
       console.error('Profile update/team action error:', error);

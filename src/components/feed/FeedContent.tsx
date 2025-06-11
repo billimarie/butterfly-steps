@@ -69,7 +69,7 @@ export default function FeedContent() {
         <Card className="shadow-lg text-center flex flex-col">
             <CardHeader>
                 <CardTitle className="font-headline text-2xl">Join the Migration!</CardTitle>
-                <CardDescription>Become a part of Monarch Miles and help us save the butterflies.</CardDescription>
+                <CardDescription>Become a part of Mojave Monarch Challenge and help us save the butterflies.</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow flex flex-col justify-center items-center">
                 <p className="mb-6 max-w-sm">

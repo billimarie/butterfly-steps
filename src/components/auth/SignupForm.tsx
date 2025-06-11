@@ -50,7 +50,7 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
       
       await fetchUserProfile(firebaseUser.uid);
 
-      toast({ title: 'Account Created!', description: "Welcome to Monarch Miles! Let's set up your profile." });
+      toast({ title: 'Account Created!', description: "Welcome to Mojave Monarch Challenge! Let's set up your profile." });
       
       let profileRedirectUrl = '/profile';
       if (invitedTeamId) {

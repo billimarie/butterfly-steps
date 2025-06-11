@@ -1,4 +1,4 @@
-# **App Name**: Monarch Miles
+# **App Name**: The Mojave Monarch Steps Challenge
 
 ## Core Features:
 
