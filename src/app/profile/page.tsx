@@ -1,49 +1,36 @@
 
-'use client';
-
-import ProfileSetupForm from '@/components/profile/ProfileSetupForm';
-import ProfileDisplay from '@/components/profile/ProfileDisplay';
-import { useAuth } from '@/context/AuthContext';
-import { useSearchParams } from 'next/navigation';
+import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import ProfilePageContent from '@/components/profile/ProfilePageContent';
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAuthRedirect } from '@/hooks/useAuthRedirect';
+
+export const metadata: Metadata = {
+  title: 'Your Profile | Monarch Miles',
+  description: 'Manage your Monarch Miles profile, track your progress, and view your badges.',
+};
+
+function ProfilePageSkeleton() {
+  return (
+    <div className="space-y-4 max-w-2xl mx-auto">
+      <Skeleton className="h-12 w-1/2" />
+      <Skeleton className="h-8 w-3/4" />
+      <div className="space-y-2 pt-6">
+        <Skeleton className="h-6 w-1/4" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+      <div className="space-y-2">
+        <Skeleton className="h-6 w-1/4" />
+        <Skeleton className="h-20 w-full" />
+      </div>
+      <Skeleton className="h-10 w-full mt-6" />
+    </div>
+  );
+}
 
 export default function ProfilePage() {
-  const { user, userProfile, loading } = useAuth();
-  useAuthRedirect({ requireAuth: true }); 
-  
-  const searchParams = useSearchParams();
-  const editMode = searchParams.get('edit') === 'true';
-  const invitedTeamId = searchParams.get('invitedTeamId');
-
-  if (loading || !user) {
-    return (
-      <div className="space-y-4 max-w-2xl mx-auto">
-        <Skeleton className="h-12 w-1/2" />
-        <Skeleton className="h-8 w-3/4" />
-        <div className="space-y-2 pt-6">
-          <Skeleton className="h-6 w-1/4" />
-          <Skeleton className="h-10 w-full" />
-        </div>
-        <div className="space-y-2">
-          <Skeleton className="h-6 w-1/4" />
-          <Skeleton className="h-20 w-full" />
-        </div>
-        <Skeleton className="h-10 w-full mt-6" />
-      </div>
-    );
-  }
-
-  // If user is loaded, and (profile is not complete OR explicitly in edit mode)
-  if (user && (!userProfile?.profileComplete || editMode)) {
-    return <ProfileSetupForm isUpdate={!!userProfile?.profileComplete && editMode} invitedTeamId={invitedTeamId} />;
-  }
-  
-  // If profile is complete and not in edit mode
-  if (userProfile?.profileComplete && !editMode) {
-    return <ProfileDisplay />;
-  }
-  
-  // Fallback, though ideally covered by loading state or redirection.
-  return <ProfileSetupForm isUpdate={false} invitedTeamId={invitedTeamId} />;
+  return (
+    <Suspense fallback={<ProfilePageSkeleton />}>
+      <ProfilePageContent />
+    </Suspense>
+  );
 }
