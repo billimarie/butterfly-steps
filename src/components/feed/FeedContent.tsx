@@ -10,48 +10,38 @@ import { Gift, ArrowRight } from 'lucide-react';
 
 import CommunityProgressCard from '@/components/dashboard/CommunityProgressCard';
 import ButterflyAnimation from '@/components/dashboard/ButterflyAnimation';
+import TopSteppersLeaderboard from '@/components/feed/TopSteppersLeaderboard'; // Import the new component
 import { getCommunityStats } from '@/lib/firebaseService';
 import type { CommunityStats } from '@/types';
 
 export default function FeedContent() {
   const [communityStats, setCommunityStats] = useState<CommunityStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingStats, setLoadingStats] = useState(true);
 
-  const fetchCommunityData = useCallback(async () => {
-    setLoading(true);
+  const fetchFeedData = useCallback(async () => {
+    setLoadingStats(true);
     try {
       const stats = await getCommunityStats();
       setCommunityStats(stats);
-    } catch (error) {
+    } catch (error) { // Added missing opening brace
       console.error("Failed to fetch community stats for feed:", error);
-      setCommunityStats(null); // Set to null on error to show appropriate message
+      setCommunityStats(null);
     } finally {
-      setLoading(false);
+      setLoadingStats(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchCommunityData();
-  }, [fetchCommunityData]);
+    fetchFeedData();
+  }, [fetchFeedData]);
 
   const communityProgressPercentage = communityStats ? (communityStats.totalSteps / 3_600_000) * 100 : 0;
 
-  if (loading) {
-    return (
-      <>
-        <Skeleton className="h-64 w-full rounded-lg" />
-        <Skeleton className="h-24 w-full rounded-lg mt-8" />
-        <div className="grid md:grid-cols-2 gap-8 mt-8">
-            <Skeleton className="h-48 w-full rounded-lg" />
-            <Skeleton className="h-48 w-full rounded-lg" />
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
-      {communityStats ? (
+      {loadingStats ? (
+        <Skeleton className="h-64 w-full rounded-lg" />
+      ) : communityStats ? (
         <>
           <CommunityProgressCard communityStats={communityStats} />
           <div className="mt-8">
@@ -60,16 +50,18 @@ export default function FeedContent() {
         </>
       ) : (
         <Card className="mt-8 text-center">
-          <CardHeader><CardTitle className="font-headline">Progress Currently Unavailable</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="font-headline">Community Progress Unavailable</CardTitle></CardHeader>
           <CardContent><p className="text-muted-foreground">We couldn't load the community progress data at this moment. Please check back soon!</p></CardContent>
         </Card>
       )}
+
+      <TopSteppersLeaderboard count={5} /> {/* Use the new component */}
 
       <div className="grid md:grid-cols-2 gap-8 mt-12">
         <Card className="shadow-lg text-center flex flex-col">
             <CardHeader>
                 <CardTitle className="font-headline text-2xl">Join the Migration!</CardTitle>
-                <CardDescription>Become a part of Mojave Monarch Challenge and help us save the butterflies.</CardDescription>
+                <CardDescription>Become a part of Monarch Miles and help us save the butterflies.</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow flex flex-col justify-center items-center">
                 <p className="mb-6 max-w-sm">
