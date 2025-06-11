@@ -14,6 +14,8 @@ import {
   arrayUnion,
   arrayRemove,
   Timestamp,
+  orderBy,
+  limit,
 } from 'firebase/firestore';
 import type { UserProfile, CommunityStats, Team } from '@/types';
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -283,7 +285,9 @@ export async function getTeam(teamId: string): Promise<Team | null> {
 }
 
 export async function getAllTeams(): Promise<Team[]> {
-  const teamsQuery = query(collection(db, TEAMS_COLLECTION));
+  // Order teams by totalSteps in descending order
+  const teamsCollectionRef = collection(db, TEAMS_COLLECTION);
+  const teamsQuery = query(teamsCollectionRef, orderBy('totalSteps', 'desc'));
   const querySnapshot = await getDocs(teamsQuery);
   return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team));
 }
@@ -304,3 +308,18 @@ export async function getTeamMembersProfiles(memberUids: string[]): Promise<User
   }
   return profiles;
 }
+
+export async function getTopUsers(count: number): Promise<UserProfile[]> {
+  const usersCollectionRef = collection(db, USERS_COLLECTION);
+  // Query to get users ordered by currentSteps descending, limited to 'count'
+  const topUsersQuery = query(usersCollectionRef, orderBy('currentSteps', 'desc'), limit(count));
+  
+  const querySnapshot = await getDocs(topUsersQuery);
+  const topUsers: UserProfile[] = [];
+  querySnapshot.forEach((docSnap) => {
+    topUsers.push(docSnap.data() as UserProfile);
+  });
+  return topUsers;
+}
+
+    
