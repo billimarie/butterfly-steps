@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { getAllTeams, getTeamMembersProfiles } from '@/lib/firebaseService';
+import { getAllTeams, getTeamMembersProfiles } from '@/lib/firebaseService'; // Updated import
 import type { Team, UserProfile } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +19,7 @@ export default function TeamsPage() {
   const { user, userProfile, fetchUserProfile } = useAuth();
   const [teams, setTeams] = useState<Team[]>([]);
   const [creatorProfiles, setCreatorProfiles] = useState<Record<string, UserProfile | undefined>>({});
+  const [creatorProfiles, setCreatorProfiles] = useState<Record<string, UserProfile | undefined>>({});
   const [loading, setLoading] = useState(true);
   const [showJoinForm, setShowJoinForm] = useState(false); // State to toggle join form
   const { toast } = useToast();
@@ -26,23 +27,26 @@ export default function TeamsPage() {
 
   useEffect(() => {
     async function loadTeamsAndCreators() {
+    async function loadTeamsAndCreators() {
       setLoading(true);
       try {
         const fetchedTeams = await getAllTeams();
-        setTeams(fetchedTeams); // Already ordered by totalSteps desc from firebaseService
+        setTeams(fetchedTeams);
 
         if (fetchedTeams.length > 0) {
-          const creatorUids = Array.from(new Set(fetchedTeams.map(team => team.creatorUid).filter(uid => !!uid)));
+          const creatorUids = Array.from(new Set(fetchedTeams.map(team => team.creatorUid)));
           if (creatorUids.length > 0) {
             const profiles = await getTeamMembersProfiles(creatorUids);
             const profilesMap: Record<string, UserProfile | undefined> = {};
             profiles.forEach(profile => {
-              if (profile) profilesMap[profile.uid] = profile;
+              profilesMap[profile.uid] = profile;
             });
             setCreatorProfiles(profilesMap);
           }
         }
       } catch (error) {
+        console.error("Failed to fetch teams or creators:", error);
+        toast({ title: 'Error', description: 'Could not load teams data.', variant: 'destructive' });
         console.error("Failed to fetch teams or creators:", error);
         toast({ title: 'Error', description: 'Could not load teams data.', variant: 'destructive' });
       } finally {
@@ -51,7 +55,10 @@ export default function TeamsPage() {
     }
     if (user) { 
         loadTeamsAndCreators();
+    if (user) { 
+        loadTeamsAndCreators();
     } else {
+        setLoading(false); 
         setLoading(false); 
     }
   }, [user, toast]);
@@ -99,9 +106,8 @@ export default function TeamsPage() {
                   <h3 className="text-xl font-semibold mb-3">Enter Team ID to Join</h3>
                   <JoinTeamForm
                     onTeamJoined={async () => {
-                      if (user?.uid) await fetchUserProfile(user.uid);
-                      setShowJoinForm(false); // Hide form after successful join
-                      router.refresh(); 
+                        await fetchUserProfile(user.uid); 
+                        router.refresh(); 
                     }}
                   />
                   <Button variant="outline" onClick={() => setShowJoinForm(false)} className="mt-2 w-full">
@@ -131,6 +137,17 @@ export default function TeamsPage() {
           </div>
         ) : teams.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {teams.map((team) => {
+              const creator = creatorProfiles[team.creatorUid];
+              return (
+                <TeamListItem 
+                  key={team.id} 
+                  team={team} 
+                  currentTeamId={userProfile?.teamId} 
+                  creatorDisplayName={creator?.displayName || null}
+                />
+              );
+            })}
             {teams.map((team) => {
               const creator = creatorProfiles[team.creatorUid];
               return (
