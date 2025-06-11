@@ -12,16 +12,21 @@ import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ALL_BADGES, type BadgeData } from '@/lib/badges';
 import type { BadgeId } from '@/lib/badges';
-import { leaveTeam } from '@/lib/firebaseService';
-import { useState } from 'react';
+import { leaveTeam, getUserDailySteps } from '@/lib/firebaseService';
+import { useState, useEffect, useCallback } from 'react';
 import StepSubmissionForm from '@/components/dashboard/StepSubmissionForm';
 import { Separator } from '@/components/ui/separator';
+import DailyStepChart from '@/components/profile/DailyStepChart';
+import type { DailyStep } from '@/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 export default function ProfileDisplay() {
   const { user, userProfile, fetchUserProfile } = useAuth();
   const { toast } = useToast();
   const [leavingTeam, setLeavingTeam] = useState(false);
+  const [dailyStepsData, setDailyStepsData] = useState<DailyStep[]>([]);
+  const [isLoadingChart, setIsLoadingChart] = useState(true);
 
   if (!userProfile) {
     return (
@@ -64,9 +69,29 @@ export default function ProfileDisplay() {
     }
   };
 
+  const fetchChartData = useCallback(async () => {
+    if (user) {
+      setIsLoadingChart(true);
+      try {
+        const data = await getUserDailySteps(user.uid, 30); // Fetch last 30 days
+        setDailyStepsData(data);
+      } catch (error) {
+        console.error("Failed to fetch daily steps data:", error);
+        toast({ title: 'Chart Error', description: 'Could not load daily step data.', variant: 'destructive' });
+      } finally {
+        setIsLoadingChart(false);
+      }
+    }
+  }, [user, toast]);
+
+  useEffect(() => {
+    fetchChartData();
+  }, [fetchChartData]);
+
   const handleStepSubmit = async () => {
     if (user) {
-      await fetchUserProfile(user.uid);
+      await fetchUserProfile(user.uid); // Refresh profile to update total steps
+      await fetchChartData(); // Refresh chart data to include new submission
     }
   };
 
@@ -115,10 +140,15 @@ export default function ProfileDisplay() {
               )}
             </div>
         </div>
-        
 
         <div>
           <StepSubmissionForm onStepSubmit={handleStepSubmit} />
+        </div>
+
+        <Separator className="my-6" />
+
+        <div>
+          <DailyStepChart dailyStepsData={dailyStepsData} isLoading={isLoadingChart} />
         </div>
 
         <Separator className="my-6" />

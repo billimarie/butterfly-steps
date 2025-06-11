@@ -15,25 +15,30 @@ export interface UserProfile {
   profileComplete: boolean;
   inviteLink?: string;
   badgesEarned?: BadgeId[];
-  teamId?: string | null; // ID of the team the user belongs to
-  teamName?: string | null; // Name of the team, denormalized for easy display
-  currentStreak: number; // Number of consecutive days logged in
-  lastStreakLoginDate: string | null; // YYYY-MM-DD of the last login that counted for streak
-  lastLoginTimestamp: Timestamp | null; // Firestore Timestamp of the absolute last login
+  teamId?: string | null;
+  teamName?: string | null;
+  currentStreak: number;
+  lastStreakLoginDate: string | null;
+  lastLoginTimestamp: Timestamp | null;
 }
 
 export interface Team {
   id: string;
   name: string;
   creatorUid: string;
-  memberUids: string[]; // List of user UIDs who are members
+  memberUids: string[];
   totalSteps: number;
-  createdAt: any; // Firebase Timestamp
+  createdAt: any; 
 }
 
 export interface CommunityStats {
   totalSteps: number;
   totalParticipants: number;
+}
+
+export interface DailyStep {
+  date: string; // YYYY-MM-DD
+  steps: number;
 }
 
 export interface AppUser extends FirebaseUser {
@@ -46,7 +51,7 @@ export interface AuthContextType {
   loading: boolean;
   error: AuthError | null;
   logout: () => Promise<void>;
-  fetchUserProfile: (uid: string, initialLogin?: boolean) => Promise<void>; // Added optional initialLogin
+  fetchUserProfile: (uid: string, initialLogin?: boolean) => Promise<void>;
   setUserProfileState: (profile: UserProfile | null) => void;
   showStreakModal: boolean;
   setShowStreakModal: (show: boolean) => void;

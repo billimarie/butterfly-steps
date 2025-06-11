@@ -2,7 +2,7 @@
 import { db } from './firebase';
 import {
   doc,
-  documentId, // Added documentId
+  documentId,
   getDoc,
   setDoc,
   updateDoc,
@@ -18,9 +18,10 @@ import {
   orderBy,
   limit as firestoreLimit,
   type DocumentSnapshot,
-  type DocumentReference
+  type DocumentReference,
+  writeBatch
 } from 'firebase/firestore';
-import type { UserProfile, CommunityStats, Team } from '@/types';
+import type { UserProfile, CommunityStats, Team, DailyStep } from '@/types';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { ALL_BADGES, type BadgeData, type BadgeId, getBadgeDataById } from '@/lib/badges';
 
@@ -28,22 +29,27 @@ const USERS_COLLECTION = 'users';
 const TEAMS_COLLECTION = 'teams';
 const COMMUNITY_COLLECTION = 'community';
 const COMMUNITY_STATS_DOC = 'stats';
+const DAILY_STEPS_SUBCOLLECTION = 'dailySteps';
+
+// Helper to get today's date in YYYY-MM-DD format (UTC)
+function getTodayDateString(): string {
+  return new Date().toISOString().split('T')[0];
+}
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   const docRef = doc(db, USERS_COLLECTION, uid);
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) {
     const data = docSnap.data();
-    // Ensure all fields are correctly typed and defaulted if necessary
     return {
-      uid: docSnap.id, // Use document ID as the canonical UID
+      uid: docSnap.id,
       email: data.email || null,
       displayName: data.displayName || null,
       activityStatus: data.activityStatus || null,
       stepGoal: data.stepGoal || null,
       currentSteps: typeof data.currentSteps === 'number' ? data.currentSteps : 0,
       profileComplete: !!data.profileComplete,
-      inviteLink: data.inviteLink, // Can be undefined
+      inviteLink: data.inviteLink,
       badgesEarned: Array.isArray(data.badgesEarned) ? data.badgesEarned : [],
       teamId: data.teamId || null,
       teamName: data.teamName || null,
@@ -58,7 +64,7 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 export async function createUserProfile(firebaseUser: FirebaseUser, additionalData: Partial<UserProfile> = {}): Promise<UserProfile> {
   const userProfileRef = doc(db, USERS_COLLECTION, firebaseUser.uid);
   const profileData: UserProfile = {
-    uid: firebaseUser.uid, // This field is stored in the document
+    uid: firebaseUser.uid,
     email: firebaseUser.email,
     displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Anonymous User',
     activityStatus: null,
@@ -75,16 +81,14 @@ export async function createUserProfile(firebaseUser: FirebaseUser, additionalDa
     ...additionalData,
   };
   await setDoc(userProfileRef, profileData);
-  // Return a fully constructed UserProfile, using the doc ID as the canonical uid
   return {
-    ...profileData, // contains the 'uid' field from above
-    uid: firebaseUser.uid, // Explicitly ensure the returned object's uid is the doc ID
+    ...profileData,
+    uid: firebaseUser.uid,
   };
 }
 
 export async function updateUserProfile(uid: string, data: Partial<UserProfile>): Promise<void> {
   const userRef = doc(db, USERS_COLLECTION, uid);
-  // Prepare data for update, ensuring the 'uid' field within the document is also updated to match the document ID.
   const updatePayload = { ...data, uid: uid };
   await setDoc(userRef, updatePayload, { merge: true });
 }
@@ -96,7 +100,7 @@ export async function updateUserStreakOnLogin(uid: string): Promise<{
 }> {
   const userRef = doc(db, USERS_COLLECTION, uid);
   const now = new Date();
-  const todayDateString = now.toISOString().split('T')[0]; // YYYY-MM-DD for today
+  const todayDateString = getTodayDateString();
 
   try {
     const result = await runTransaction(db, async (transaction) => {
@@ -107,7 +111,7 @@ export async function updateUserStreakOnLogin(uid: string): Promise<{
             currentStreak: 1,
             lastStreakLoginDate: todayDateString,
             lastLoginTimestamp: Timestamp.fromDate(now),
-            uid: uid // ensure uid field is set if creating new
+            uid: uid
         }, { merge: true });
         return {
             updatedStreakCount: 1,
@@ -138,34 +142,31 @@ export async function updateUserStreakOnLogin(uid: string): Promise<{
           newStreakCount = currentStreak + 1;
           newLastStreakLoginDate = todayDateString;
         } else if (diffDays === 0) {
-          // Already logged in today and streak counted
-          newStreakCount = currentStreak; 
-          newLastStreakLoginDate = todayDateString; // Keep it as today
+          newStreakCount = currentStreak;
+          newLastStreakLoginDate = todayDateString;
         } else if (diffDays > 1) {
-          // Check grace period only if more than 1 calendar day missed
           if (lastLoginFirestoreTimestamp && lastLoginFirestoreTimestamp instanceof Timestamp) {
             const lastLoginActualTime = lastLoginFirestoreTimestamp.toDate().getTime();
             const currentTime = now.getTime();
             const hoursSinceLastLogin = (currentTime - lastLoginActualTime) / (1000 * 60 * 60);
 
-            if (hoursSinceLastLogin < 47.99) { // within grace period
+            if (hoursSinceLastLogin < 47.99) {
               newStreakCount = currentStreak + 1;
               newLastStreakLoginDate = todayDateString;
-            } else { // grace period missed
+            } else {
               newStreakCount = 1;
               newLastStreakLoginDate = todayDateString;
             }
-          } else { // No last login timestamp, treat as fresh start for streak
+          } else {
             newStreakCount = 1;
             newLastStreakLoginDate = todayDateString;
           }
-        } else { // Edge case (e.g. date from future? system clock changed?) - reset streak
+        } else {
           newStreakCount = 1;
           newLastStreakLoginDate = todayDateString;
         }
       }
 
-      // If streak was 0, and they log in, it should become 1.
       if (newStreakCount === 0 && newLastStreakLoginDate === todayDateString) {
           newStreakCount = 1;
       }
@@ -195,7 +196,6 @@ export async function updateUserStreakOnLogin(uid: string): Promise<{
   }
 }
 
-
 export async function checkAndAwardBadges(
   uid: string,
   currentTotalSteps: number,
@@ -221,55 +221,61 @@ export async function checkAndAwardBadges(
   return newlyEarnedBadgesData;
 }
 
-export async function submitSteps(uid: string, steps: number): Promise<BadgeData[]> {
-  if (steps <= 0) {
+export async function submitSteps(uid: string, stepsToAdd: number): Promise<BadgeData[]> {
+  if (stepsToAdd <= 0) {
     throw new Error("Steps must be a positive number.");
   }
 
   const userDocRef = doc(db, USERS_COLLECTION, uid);
   const communityStatsRef = doc(db, COMMUNITY_COLLECTION, COMMUNITY_STATS_DOC);
+  const todayDateStr = getTodayDateString();
+  const dailyStepDocRef = doc(db, USERS_COLLECTION, uid, DAILY_STEPS_SUBCOLLECTION, todayDateStr);
+
   let teamDocRef: DocumentReference | undefined;
   let userProfileDataBeforeUpdate: UserProfile | null = null;
 
-
   await runTransaction(db, async (transaction) => {
-    // Perform all reads first
     const userDocSnap = await transaction.get(userDocRef);
     if (!userDocSnap.exists()) {
       throw new Error("User profile does not exist.");
     }
     const data = userDocSnap.data();
-    userProfileDataBeforeUpdate = { 
-        ...data, 
-        uid: userDocSnap.id, // Ensure uid is doc.id
+    userProfileDataBeforeUpdate = {
+        ...data,
+        uid: userDocSnap.id,
         currentSteps: typeof data.currentSteps === 'number' ? data.currentSteps : 0,
         badgesEarned: Array.isArray(data.badgesEarned) ? data.badgesEarned : [],
     } as UserProfile;
 
-
     const communityStatsSnap = await transaction.get(communityStatsRef);
+    const dailyStepSnap = await transaction.get(dailyStepDocRef);
 
     let teamDocSnap: DocumentSnapshot | undefined;
     if (userProfileDataBeforeUpdate.teamId) {
       teamDocRef = doc(db, TEAMS_COLLECTION, userProfileDataBeforeUpdate.teamId);
-      teamDocSnap = await transaction.get(teamDocRef); // Read team doc
+      teamDocSnap = await transaction.get(teamDocRef);
     }
 
-    // Now perform all writes
-    transaction.update(userDocRef, { currentSteps: increment(steps) });
+    transaction.update(userDocRef, { currentSteps: increment(stepsToAdd) });
 
     if (!communityStatsSnap.exists()) {
-      transaction.set(communityStatsRef, { totalSteps: steps, totalParticipants: 1 });
+      transaction.set(communityStatsRef, { totalSteps: stepsToAdd, totalParticipants: 1 });
     } else {
-      transaction.update(communityStatsRef, { totalSteps: increment(steps) });
+      transaction.update(communityStatsRef, { totalSteps: increment(stepsToAdd) });
     }
 
     if (teamDocRef && teamDocSnap && teamDocSnap.exists()) {
-      transaction.update(teamDocRef, { totalSteps: increment(steps) });
+      transaction.update(teamDocRef, { totalSteps: increment(stepsToAdd) });
+    }
+
+    if (dailyStepSnap.exists()) {
+      transaction.update(dailyStepDocRef, { steps: increment(stepsToAdd) });
+    } else {
+      transaction.set(dailyStepDocRef, { date: todayDateStr, steps: stepsToAdd });
     }
   });
 
-  const updatedUserProfile = await getUserProfile(uid); 
+  const updatedUserProfile = await getUserProfile(uid);
   if (!updatedUserProfile || typeof updatedUserProfile.currentSteps !== 'number') {
     console.error("Failed to get updated user profile or currentSteps after step submission.");
     return [];
@@ -278,6 +284,24 @@ export async function submitSteps(uid: string, steps: number): Promise<BadgeData
   const newlyAwardedBadges = await checkAndAwardBadges(uid, updatedUserProfile.currentSteps, updatedUserProfile.badgesEarned || []);
   return newlyAwardedBadges;
 }
+
+export async function getUserDailySteps(uid: string, limitDays: number = 30): Promise<DailyStep[]> {
+  const dailyStepsRef = collection(db, USERS_COLLECTION, uid, DAILY_STEPS_SUBCOLLECTION);
+  const q = query(dailyStepsRef, orderBy('date', 'desc'), firestoreLimit(limitDays));
+  const querySnapshot = await getDocs(q);
+  
+  const dailySteps: DailyStep[] = [];
+  querySnapshot.forEach((doc) => {
+    const data = doc.data();
+    dailySteps.push({
+      date: data.date, // This is YYYY-MM-DD
+      steps: data.steps,
+    });
+  });
+  // Reverse to have dates in ascending order for the chart
+  return dailySteps.reverse(); 
+}
+
 
 export async function getCommunityStats(): Promise<CommunityStats> {
   const docRef = doc(db, COMMUNITY_COLLECTION, COMMUNITY_STATS_DOC);
@@ -290,7 +314,6 @@ export async function getCommunityStats(): Promise<CommunityStats> {
 
 export async function incrementParticipantCount(): Promise<void> {
     const communityStatsRef = doc(db, COMMUNITY_COLLECTION, COMMUNITY_STATS_DOC);
-
     await runTransaction(db, async (transaction) => {
         const communityStatsDoc = await transaction.get(communityStatsRef);
         if (!communityStatsDoc.exists()) {
@@ -334,7 +357,6 @@ export async function createTeam(creatorUserId: string, teamName: string, creato
     }
     
     transaction.update(userProfileDocRef, userProfileUpdates);
-
 
     return { teamId: newTeamDocRef.id, teamName: teamName, awardedTeamBadge };
   });
@@ -418,7 +440,6 @@ export async function leaveTeam(userId: string, teamId: string, userCurrentSteps
   });
 }
 
-
 export async function getTeam(teamId: string): Promise<Team | null> {
   const teamRef = doc(db, TEAMS_COLLECTION, teamId);
   const teamSnap = await getDoc(teamRef);
@@ -439,18 +460,17 @@ export async function getTeamMembersProfiles(memberUids: string[]): Promise<User
   if (!memberUids || memberUids.length === 0) return [];
 
   const profiles: UserProfile[] = [];
-  const CHUNK_SIZE = 30; 
+  const CHUNK_SIZE = 30;
   for (let i = 0; i < memberUids.length; i += CHUNK_SIZE) {
       const chunk = memberUids.slice(i, i + CHUNK_SIZE);
       if (chunk.length > 0) {
         const usersRef = collection(db, USERS_COLLECTION);
-        // Query by document ID directly, which is more robust.
         const q = query(usersRef, where(documentId(), 'in', chunk));
         const querySnapshot = await getDocs(q);
         querySnapshot.docs.forEach(docSnap => {
             const data = docSnap.data();
             profiles.push({
-                uid: docSnap.id, // Use the document ID as the canonical UserProfile.uid
+                uid: docSnap.id,
                 email: data.email || null,
                 displayName: data.displayName || null,
                 activityStatus: data.activityStatus || null,
@@ -478,14 +498,14 @@ export async function getTopUsers(count: number): Promise<UserProfile[]> {
   return querySnapshot.docs.map(doc => {
     const data = doc.data();
     return {
-      uid: doc.id, // Use the document ID as the uid
+      uid: doc.id,
       email: data.email || null,
       displayName: data.displayName || null,
       activityStatus: data.activityStatus || null,
       stepGoal: data.stepGoal || null,
       currentSteps: typeof data.currentSteps === 'number' ? data.currentSteps : 0,
       profileComplete: !!data.profileComplete,
-      inviteLink: data.inviteLink, 
+      inviteLink: data.inviteLink,
       badgesEarned: Array.isArray(data.badgesEarned) ? data.badgesEarned : [],
       teamId: data.teamId || null,
       teamName: data.teamName || null,
@@ -495,4 +515,3 @@ export async function getTopUsers(count: number): Promise<UserProfile[]> {
     } as UserProfile;
   });
 }
-

@@ -39,9 +39,6 @@ export default function Navbar() {
               <Button variant="ghost" asChild className="hidden sm:inline-flex">
                 <Link href="/teams">Teams</Link>
               </Button>
-              <Button variant="ghost" asChild className="hidden md:inline-flex">
-                <Link href="/invite">Generate Invite</Link>
-              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full">
@@ -69,9 +66,6 @@ export default function Navbar() {
                   </DropdownMenuItem>
                    <DropdownMenuItem asChild>
                     <Link href="/teams"><Users className="mr-2 h-4 w-4" />Teams</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/invite"><Gift className="mr-2 h-4 w-4" />Invite Message</Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={logout}>
