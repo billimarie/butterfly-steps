@@ -464,6 +464,7 @@ export async function getAllTeams(): Promise<Team[]> {
   return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team));
 }
 
+
 export async function getTeamMembersProfiles(memberUids: string[]): Promise<UserProfile[]> {
   if (!memberUids || memberUids.length === 0) return [];
 
