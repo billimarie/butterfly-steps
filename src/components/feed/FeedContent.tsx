@@ -10,7 +10,7 @@ import { Gift, ArrowRight } from 'lucide-react';
 
 import CommunityProgressCard from '@/components/dashboard/CommunityProgressCard';
 import ButterflyAnimation from '@/components/dashboard/ButterflyAnimation';
-import TopSteppersLeaderboard from '@/components/feed/TopSteppersLeaderboard'; // Import the new component
+import TopSteppersLeaderboard from '@/components/feed/TopSteppersLeaderboard';
 import { getCommunityStats } from '@/lib/firebaseService';
 import type { CommunityStats } from '@/types';
 
@@ -23,7 +23,7 @@ export default function FeedContent() {
     try {
       const stats = await getCommunityStats();
       setCommunityStats(stats);
-    } catch (error) { // Added missing opening brace
+    } catch (error) {
       console.error("Failed to fetch community stats for feed:", error);
       setCommunityStats(null);
     } finally {
@@ -35,8 +35,6 @@ export default function FeedContent() {
     fetchFeedData();
   }, [fetchFeedData]);
 
-  const communityProgressPercentage = communityStats ? (communityStats.totalSteps / 3_600_000) * 100 : 0;
-
   return (
     <>
       {loadingStats ? (
@@ -45,7 +43,7 @@ export default function FeedContent() {
         <>
           <CommunityProgressCard communityStats={communityStats} />
           <div className="mt-8">
-            <ButterflyAnimation progress={communityProgressPercentage} type="community" />
+            <ButterflyAnimation type="community" totalCommunitySteps={communityStats.totalSteps} />
           </div>
         </>
       ) : (
@@ -55,7 +53,7 @@ export default function FeedContent() {
         </Card>
       )}
 
-      <TopSteppersLeaderboard count={5} /> {/* Use the new component */}
+      <TopSteppersLeaderboard count={5} />
 
       <div className="grid md:grid-cols-2 gap-8 mt-12">
         <Card className="shadow-lg text-center flex flex-col">

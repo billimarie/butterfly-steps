@@ -15,7 +15,9 @@ import {
   arrayRemove,
   Timestamp,
   orderBy,
-  limit,
+  limit as firestoreLimit,
+  type DocumentSnapshot,
+  type DocumentReference
 } from 'firebase/firestore';
 import type { UserProfile, CommunityStats, Team } from '@/types';
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -77,7 +79,6 @@ export async function checkAndAwardBadges(
   const newBadgeIdsToSaveSet = new Set<BadgeId>(currentUserBadgeIds);
 
   for (const badge of ALL_BADGES) {
-    // Skip team-player badge here, it's awarded specifically on join/create
     if (badge.id === 'team-player') continue;
 
     if (currentTotalSteps >= badge.milestone && !currentUserBadgeIds.includes(badge.id)) {
@@ -103,28 +104,34 @@ export async function submitSteps(uid: string, steps: number): Promise<BadgeData
   const communityStatsRef = doc(db, COMMUNITY_COLLECTION, COMMUNITY_STATS_DOC);
   
   await runTransaction(db, async (transaction) => {
-    const userDoc = await transaction.get(userDocRef);
-    const communityStatsDoc = await transaction.get(communityStatsRef);
-
-    if (!userDoc.exists()) {
+    // --- All READS first ---
+    const userDocSnap = await transaction.get(userDocRef);
+    if (!userDocSnap.exists()) {
       throw new Error("User profile does not exist.");
     }
-    const userProfileData = userDoc.data() as UserProfile;
+    const userProfileData = userDocSnap.data() as UserProfile;
 
+    const communityStatsSnap = await transaction.get(communityStatsRef);
+
+    let teamDocSnap: DocumentSnapshot | undefined = undefined;
+    let teamDocRef: DocumentReference | undefined = undefined;
+
+    if (userProfileData.teamId) {
+      teamDocRef = doc(db, TEAMS_COLLECTION, userProfileData.teamId);
+      teamDocSnap = await transaction.get(teamDocRef); // Read team doc
+    }
+
+    // --- All WRITES next ---
     transaction.update(userDocRef, { currentSteps: increment(steps) });
 
-    if (!communityStatsDoc.exists()) {
+    if (!communityStatsSnap.exists()) {
       transaction.set(communityStatsRef, { totalSteps: steps, totalParticipants: 1 });
     } else {
       transaction.update(communityStatsRef, { totalSteps: increment(steps) });
     }
 
-    if (userProfileData?.teamId) {
-      const teamDocRef = doc(db, TEAMS_COLLECTION, userProfileData.teamId);
-      const teamDoc = await transaction.get(teamDocRef);
-      if (teamDoc.exists()) {
-        transaction.update(teamDocRef, { totalSteps: increment(steps) });
-      }
+    if (teamDocRef && teamDocSnap && teamDocSnap.exists()) {
+      transaction.update(teamDocRef, { totalSteps: increment(steps) });
     }
   });
 
@@ -149,6 +156,7 @@ export async function getCommunityStats(): Promise<CommunityStats> {
 
 export async function incrementParticipantCount(): Promise<void> {
     const communityStatsRef = doc(db, COMMUNITY_COLLECTION, COMMUNITY_STATS_DOC);
+    
     await runTransaction(db, async (transaction) => {
         const communityStatsDoc = await transaction.get(communityStatsRef);
         if (!communityStatsDoc.exists()) {
@@ -215,10 +223,9 @@ export async function joinTeam(userId: string, teamIdToJoin: string, userCurrent
     const newTeamData = newTeamSnap.data() as Team;
 
     if (userProfileData.teamId === teamIdToJoin) {
-      return { teamId: userProfileData.teamId, teamName: userProfileData.teamName! }; // No badge awarded if already on team
+      return { teamId: userProfileData.teamId, teamName: userProfileData.teamName! }; 
     }
 
-    // Leave current team if on one
     if (userProfileData.teamId) {
       const oldTeamDocRef = doc(db, TEAMS_COLLECTION, userProfileData.teamId);
       const oldTeamSnap = await transaction.get(oldTeamDocRef);
@@ -285,10 +292,9 @@ export async function getTeam(teamId: string): Promise<Team | null> {
 }
 
 export async function getAllTeams(): Promise<Team[]> {
-  // Order teams by totalSteps in descending order
   const teamsCollectionRef = collection(db, TEAMS_COLLECTION);
-  const teamsQuery = query(teamsCollectionRef, orderBy('totalSteps', 'desc'));
-  const querySnapshot = await getDocs(teamsQuery);
+  const q = query(teamsCollectionRef, orderBy("totalSteps", "desc"));
+  const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team));
 }
 
@@ -310,16 +316,8 @@ export async function getTeamMembersProfiles(memberUids: string[]): Promise<User
 }
 
 export async function getTopUsers(count: number): Promise<UserProfile[]> {
-  const usersCollectionRef = collection(db, USERS_COLLECTION);
-  // Query to get users ordered by currentSteps descending, limited to 'count'
-  const topUsersQuery = query(usersCollectionRef, orderBy('currentSteps', 'desc'), limit(count));
-  
-  const querySnapshot = await getDocs(topUsersQuery);
-  const topUsers: UserProfile[] = [];
-  querySnapshot.forEach((docSnap) => {
-    topUsers.push(docSnap.data() as UserProfile);
-  });
-  return topUsers;
+  const usersRef = collection(db, USERS_COLLECTION);
+  const q = query(usersRef, orderBy('currentSteps', 'desc'), firestoreLimit(count));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(doc => doc.data() as UserProfile);
 }
-
-    

@@ -23,12 +23,11 @@ import Logo from '@/components/ui/Logo';
 
 function Dashboard({ userProfile, initialCommunityStats }: { userProfile: UserProfile, initialCommunityStats: CommunityStats | null }) {
   const [communityStats, setCommunityStats] = useState<CommunityStats | null>(initialCommunityStats);
-  const { fetchUserProfile } = useAuth(); // Get fetchUserProfile to refresh user stats
+  const { fetchUserProfile } = useAuth();
 
   const refreshDashboardData = useCallback(async () => {
     const stats = await getCommunityStats();
     setCommunityStats(stats);
-    // Refresh user profile data as well, as step submission updates it
     if (userProfile?.uid) {
       await fetchUserProfile(userProfile.uid);
     }
@@ -36,17 +35,12 @@ function Dashboard({ userProfile, initialCommunityStats }: { userProfile: UserPr
 
 
   useEffect(() => {
-    // If initialCommunityStats are provided (e.g. from SSR or initial fetch), use them.
-    // Otherwise, or if a refresh is needed, fetch them.
     if (!initialCommunityStats) {
         refreshDashboardData();
     } else {
         setCommunityStats(initialCommunityStats);
     }
   }, [initialCommunityStats, refreshDashboardData]);
-
-  const userProgress = userProfile.stepGoal ? (userProfile.currentSteps / userProfile.stepGoal) * 100 : 0;
-  const communityProgress = communityStats ? (communityStats.totalSteps / 3_600_000) * 100 : 0;
 
   return (
     <div className="space-y-8">
@@ -55,14 +49,20 @@ function Dashboard({ userProfile, initialCommunityStats }: { userProfile: UserPr
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <CommunityProgressCard communityStats={communityStats} />
-           {communityStats && <ButterflyAnimation progress={communityProgress} type="community" />}
+           {communityStats && <ButterflyAnimation type="community" totalCommunitySteps={communityStats.totalSteps} />}
         </div>
         <div className="space-y-6">
           <UserProgressCard userProfile={userProfile} />
           <StepSubmissionForm onStepSubmit={refreshDashboardData} />
         </div>
       </div>
-      {userProfile.profileComplete && userProfile.stepGoal && <ButterflyAnimation progress={userProgress} type="user" />}
+      {userProfile.profileComplete && (userProfile.stepGoal || userProfile.currentSteps > 0) && (
+        <ButterflyAnimation 
+          type="user" 
+          userCurrentSteps={userProfile.currentSteps} 
+          userStepGoal={userProfile.stepGoal} 
+        />
+      )}
       
       <Card className="shadow-lg">
         <CardHeader>
@@ -105,25 +105,23 @@ function LandingPage() {
     fetchLandingPageStats();
   }, [fetchLandingPageStats]);
 
-  const communityProgressPercentage = communityStats ? (communityStats.totalSteps / 3_600_000) * 100 : 0;
-
   return (
     <div className="text-center py-12 space-y-12">
       <div className="relative w-full h-72 md:h-96 rounded-xl overflow-hidden shadow-2xl">
-        <Image 
-            src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1738520667/Donors/IMG_7534_jy4pvi.jpg" 
-            alt="Monarch butterflies on milkweed" 
-            layout="fill" 
+        <Image
+            src="https://placehold.co/1200x400.png"
+            alt="Monarch butterflies on milkweed"
+            layout="fill"
             objectFit="cover"
             data-ai-hint="monarch butterfly milkweed"
             priority
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex flex-col items-center justify-end p-8">
             <h1 className="font-headline text-5xl md:text-7xl font-bold text-white mb-4">
-              Mojave Monarch Challenge
+                Monarch Miles
             </h1>
             <p className="text-xl md:text-2xl text-slate-100 mb-8 max-w-3xl">
-                Track your steps, raise funds, and help save the monarch butterfly!
+                Join the "Stepping For Monarchs" migration challenge. Track your steps, raise funds, and help save the monarch butterfly!
             </p>
         </div>
       </div>
@@ -138,7 +136,7 @@ function LandingPage() {
         ) : communityStats ? (
           <div className="space-y-6">
             <CommunityProgressCard communityStats={communityStats} />
-            <ButterflyAnimation progress={communityProgressPercentage} type="community" />
+            <ButterflyAnimation type="community" totalCommunitySteps={communityStats.totalSteps} />
           </div>
         ) : (
           <Card className="text-center">
@@ -161,10 +159,10 @@ function LandingPage() {
         <Card className="shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader>
                 <Users className="h-12 w-12 text-primary mb-3"/>
-                <CardTitle className="font-headline">Raise Awareness</CardTitle>
+                <CardTitle className="font-headline">Raise Awareness & Join Teams</CardTitle>
             </CardHeader>
             <CardContent>
-                <p>Invite your network to sponsor your journey and support ForEveryStarATree.org's conservation efforts.</p>
+                <p>Invite your network to sponsor your journey, join or create a team, and support ForEveryStarATree.org's conservation efforts.</p>
             </CardContent>
         </Card>
         <Card className="shadow-lg hover:shadow-xl transition-shadow">
@@ -215,7 +213,7 @@ function LandingPage() {
 
 export default function HomePage() {
   const { user, userProfile, loading: authLoading } = useAuth();
-  useAuthRedirect({ requireAuth: false }); 
+  useAuthRedirect({ requireAuth: false });
   
   const [initialCommunityStats, setInitialCommunityStats] = useState<CommunityStats | null>(null);
   const [communityStatsLoading, setCommunityStatsLoading] = useState(true);
@@ -237,12 +235,12 @@ export default function HomePage() {
         setInitialCommunityStats(stats);
       } catch (error) {
         console.error("Failed to fetch initial community stats:", error);
-        setInitialCommunityStats(null); // Ensure state is cleared on error
+        setInitialCommunityStats(null);
       } finally {
         setCommunityStatsLoading(false);
       }
     } else {
-      setCommunityStatsLoading(false); 
+      setCommunityStatsLoading(false);
     }
   }, [user, userProfile?.profileComplete]);
 
@@ -267,18 +265,17 @@ export default function HomePage() {
           <div className="mb-4"> <Logo /> </div>
           <p className="text-xl font-semibold text-foreground mb-2">Finalizing your setup...</p>
           <p className="text-muted-foreground">Redirecting to your profile to complete setup.</p>
-          <Skeleton className="h-8 w-48 mt-4" /> 
+          <Skeleton className="h-8 w-48 mt-4" />
         </div>
       );
-    } else { 
+    } else {
       if (communityStatsLoading) {
-        return ( 
+        return (
           <div className="space-y-8">
-            <CountdownTimer /> 
+            <CountdownTimer />
             <Skeleton className="h-64 w-full rounded-lg lg:col-span-2" />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
-                 {/* Placeholder for community progress skeleton if needed, or remove if above skeleton is enough */}
               </div>
               <div className="space-y-6">
                 <Skeleton className="h-48 w-full rounded-lg" />
@@ -290,8 +287,7 @@ export default function HomePage() {
       }
       return <Dashboard userProfile={userProfile} initialCommunityStats={initialCommunityStats} />;
     }
-  } else { 
+  } else {
      return <LandingPage />;
   }
 }
-
