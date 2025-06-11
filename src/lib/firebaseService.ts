@@ -440,6 +440,7 @@ export async function leaveTeam(userId: string, teamId: string, userCurrentSteps
   });
 }
 
+
 export async function getTeam(teamId: string): Promise<Team | null> {
   const teamRef = doc(db, TEAMS_COLLECTION, teamId);
   const teamSnap = await getDoc(teamRef);
