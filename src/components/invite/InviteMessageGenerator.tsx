@@ -47,9 +47,9 @@ export default function InviteMessageGenerator() {
       userName: userProfile.displayName || user.email || 'A challenger',
       stepGoal: userProfile.stepGoal,
       activityStatus: userProfile.activityStatus,
-      challengeName: 'Stepping For Monarchs',
-      nonprofitName: 'ForEveryStarATree.org',
-      donationLink: 'https://foreveryStaratree.org/donate', // General donation link
+      challengeName: 'Butterfly Steps',
+      nonprofitName: 'For Every Star A Tree',
+      donationLink: 'https://foreveryStaratree.org/donate.html', // General donation link
     };
 
     try {
@@ -120,7 +120,7 @@ export default function InviteMessageGenerator() {
                   <Copy className="mr-2 h-4 w-4" /> Copy
                 </Button>
                 <Button type="button" variant="default" onClick={() => {
-                     const mailtoLink = `mailto:?subject=Sponsor My Stepping For Monarchs Challenge!&body=${encodeURIComponent(inviteMessage + "\n\nLearn more and support ForEveryStarATree.org: https://foreveryStaratree.org/donate" + (userProfile?.inviteLink ? `\n\nSee my progress: ${userProfile.inviteLink}` : ""))}`;
+                     const mailtoLink = `mailto:?subject=Sponsor My Butterfly Steps Challenge!&body=${encodeURIComponent(inviteMessage + "\n\nLearn more and support ForEveryStarATree.org: https://foreveryStaratree.org/donate" + (userProfile?.inviteLink ? `\n\nSee my progress: ${userProfile.inviteLink}` : ""))}`;
                      window.location.href = mailtoLink;
                 }} disabled={!inviteMessage}>
                   <Send className="mr-2 h-4 w-4" /> Share via Email

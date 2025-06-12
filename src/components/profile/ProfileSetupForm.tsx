@@ -227,7 +227,7 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
         }
       }
 
-      toast({ title: 'Profile Updated!', description: 'Your Monarch Miles profile is ready.' });
+      toast({ title: 'Profile Updated!', description: 'Your Butterfly Steps profile is ready.' });
       router.push('/');
     } catch (error) { 
       console.error('Profile update/team action error:', error);
@@ -264,7 +264,7 @@ export default function ProfileSetupForm({ isUpdate = false, invitedTeamId }: Pr
           {isUpdate ? 'Update Your Profile' : 'Set Up Your Profile'}
         </CardTitle>
         <CardDescription>
-          {isUpdate ? 'Modify your details for the Stepping For Monarchs challenge.' : 'Tell us a bit about yourself to get started with the Stepping For Monarchs challenge.'}
+          {isUpdate ? 'Modify your details for the Butterfly Steps challenge.' : 'Tell us a bit about yourself to get started with the Butterfly Steps challenge.'}
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>

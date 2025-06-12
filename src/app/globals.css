@@ -160,8 +160,8 @@
   /* start at 0 so they don't appear while loading */
   -webkit-animation-fill-mode: backwards;
   animation-fill-mode: backwards;
-  animation: fly 20s infinite linear;
-  animation-delay: 0.25s;
+  animation: fly 10s infinite linear;
+  animation-delay: 0.1s;
 }
 .mariposa:nth-child(2) {
   animation-delay: 0.7s;
@@ -276,12 +276,12 @@
 @keyframes fly {
   0% {
     opacity: 0;
-    transform: translateY(-30vh);
+    transform: translateY(-20vh);
   }
   3%, 99% {
     opacity: 1;
   }
   100% {
-    transform: translateY(-65vh);
+    transform: translateY(-40vh);
   }
 }
