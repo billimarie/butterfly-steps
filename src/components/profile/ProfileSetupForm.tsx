@@ -13,11 +13,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { updateUserProfile, incrementParticipantCount, getUserProfile } from '@/lib/firebaseService';
+import { updateUserProfile, incrementParticipantCount, createTeam, joinTeam, leaveTeam, getUserProfile } from '@/lib/firebaseService';
 import type { ActivityStatus, UserProfile } from '@/types';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { CheckCircle, Zap, TrendingUp, Target, Edit3 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { CheckCircle, Zap, TrendingUp, Target, Edit3, Users, LogOut } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+
+import { ToastAction } from "@/components/ui/toast";
+import type { BadgeData } from '@/lib/badges';
 
 
 const activityGoalsMap: Record<ActivityStatus, { label: string; goals: string[] }> = {
@@ -36,6 +42,9 @@ const profileSetupSchema = z.object({
     (val) => (val === "" || val === undefined || val === null ? undefined : Number(String(val).replace(/,/g, ''))),
     z.number().positive('Custom goal must be a positive number.').optional()
   ),
+  teamAction: z.enum(['none', 'create', 'join']).default('none'),
+  newTeamName: z.string().min(3, "Team name must be at least 3 characters").max(50).optional(),
+  joinTeamId: z.string().min(5, "Team ID seems too short").optional(),
 }).refine(data => {
   if (data.stepGoalOption === 'Custom') {
     return data.customStepGoal !== undefined && data.customStepGoal > 0;
@@ -99,8 +108,15 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
         setValue('stepGoalOption', undefined);
         setValue('customStepGoal', undefined);
       }
+      if (userProfile.teamId) {
+        setValue('teamAction', 'none'); 
+      }
+
+    } else if (user) {
+        setValue('displayName', user.email?.split('@')[0] || '');
     }
-  }, [user, userProfile, setValue]);
+  }, [userProfile, user, setValue]);
+
 
   const onSubmit: SubmitHandler<ProfileSetupFormInputs> = async (data) => {
     if (!user) {
@@ -124,12 +140,35 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       profileComplete: true,
       currentSteps: currentSteps, 
       badgesEarned: userProfile?.badgesEarned || [],
-      // Preserve existing teamId and teamName if updating, or they will be null for new profiles
-      teamId: userProfile?.teamId || null,
-      teamName: userProfile?.teamName || null,
     };
 
     try {
+      let teamUpdate: { teamId: string | null; teamName: string | null } = { teamId: userProfile?.teamId || null, teamName: userProfile?.teamName || null };
+      let awardedTeamBadgeData: BadgeData | undefined = undefined;
+
+      if (data.teamAction === 'create' && data.newTeamName && !userProfile?.teamId) {
+        const result = await createTeam(user.uid, data.newTeamName, currentSteps);
+        teamUpdate = { teamId: result.teamId, teamName: result.teamName };
+        awardedTeamBadgeData = result.awardedTeamBadge;
+        toast({ title: 'Team Created!', description: `You've created and joined "${result.teamName}".` });
+      } else if (data.teamAction === 'join' && data.joinTeamId && !userProfile?.teamId) {
+        const result = await joinTeam(user.uid, data.joinTeamId, currentSteps);
+        if (result) {
+            teamUpdate = { teamId: result.teamId, teamName: result.teamName };
+            awardedTeamBadgeData = result.awardedTeamBadge;
+            toast({ title: 'Team Joined!', description: `You've joined "${result.teamName}".` });
+        } else {
+            toast({ title: 'Failed to join team', description: 'Please check the Team ID and try again.', variant: 'destructive'});
+            setLoading(false);
+            return;
+        }
+      }
+      
+      profileUpdateData.teamId = teamUpdate.teamId;
+      profileUpdateData.teamName = teamUpdate.teamName;
+      // If a team badge was awarded, ensure it's included in the profile update
+      // This is now handled within createTeam/joinTeam directly writing to user profile badges.
+
       await updateUserProfile(user.uid, profileUpdateData);
       
       if (!isUpdate && !userProfile?.profileComplete) { 
@@ -138,14 +177,50 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       
       const updatedFullProfile = await getUserProfile(user.uid);
       if (updatedFullProfile) {
-        setUserProfileState(updatedFullProfile); 
+        setUserProfileState(updatedFullProfile); // This ensures AuthContext has the latest badges
+        // Check if the team badge was newly awarded by comparing with initial profile state
+        // This is a bit tricky if the component re-renders. The createTeam/joinTeam return is more reliable.
+        if (awardedTeamBadgeData) {
+             const badge = awardedTeamBadgeData;
+             toast({
+                title: 'Badge Unlocked!',
+                description: (
+                  <div className="flex items-center">
+                    <badge.icon className="mr-2 h-5 w-5 text-primary" />
+                    <span>You've earned the "{badge.name}" badge!</span>
+                  </div>
+                ),
+                action: (
+                  <ToastAction
+                    altText="View on Profile"
+                    onClick={() => router.push('/profile')}
+                  >
+                    View on Profile
+                  </ToastAction>
+                ),
+            });
+        }
       }
 
       toast({ title: 'Profile Updated!', description: 'Your Monarch Miles profile is ready.' });
       router.push('/');
-    } catch (error) { 
-      console.error('Profile update error:', error);
-      toast({ title: 'Update Failed', description: (error as Error).message || 'Could not update profile. Please try again.', variant: 'destructive' });
+    } catch (error) {
+      console.error('Profile update/team action error:', error);
+      toast({ title: 'Update Failed', description: (error as Error).message || 'Could not update profile or team. Please try again.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLeaveTeam = async () => {
+    if (!user || !userProfile?.teamId) return;
+    setLoading(true);
+    try {
+      await leaveTeam(user.uid, userProfile.teamId, userProfile.currentSteps);
+      toast({ title: 'Left Team', description: `You have left ${userProfile.teamName}.` });
+      await fetchUserProfile(user.uid); 
+    } catch (error) {
+      toast({ title: 'Error Leaving Team', description: (error as Error).message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -258,9 +333,71 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
           )}
         
           <Separator />
-          
-          {/* Team options removed */}
 
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center"><Users className="mr-2 h-5 w-5 text-primary" /> Team Options</h3>
+            {userProfile?.teamId && userProfile?.teamName ? (
+              <div>
+                <p>You are currently on team: <strong className="text-accent">{userProfile.teamName}</strong>.</p>
+                <Button type="button" variant="outline" onClick={handleLeaveTeam} disabled={loading} className="mt-2">
+                  <LogOut className="mr-2 h-4 w-4" /> Leave Team
+                </Button>
+                <p className="text-xs text-muted-foreground mt-1">To join or create a new team, you must first leave your current team.</p>
+              </div>
+            ) : (
+              <>
+                <Controller
+                  name="teamAction"
+                  control={control}
+                  render={({ field }) => (
+                    <RadioGroup
+                      onValueChange={(value) => field.onChange(value as 'none' | 'create' | 'join')}
+                      value={field.value}
+                      className="space-y-2"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="none" id="teamNone" />
+                        <Label htmlFor="teamNone">No team action / Skip for now</Label>
+                      </div>
+                       <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="create" id="teamCreate" />
+                        <Label htmlFor="teamCreate">Create a new team</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="join" id="teamJoin" />
+                        <Label htmlFor="teamJoin">Join an existing team</Label>
+                      </div>
+                    </RadioGroup>
+                  )}
+                />
+
+                {selectedTeamAction === 'create' && (
+                  <div className="space-y-2 pl-6 pt-2">
+                    <Label htmlFor="newTeamName">New Team Name</Label>
+                    <Controller
+                        name="newTeamName"
+                        control={control}
+                        render={({ field }) => <Input id="newTeamName" placeholder="e.g., The Monarch Trackers" {...field} />}
+                    />
+                    {errors.newTeamName && <p className="text-sm text-destructive">{errors.newTeamName.message}</p>}
+                  </div>
+                )}
+
+                {selectedTeamAction === 'join' && (
+                  <div className="space-y-2 pl-6 pt-2">
+                    <Label htmlFor="joinTeamId">Team ID to Join</Label>
+                     <Controller
+                        name="joinTeamId"
+                        control={control}
+                        render={({ field }) => <Input id="joinTeamId" placeholder="Enter Team ID" {...field} />}
+                    />
+                    {errors.joinTeamId && <p className="text-sm text-destructive">{errors.joinTeamId.message}</p>}
+                    <p className="text-xs text-muted-foreground">Ask the team creator for the Team ID.</p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={loading}>
