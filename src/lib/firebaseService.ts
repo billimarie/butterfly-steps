@@ -21,7 +21,7 @@ import {
   type DocumentReference,
   writeBatch
 } from 'firebase/firestore';
-import type { UserProfile, CommunityStats, Team, DailyStep } from '@/types';
+import type { UserProfile, CommunityStats, Team, DailyStep, StreakUpdateResults } from '@/types';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { ALL_BADGES, type BadgeData, type BadgeId, getBadgeDataById } from '@/lib/badges';
 
@@ -32,7 +32,7 @@ const COMMUNITY_STATS_DOC = 'stats';
 const DAILY_STEPS_SUBCOLLECTION = 'dailySteps';
 
 // Helper to get today's date in YYYY-MM-DD format (UTC)
-function getTodayDateString(): string {
+function getTodayDateStringUTC(): string {
   return new Date().toISOString().split('T')[0];
 }
 
@@ -40,11 +40,18 @@ function getTodayDateString(): string {
 function mapDocToUserProfile(docSnap: DocumentSnapshot): UserProfile {
   const data = docSnap.data();
   if (!data) {
+<<<<<<< HEAD
+    throw new Error(`Document data not found for user ${docSnap.id}`);
+  }
+  return {
+    uid: docSnap.id,
+=======
     // This case should ideally not be hit if docSnap.exists() is checked before calling
     throw new Error(`Document data not found for user ${docSnap.id}`);
   }
   return {
     uid: docSnap.id, // Use the document ID as the UID
+>>>>>>> 90feff25b7e434fe77bbae0305a9f742ec8923f1
     email: data.email || null,
     displayName: data.displayName || null,
     activityStatus: data.activityStatus || null,
@@ -56,7 +63,11 @@ function mapDocToUserProfile(docSnap: DocumentSnapshot): UserProfile {
     teamId: data.teamId || null,
     teamName: data.teamName || null,
     currentStreak: typeof data.currentStreak === 'number' ? data.currentStreak : 0,
+<<<<<<< HEAD
+    lastStreakLoginDate: data.lastStreakLoginDate || null, // Should be YYYY-MM-DD
+=======
     lastStreakLoginDate: data.lastStreakLoginDate || null,
+>>>>>>> 90feff25b7e434fe77bbae0305a9f742ec8923f1
     lastLoginTimestamp: data.lastLoginTimestamp instanceof Timestamp ? data.lastLoginTimestamp : null,
   };
 }
@@ -95,57 +106,74 @@ export async function createUserProfile(firebaseUser: FirebaseUser, additionalDa
 
 export async function updateUserProfile(uid: string, data: Partial<UserProfile>): Promise<void> {
   const userRef = doc(db, USERS_COLLECTION, uid);
+<<<<<<< HEAD
+  const updatePayload = { ...data, uid: uid }; 
+=======
   const updatePayload = { ...data, uid: uid }; // Ensure UID is part of the update if using setDoc with merge
+>>>>>>> 90feff25b7e434fe77bbae0305a9f742ec8923f1
   await setDoc(userRef, updatePayload, { merge: true });
 }
 
-export async function updateUserStreakOnLogin(uid: string): Promise<{
-  updatedStreakCount: number;
-  updatedLastStreakLoginDate: string | null;
-  updatedLastLoginTimestamp: Timestamp;
-}> {
+export async function updateUserStreakOnLogin(uid: string): Promise<StreakUpdateResults> {
   const userRef = doc(db, USERS_COLLECTION, uid);
   const now = new Date();
-  const todayDateString = getTodayDateString();
+  const todayDateStringUTC = getTodayDateStringUTC();
+  const newLastLoginTimestamp = Timestamp.fromDate(now);
 
   try {
     const result = await runTransaction(db, async (transaction) => {
       const userSnap = await transaction.get(userRef);
+      
+      let currentStreak = 0;
+      let lastStreakLoginDateStr: string | null = null;
+      let streakProcessedForToday = false;
+
       if (!userSnap.exists()) {
-        console.warn(`User profile ${uid} not found during streak update.`);
-         transaction.set(userRef, {
+        // This case should ideally be rare if profiles are created upon signup.
+        // If it happens, we start a new streak.
+        console.warn(`User profile ${uid} not found during streak update. Initializing streak.`);
+        transaction.set(userRef, {
+            uid: uid, // ensure uid is set
             currentStreak: 1,
-            lastStreakLoginDate: todayDateString,
-            lastLoginTimestamp: Timestamp.fromDate(now),
-            uid: uid
+            lastStreakLoginDate: todayDateStringUTC,
+            lastLoginTimestamp: newLastLoginTimestamp,
         }, { merge: true });
         return {
             updatedStreakCount: 1,
-            updatedLastStreakLoginDate: todayDateString,
-            updatedLastLoginTimestamp: Timestamp.fromDate(now),
+            updatedLastStreakLoginDate: todayDateStringUTC,
+            updatedLastLoginTimestamp: newLastLoginTimestamp,
+            streakProcessedForToday: true,
         };
       }
 
-      const userProfile = userSnap.data() as UserProfile;
-      let currentStreak = userProfile.currentStreak || 0;
-      const lastStreakLoginDateStr = userProfile.lastStreakLoginDate;
-      const lastLoginFirestoreTimestamp = userProfile.lastLoginTimestamp;
-
+      const userProfile = mapDocToUserProfile(userSnap); // Use helper for consistency
+      currentStreak = userProfile.currentStreak;
+      lastStreakLoginDateStr = userProfile.lastStreakLoginDate;
+      
       let newStreakCount = currentStreak;
       let newLastStreakLoginDate = lastStreakLoginDateStr;
 
       if (!lastStreakLoginDateStr) {
+        // First login ever for streak purposes for this user
         newStreakCount = 1;
-        newLastStreakLoginDate = todayDateString;
-      } else {
-        const lastStreakDate = new Date(lastStreakLoginDateStr + 'T00:00:00Z');
-        const todayAtMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        newLastStreakLoginDate = todayDateStringUTC;
+        streakProcessedForToday = true;
+      } else if (lastStreakLoginDateStr !== todayDateStringUTC) {
+        // This is the first login on a new UTC calendar day
+        streakProcessedForToday = true;
+        
+        const lastLoginDate = new Date(lastStreakLoginDateStr + 'T00:00:00Z'); // Parse as UTC
+        const yesterday = new Date(now);
+        yesterday.setUTCDate(now.getUTCDate() - 1);
+        const yesterdayStringUTC = yesterday.toISOString().split('T')[0];
 
-        const diffTime = todayAtMidnight.getTime() - lastStreakDate.getTime();
-        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays === 1) {
+        if (lastStreakLoginDateStr === yesterdayStringUTC) {
+          // Logged in consecutively
           newStreakCount = currentStreak + 1;
+<<<<<<< HEAD
+        } else {
+          // Missed one or more days
+=======
           newLastStreakLoginDate = todayDateString;
         } else if (diffDays === 0) {
           newStreakCount = currentStreak; 
@@ -168,16 +196,32 @@ export async function updateUserStreakOnLogin(uid: string): Promise<{
              newLastStreakLoginDate = todayDateString;
           }
         } else { 
+>>>>>>> 90feff25b7e434fe77bbae0305a9f742ec8923f1
           newStreakCount = 1;
-          newLastStreakLoginDate = todayDateString;
         }
+        newLastStreakLoginDate = todayDateStringUTC;
+      } else {
+        // Already logged in today (UTC) and streak was processed.
+        // newStreakCount remains currentStreak.
+        // newLastStreakLoginDate remains todayDateStringUTC.
+        // streakProcessedForToday remains false for THIS specific call, as the day's first processing is done.
+         streakProcessedForToday = false;
       }
+      
+      // Ensure streak is at least 1 if processed for today and was 0
+      if (streakProcessedForToday && newStreakCount === 0) {
+        newStreakCount = 1;
+      }
+<<<<<<< HEAD
+
+=======
       
       if (newStreakCount === 0 && newLastStreakLoginDate === todayDateString) {
           newStreakCount = 1;
       }
 
       const newLastLoginTimestamp = Timestamp.fromDate(now);
+>>>>>>> 90feff25b7e434fe77bbae0305a9f742ec8923f1
       transaction.update(userRef, {
         currentStreak: newStreakCount,
         lastStreakLoginDate: newLastStreakLoginDate,
@@ -188,19 +232,23 @@ export async function updateUserStreakOnLogin(uid: string): Promise<{
         updatedStreakCount: newStreakCount,
         updatedLastStreakLoginDate: newLastStreakLoginDate,
         updatedLastLoginTimestamp: newLastLoginTimestamp,
+        streakProcessedForToday: streakProcessedForToday,
       };
     });
     return result;
   } catch (error) {
     console.error("Transaction failed for streak update: ", error);
+    // Fallback: return current state if transaction fails, don't indicate processing
     const fallbackProfile = await getUserProfile(uid);
     return {
         updatedStreakCount: fallbackProfile?.currentStreak || 0,
         updatedLastStreakLoginDate: fallbackProfile?.lastStreakLoginDate || null,
-        updatedLastLoginTimestamp: fallbackProfile?.lastLoginTimestamp instanceof Timestamp ? fallbackProfile.lastLoginTimestamp : Timestamp.fromDate(now),
+        updatedLastLoginTimestamp: fallbackProfile?.lastLoginTimestamp || newLastLoginTimestamp,
+        streakProcessedForToday: false, 
     };
   }
 }
+
 
 export async function checkAndAwardBadges(
   uid: string,
@@ -234,8 +282,8 @@ export async function submitSteps(uid: string, stepsToAdd: number): Promise<Badg
 
   const userDocRef = doc(db, USERS_COLLECTION, uid);
   const communityStatsRef = doc(db, COMMUNITY_COLLECTION, COMMUNITY_STATS_DOC);
-  const todayDateStr = getTodayDateString();
-  const dailyStepDocRef = doc(db, USERS_COLLECTION, uid, DAILY_STEPS_SUBCOLLECTION, todayDateStr);
+  const todayDateStrUTC = getTodayDateStringUTC();
+  const dailyStepDocRef = doc(db, USERS_COLLECTION, uid, DAILY_STEPS_SUBCOLLECTION, todayDateStrUTC);
 
   let teamDocRef: DocumentReference | undefined;
   let userProfileDataBeforeUpdate: UserProfile | null = null;
@@ -268,7 +316,11 @@ export async function submitSteps(uid: string, stepsToAdd: number): Promise<Badg
     if (dailyStepSnap.exists()) {
         transaction.update(dailyStepDocRef, { steps: increment(stepsToAdd) });
     } else {
+<<<<<<< HEAD
+        transaction.set(dailyStepDocRef, { date: todayDateStrUTC, steps: stepsToAdd });
+=======
         transaction.set(dailyStepDocRef, { date: todayDateStr, steps: stepsToAdd });
+>>>>>>> 90feff25b7e434fe77bbae0305a9f742ec8923f1
     }
 
     if (userProfileDataBeforeUpdate?.teamId && teamDocRef && teamDocSnap?.exists()) {
@@ -292,7 +344,11 @@ export async function getUserDailySteps(uid: string, limitDays: number = 30): Pr
   const querySnapshot = await getDocs(q);
   
   const dailySteps: DailyStep[] = [];
+<<<<<<< HEAD
+  querySnapshot.forEach((docSnap) => {
+=======
   querySnapshot.forEach((docSnap) => { // Changed doc to docSnap for clarity
+>>>>>>> 90feff25b7e434fe77bbae0305a9f742ec8923f1
     const data = docSnap.data();
     dailySteps.push({
       date: data.date, 
@@ -443,18 +499,21 @@ export async function getAllTeams(): Promise<Team[]> {
   const teamsCollectionRef = collection(db, TEAMS_COLLECTION);
   const q = query(teamsCollectionRef, orderBy("totalSteps", "desc"));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Team)); // Changed doc to docSnap
+  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Team));
 }
 
 export async function getTeamMembersProfiles(memberUids: string[]): Promise<UserProfile[]> {
   if (!memberUids || memberUids.length === 0) return [];
 
   const profiles: UserProfile[] = [];
+  // Firestore 'in' queries are limited to 30 items in the array.
+  // Chunk the memberUids array if it's larger.
   const CHUNK_SIZE = 30; 
   for (let i = 0; i < memberUids.length; i += CHUNK_SIZE) {
       const chunk = memberUids.slice(i, i + CHUNK_SIZE);
       if (chunk.length > 0) { 
         const usersRef = collection(db, USERS_COLLECTION);
+        // Use documentId() for querying by document ID
         const q = query(usersRef, where(documentId(), 'in', chunk));
         const querySnapshot = await getDocs(q);
         querySnapshot.forEach(docSnap => { // Changed docSnap from forEach doc to docSnap

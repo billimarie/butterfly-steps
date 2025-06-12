@@ -12,7 +12,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { updateUserProfile, createTeam, joinTeam, leaveTeam, getUserProfile } from '@/lib/firebaseService';
+import { createTeam, joinTeam, leaveTeam, getUserProfile } from '@/lib/firebaseService';
 import type { ActivityStatus, UserProfile } from '@/types';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -21,6 +21,8 @@ import { Separator } from '@/components/ui/separator';
 import { ToastAction } from "@/components/ui/toast";
 import type { BadgeData, BadgeId } from '@/lib/badges';
 import { getBadgeDataById } from '@/lib/badges';
+import { db } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 
 const activityGoalsMap: Record<ActivityStatus, { label: string; goals: string[] }> = {
@@ -29,7 +31,6 @@ const activityGoalsMap: Record<ActivityStatus, { label: string; goals: string[] 
   'Very Active': { label: 'Regular vigorous exercise / active job', goals: ['100,000 steps', '300,000 steps', '500,000 steps', 'Custom'] },
 };
 
-// This schema is now for *updating* an existing profile.
 const profileUpdateSchema = z.object({
   displayName: z.string().min(2, "Display name is required").max(50),
   activityStatus: z.enum(['Sedentary', 'Moderately Active', 'Very Active'], {
@@ -40,7 +41,7 @@ const profileUpdateSchema = z.object({
     (val) => (val === "" || val === undefined || val === null ? undefined : Number(String(val).replace(/,/g, ''))),
     z.number().positive('Custom goal must be a positive number.').optional()
   ),
-  teamAction: z.enum(['none', 'create', 'join']).default('none'), // For users managing team post-signup
+  teamAction: z.enum(['none', 'create', 'join']).default('none'),
   newTeamName: z.string().min(3, "Team name must be at least 3 characters").max(50).optional(),
   joinTeamId: z.string().min(5, "Team ID seems too short").optional(),
 }).refine(data => {
@@ -64,7 +65,7 @@ const profileUpdateSchema = z.object({
 type ProfileUpdateFormInputs = z.infer<typeof profileUpdateSchema>;
 
 interface ProfileSetupFormProps {
-  isUpdate?: boolean; // This prop indicates if the form is for update or initial setup (though initial setup is now mainly via SignupForm)
+  isUpdate?: boolean;
 }
 
 export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormProps) {
@@ -78,8 +79,8 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
     defaultValues: {
       displayName: userProfile?.displayName || '',
       activityStatus: userProfile?.activityStatus || undefined,
-      stepGoalOption: undefined, // Will be set in useEffect
-      customStepGoal: undefined, // Will be set in useEffect
+      stepGoalOption: undefined,
+      customStepGoal: undefined,
       teamAction: 'none',
       newTeamName: '',
       joinTeamId: '',
@@ -110,14 +111,11 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
             setValue('customStepGoal', undefined);
         }
       } else {
-        // Sensible defaults if activityStatus is somehow null on an existing profile
         setValue('activityStatus', 'Moderately Active'); 
         setValue('stepGoalOption', activityGoalsMap['Moderately Active'].goals[0]);
       }
-      // Team action defaults to 'none' as user is likely already on a team or choosing explicitly
       setValue('teamAction', 'none');
     } else if (user && !isUpdate) { 
-        // This case is less likely now with combined signup, but handles if user lands here for initial setup.
         setValue('displayName', user.email?.split('@')[0] || '');
         setValue('activityStatus', 'Moderately Active'); 
         setValue('stepGoalOption', activityGoalsMap['Moderately Active'].goals[0]);
@@ -126,94 +124,106 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
 
 
   const onSubmit: SubmitHandler<ProfileUpdateFormInputs> = async (data) => {
-    if (!user || !userProfile) { // User must exist and have a profile to update
-      toast({ title: 'Error', description: 'User profile not found. Please log in again.', variant: 'destructive' });
+    if (!user) {
+      toast({ title: 'Error', description: 'User not authenticated. Please log in again.', variant: 'destructive' });
       return;
     }
     setLoading(true);
 
-    let finalStepGoal: number;
-    if (data.stepGoalOption === 'Custom') {
-      finalStepGoal = data.customStepGoal!;
-    } else {
-      finalStepGoal = parseInt(data.stepGoalOption.replace(/,/g, '').replace(' steps', ''));
-    }
-    
-    // Ensure all existing fields from userProfile are preserved unless explicitly changed by the form
-    const profileUpdateData: Partial<UserProfile> = {
-      ...userProfile, // Start with existing profile data
-      displayName: data.displayName,
-      activityStatus: data.activityStatus,
-      stepGoal: finalStepGoal,
-      profileComplete: true, // Should already be true if they are updating, but enforce it.
-    };
+    try {
+      let finalStepGoal: number;
+      if (data.stepGoalOption === 'Custom') {
+        finalStepGoal = data.customStepGoal!;
+      } else {
+        finalStepGoal = parseInt(data.stepGoalOption.replace(/,/g, '').replace(' steps', ''));
+      }
+      
+      const baseProfile: UserProfile = userProfile ? { ...userProfile } : {
+        uid: user.uid,
+        email: user.email,
+        displayName: '', 
+        activityStatus: null, 
+        stepGoal: null, 
+        currentSteps: 0,
+        profileComplete: false, 
+        inviteLink: `${process.env.NEXT_PUBLIC_APP_URL || ''}/profile/${user.uid}`,
+        badgesEarned: [],
+        teamId: null,
+        teamName: null,
+        currentStreak: 0,
+        lastStreakLoginDate: null,
+        lastLoginTimestamp: null,
+      };
+      
+      const profileUpdateData: UserProfile = {
+        ...baseProfile, 
+        displayName: data.displayName,
+        activityStatus: data.activityStatus,
+        stepGoal: finalStepGoal,
+        profileComplete: true, 
+      };
 
-    let awardedTeamBadge: BadgeData | undefined = undefined;
+      let awardedTeamBadge: BadgeData | undefined = undefined;
 
-    // Handle team changes only if user is NOT currently on a team OR if they are explicitly leaving
-    // The leave action is handled by a separate button now in ProfileDisplay.
-    // This form section is for joining/creating if not on a team.
-    if (!userProfile.teamId) { 
-        if (data.teamAction === 'create' && data.newTeamName) {
-            const result = await createTeam(user.uid, data.newTeamName, userProfile.currentSteps);
-            profileUpdateData.teamId = result.teamId;
-            profileUpdateData.teamName = result.teamName;
-            awardedTeamBadge = result.awardedTeamBadge;
-            toast({ title: 'Team Created!', description: `You've created and joined "${result.teamName}".` });
-        } else if (data.teamAction === 'join' && data.joinTeamId) {
-            const result = await joinTeam(user.uid, data.joinTeamId, userProfile.currentSteps);
-            if (result) {
-                profileUpdateData.teamId = result.teamId;
-                profileUpdateData.teamName = result.teamName;
-                awardedTeamBadge = result.awardedTeamBadge;
-                toast({ title: 'Team Joined!', description: `You've joined "${result.teamName}".` });
-            } else {
-                toast({ title: 'Failed to join team', description: 'Please check the Team ID and try again.', variant: 'destructive'});
-                setLoading(false);
-                return; 
-            }
-        }
-    }
-    
-    if (awardedTeamBadge && !profileUpdateData.badgesEarned?.includes(awardedTeamBadge.id as BadgeId)) {
-        profileUpdateData.badgesEarned = [...(profileUpdateData.badgesEarned || []), awardedTeamBadge.id as BadgeId];
-    }
-    
-    await updateUserProfile(user.uid, profileUpdateData);
-    
-    // Fetch the updated profile to reflect changes in the UI and AuthContext
-    const updatedFullProfile = await getUserProfile(user.uid);
-    if (updatedFullProfile) {
-    setUserProfileState(updatedFullProfile); 
-        if (awardedTeamBadge) { 
-            const badge = awardedTeamBadge;
-            toast({
-                title: 'Badge Unlocked!',
-                description: (
-                    <div className="flex items-center">
-                    <badge.icon className="mr-2 h-5 w-5 text-primary" />
-                    <span>You've earned the "{badge.name}" badge!</span>
-                    </div>
-                ),
-                action: (
-                    <ToastAction altText="View on Profile" onClick={() => router.push('/profile')}>
-                    View on Profile
-                    </ToastAction>
-                ),
-            });
-        }
-    }
+      if (!profileUpdateData.teamId) { 
+          if (data.teamAction === 'create' && data.newTeamName) {
+              const result = await createTeam(user.uid, data.newTeamName, profileUpdateData.currentSteps);
+              profileUpdateData.teamId = result.teamId;
+              profileUpdateData.teamName = result.teamName;
+              awardedTeamBadge = result.awardedTeamBadge;
+              toast({ title: 'Team Created!', description: `You've created and joined "${result.teamName}".` });
+          } else if (data.teamAction === 'join' && data.joinTeamId) {
+              const result = await joinTeam(user.uid, data.joinTeamId, profileUpdateData.currentSteps);
+              if (result) {
+                  profileUpdateData.teamId = result.teamId;
+                  profileUpdateData.teamName = result.teamName;
+                  awardedTeamBadge = result.awardedTeamBadge;
+                  toast({ title: 'Team Joined!', description: `You've joined "${result.teamName}".` });
+              } else {
+                  toast({ title: 'Failed to join team', description: 'Please check the Team ID and try again.', variant: 'destructive'});
+                  return; // Stop further execution in try block if team join fails.
+              }
+          }
+      }
+      
+      if (awardedTeamBadge && !profileUpdateData.badgesEarned?.includes(awardedTeamBadge.id as BadgeId)) {
+          profileUpdateData.badgesEarned = [...(profileUpdateData.badgesEarned || []), awardedTeamBadge.id as BadgeId];
+      }
+      
+      await setDoc(doc(db, "users", user.uid), profileUpdateData, { merge: true });
+      
+      const updatedFullProfile = await getUserProfile(user.uid);
+      if (updatedFullProfile) {
+        setUserProfileState(updatedFullProfile); 
+          if (awardedTeamBadge) { 
+              const badge = awardedTeamBadge;
+              toast({
+                  title: 'Badge Unlocked!',
+                  description: (
+                      <div className="flex items-center">
+                      <badge.icon className="mr-2 h-5 w-5 text-primary" />
+                      <span>You've earned the "{badge.name}" badge!</span>
+                      </div>
+                  ),
+                  action: (
+                      <ToastAction altText="View on Profile" onClick={() => router.push('/profile')}>
+                      View on Profile
+                      </ToastAction>
+                  ),
+              });
+          }
+      }
 
-    toast({ title: 'Profile Updated!', description: 'Your Butterfly Steps profile has been updated.' });
-    router.push('/profile'); // Go back to profile display view
-    
-    } catch (error) { 
+      toast({ title: 'Profile Updated!', description: 'Your Butterfly Steps profile has been updated.' });
+      router.push('/profile'); 
+      
+    } catch (error) {
         console.error('Profile update/team action error:', error);
         toast({ title: 'Update Failed', description: (error as Error).message || 'Could not update profile or team. Please try again.', variant: 'destructive' });
     } finally {
         setLoading(false);
     }
-  };
+  }; // This is line 216 from the error if the structure aligns with the user's error message
   
   const handleLeaveTeamAndResetForm = async () => {
     if (!user || !userProfile?.teamId) return;
@@ -224,8 +234,7 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       setValue('teamAction', 'none'); 
       setValue('joinTeamId', '');
       setValue('newTeamName','');
-      await fetchUserProfile(user.uid); // This will update userProfile in context
-      // Form fields for team will re-evaluate based on new userProfile.teamId being null
+      await fetchUserProfile(user.uid); 
     } catch (error) {
       toast({ title: 'Error Leaving Team', description: (error as Error).message, variant: 'destructive' });
     } finally {
@@ -235,7 +244,6 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
 
 
   if (!userProfile && isUpdate) {
-    // Should not happen if `useAuthRedirect` is working correctly for `/profile?edit=true`
     return <p>Loading profile or profile not found...</p>;
   }
 
@@ -370,7 +378,7 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
                     >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="none" id="profileTeamNone" />
-                        <Label htmlFor="profileTeamNone">No team action / Keep current status</Label>
+                        <Label htmlFor="profileTeamNone">No team action / Skip for now</Label>
                       </div>
                        <div className="flex items-center space-x-2">
                         <RadioGroupItem value="create" id="profileTeamCreate" />
@@ -431,5 +439,4 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
     </Card>
   );
 }
-
     

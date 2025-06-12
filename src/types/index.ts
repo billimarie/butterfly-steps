@@ -18,7 +18,7 @@ export interface UserProfile {
   teamId?: string | null;
   teamName?: string | null;
   currentStreak: number;
-  lastStreakLoginDate: string | null;
+  lastStreakLoginDate: string | null; // YYYY-MM-DD
   lastLoginTimestamp: Timestamp | null;
 }
 
@@ -43,6 +43,13 @@ export interface DailyStep {
 
 export interface AppUser extends FirebaseUser {
   profile?: UserProfile;
+}
+
+export interface StreakUpdateResults {
+  updatedStreakCount: number;
+  updatedLastStreakLoginDate: string | null;
+  updatedLastLoginTimestamp: Timestamp;
+  streakProcessedForToday: boolean;
 }
 
 export interface AuthContextType {
