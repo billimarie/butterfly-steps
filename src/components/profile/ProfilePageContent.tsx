@@ -32,21 +32,26 @@ export default function ProfilePageContent() {
   
   const searchParams = useSearchParams();
   const editMode = searchParams.get('edit') === 'true';
-  // const invitedTeamId = searchParams.get('invitedTeamId'); // Read, but not passed down
 
   if (loading || !user) {
     return <ProfilePageSkeleton />;
   }
 
-  // invitedTeamId prop removed from ProfileSetupForm
-  if (user && (!userProfile?.profileComplete || editMode)) {
+  // If user exists but profile is not complete, OR if in editMode, show the setup/update form.
+  // The `isUpdate` prop for ProfileSetupForm determines its behavior (initial setup vs. update).
+  // For initial setup, `isUpdate` will be false. For edits, it will be true.
+  if (!userProfile?.profileComplete || editMode) {
     return <ProfileSetupForm isUpdate={!!userProfile?.profileComplete && editMode} />;
   }
   
+  // If profile is complete and not in edit mode, display the profile.
   if (userProfile?.profileComplete && !editMode) {
     return <ProfileDisplay />;
   }
   
-  // invitedTeamId prop removed from ProfileSetupForm
+  // Fallback, should ideally be covered by above conditions or redirection.
+  // This would render the form for initial setup if somehow profile is null but user exists.
   return <ProfileSetupForm isUpdate={false} />;
 }
+
+    
