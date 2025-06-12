@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Gift, ArrowRight } from 'lucide-react';
+import { Gift, ArrowRight, Medal, Footprints, Users } from 'lucide-react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'; // Assuming AvatarImage might not be used or needed for public view
 
 import CommunityProgressCard from '@/components/dashboard/CommunityProgressCard';
 import ButterflyAnimation from '@/components/dashboard/ButterflyAnimation';
@@ -95,3 +96,4 @@ export default function FeedContent() {
     </>
   );
 }
+
