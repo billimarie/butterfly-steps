@@ -75,23 +75,21 @@ export default function FeedContent() {
             </CardFooter>
         </Card>
 
-        <Card className="shadow-lg text-center flex flex-col">
-            <CardHeader>
-                <CardTitle className="font-headline text-2xl">Support the Monarchs</CardTitle>
-                <CardDescription>Your contributions make a real difference for monarch butterfly conservation.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-grow flex flex-col justify-center items-center">
-                <p className="mb-6 max-w-sm">
-                    Help ForEveryStarATree.org plant native milkweed and restore vital habitats for these beautiful creatures.
-                </p>
-            </CardContent>
-             <CardFooter className="justify-center pt-0">
-                <Button asChild size="lg">
-                    <a href="https://foreveryStaratree.org/donate" target="_blank" rel="noopener noreferrer">
-                        <Gift className="mr-2 h-5 w-5"/> Donate to ForEveryStarATree.org
-                    </a>
-                </Button>
-            </CardFooter>
+        <Card className="shadow-lg">
+          <CardHeader>
+              <CardTitle className="font-headline text-2xl">Support the Monarchs</CardTitle>
+              <CardDescription>Every Step Count</CardDescription>
+          </CardHeader>
+          <CardContent>
+              <p className="mb-4">
+                  Our nonprofit ecofarm plants Butterfly Habitats in the Mojave Desert. You can help us plant native milkweed and turn desertified land into a thriving ecosystem!
+              </p>
+              <Button asChild size="lg">
+                  <a href="https://foreverystaratree.org/donate.html" target="_blank" rel="noopener noreferrer">
+                      <Gift className="mr-2 h-5 w-5"/> Donate to For Every Star, A Tree
+                  </a>
+              </Button>
+          </CardContent>
         </Card>
       </div>
     </>

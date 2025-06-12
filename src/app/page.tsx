@@ -47,7 +47,6 @@ function Dashboard({ userProfile, initialCommunityStats }: { userProfile: UserPr
   return (
     <div className="space-y-8">
       <CountdownTimer />
-      {/* StreakDisplay component removed from here, it's now a global modal */}
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -71,15 +70,15 @@ function Dashboard({ userProfile, initialCommunityStats }: { userProfile: UserPr
       <Card className="shadow-lg">
         <CardHeader>
             <CardTitle className="font-headline text-2xl">Support the Monarchs</CardTitle>
-            <CardDescription>Your steps and sponsorships make a real difference for monarch butterfly conservation.</CardDescription>
+            <CardDescription>Every Step Count</CardDescription>
         </CardHeader>
         <CardContent>
             <p className="mb-4">
-                Help us plant native milkweed and restore habitats for these beautiful creatures. Every contribution counts!
+                Our nonprofit ecofarm plants Butterfly Habitats in the Mojave Desert. You can help us plant native milkweed and turn desertified land into a thriving ecosystem!
             </p>
             <Button asChild size="lg">
-                <a href="https://foreveryStaratree.org/donate" target="_blank" rel="noopener noreferrer">
-                    <Gift className="mr-2 h-5 w-5"/> Donate to ForEveryStarATree.org
+                <a href="https://foreverystaratree.org/donate.html" target="_blank" rel="noopener noreferrer">
+                    <Gift className="mr-2 h-5 w-5"/> Donate to For Every Star, A Tree
                 </a>
             </Button>
         </CardContent>
@@ -117,15 +116,15 @@ function LandingPage() {
              font-headline md:text-7xl font-bold my-4">
                 Butterfly Steps
             </h1>
-            <p className="text-xl md:text-2xl mb-16 max-w-3xl text-neutral-600 uppercase mx-auto">
-                3.6 million steps<br />by October 31st, 2025
+            <p className="text-xl md:text-2xl mb-16 max-w-3xl text-neutral-600 mx-auto">
+                A "step challenge" to help save<br />the western Monarch Butterfly
             </p>
             <div className="space-y-8 md:space-x-16">
               <Button size="lg" asChild>
-                <Link href="/signup">Get Started <ArrowRight className="ml-2 h-5 w-5"/></Link>
+                <Link href="/signup">Join Us <ArrowRight className="ml-2 h-5 w-5"/></Link>
               </Button>
               <Button size="lg" variant="ghost" asChild>
-                <Link href="/feed">Our Migration Walk <img src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1749691114/Cartoons/catti-the-caterpillar_b9skmk.png" className="w-12" /></Link>
+                <Link href="/feed">See Our Migration Walk <img src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1749691114/Cartoons/catti-the-caterpillar_b9skmk.png" className="w-12" /></Link>
               </Button>
             </div>
         </div>
@@ -151,38 +150,35 @@ function LandingPage() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-8 text-left container mx-auto px-4">
-        <Card className="shadow-lg hover:shadow-xl transition-shadow">
-            <CardHeader>
-                <Footprints className="h-12 w-12 text-primary mb-3"/>
-                <CardTitle className="font-headline">Track Your Steps</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <p>Log your daily steps and watch your progress towards your personal goal and the community's symbolic migration.</p>
-            </CardContent>
-        </Card>
-        <Card className="shadow-lg hover:shadow-xl transition-shadow">
-            <CardHeader>
-                <Users className="h-12 w-12 text-primary mb-3"/>
-                <CardTitle className="font-headline">Raise Awareness & Join Teams</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <p>Invite your network to sponsor your journey, join or create a team, and support ForEveryStarATree.org's conservation efforts.</p>
-            </CardContent>
-        </Card>
-        <Card className="shadow-lg hover:shadow-xl transition-shadow">
-            <CardHeader>
-                <Gift className="h-12 w-12 text-primary mb-3"/>
-                <CardTitle className="font-headline">Make a Difference</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <p>Funds raised help plant native milkweed, crucial for monarch survival. Your steps have a real impact!</p>
-            </CardContent>
+      <div className="gap-8 text-left container mx-auto px-4 pb-12 mb-6">
+        <Card className="shadow-lg container mx-auto px-4 py-8 bg-card">
+          <CardHeader>
+              <CardTitle className="font-headline text-2xl">Let's "Step It Up" for Butterflies!</CardTitle>
+              <CardDescription>The Butterfly Steps Challenge</CardDescription>
+          </CardHeader>
+          <CardContent>
+              <p className="mb-4">Since 2000, butterflies have declined by 22%.<sup>1</sup></p>
+              <p className="mb-4">That's why we're hosting our first "Butterfly Steps" challenge: to "step" together and help grow desertified land into thriving Butterfly Habitats.</p>
+              <p className="mb-4">Our goal is <strong>3,600,000</strong> steps. Here's why: our <a href="https://foreverystaratree.org" target="_blank" className="underline">nonprofit ecofarm</a> is located in the Mojave Desert&mdash;one of the hottest, most uninhabitable places on Earth.</p>
+              <p className="mb-4"><strong>It would take you 3.6 million steps</strong> to walk from our ecofarm in the Mojave Desert to the lush, biodiverse Butterfly Sanctuaries near Mexico City.</p>
+              <p className="mb-4">...and that's not even <em>half</em> of the western Monarch Butterfly's migration journey!</p>
+              <p className="mb-4">In honor of their annual migration this October, we're matching the Monarch's journey over the summer&mdash;when school is out.</p>
+              <p className="mb-4">Sign up, log your steps every day, and help us reach 3.6 million steps by Halloween!
+              </p>
+              <Button size="lg" className="mt-10 mx-auto text-center flex w-full">
+                <Link href="/signup" className="inline-flex">Log Your Steps <Footprints className="ml-2 h-5 w-5" /></Link>
+              </Button>
+          </CardContent>
         </Card>
       </div>
 
       <div className="p-8 space-y-8 container mx-auto px-4">
-        <h2 className="text-4xl font-headline text-primary">Our Community's Journey</h2>
+        <CommunityProgressCard communityStats={communityStats} />
+      </div>
+      
+
+      <div className="p-8 space-y-8 container mx-auto px-4">
+        <h2 className="text-4xl font-headline text-primary">Our Migration</h2>
         {statsLoading ? (
           <div className="space-y-6">
             <Skeleton className="h-56 w-full rounded-lg" />
@@ -191,9 +187,17 @@ function LandingPage() {
           </div>
         ) : communityStats ? (
           <div className="space-y-6">
-            <CommunityProgressCard communityStats={communityStats} />
-            <ButterflyAnimation type="community" totalCommunitySteps={communityStats.totalSteps} />
             <InteractiveMap totalCommunitySteps={communityStats.totalSteps} className="mt-6" />
+
+
+
+
+            <ButterflyAnimation type="community" totalCommunitySteps={communityStats.totalSteps} />
+
+
+
+            <CommunityProgressCard communityStats={communityStats} />
+            
           </div>
         ) : (
           <Card className="text-center">
@@ -203,23 +207,59 @@ function LandingPage() {
         )}
       </div>
       
-      <Card className="shadow-lg container mx-auto px-4 py-8 bg-card">
-        <CardHeader className="text-center">
-            <CardTitle className="font-headline text-3xl">Support the Monarchs</CardTitle>
-            <CardDescription>Your steps and sponsorships make a real difference for monarch butterfly conservation.</CardDescription>
-        </CardHeader>
-        <CardContent className="text-center">
-            <p className="mb-6 max-w-xl mx-auto">
-                Help ForEveryStarATree.org plant native milkweed and restore vital habitats for these beautiful creatures. Every contribution counts towards their survival.
-            </p>
-            <Button asChild size="lg">
-                <a href="https://foreveryStaratree.org/donate" target="_blank" rel="noopener noreferrer">
-                    <Gift className="mr-2 h-5 w-5"/> Donate to ForEveryStarATree.org
-                </a>
-            </Button>
-        </CardContent>
-      </Card>
 
+      <div className="grid md:grid-cols-3 gap-8 text-left container mx-auto px-4 pb-12 mb-6">
+        <Card className="shadow-lg hover:shadow-xl transition-shadow">
+            <CardHeader>
+                <Footprints className="h-12 w-12 text-primary mb-3"/>
+                <CardTitle className="font-headline">Track Your Steps</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p>"Step" closer to your personal goal as we embark on a symbolic migration&mdash;together.</p>
+            </CardContent>
+        </Card>
+        <Card className="shadow-lg hover:shadow-xl transition-shadow">
+            <CardHeader>
+                <Users className="h-12 w-12 text-primary mb-3"/>
+                <CardTitle className="font-headline">Join A Team</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p>Log your daily steps with your friends! You can create your own team, or join an existing one.</p>
+            </CardContent>
+        </Card>
+        <Card className="shadow-lg hover:shadow-xl transition-shadow">
+            <CardHeader>
+                <Gift className="h-12 w-12 text-primary mb-3"/>
+                <CardTitle className="font-headline">1 Step Raises $1</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p>Your steps have a <strong>real</strong> impact. In 2024, we raised enough funds to plant a quarter-acre Butterfly Garden!</p>
+            </CardContent>
+        </Card>
+      </div>
+
+      <div className="gap-8 text-left container mx-auto px-4 pb-12 mb-6">
+        <Card className="shadow-lg container mx-auto px-4 py-8 bg-card">
+          <CardHeader>
+              <CardTitle className="font-headline text-2xl">Support the Monarchs</CardTitle>
+              <CardDescription>Every Step Counts!</CardDescription>
+          </CardHeader>
+          <CardContent>
+              <p className="mb-4">
+                  Our nonprofit ecofarm plants Butterfly Habitats in the Mojave Desert. You can help us plant native milkweed and turn desertified land into a thriving ecosystem!
+              </p>
+              <Button asChild size="lg">
+                  <a href="https://foreverystaratree.org/donate.html" target="_blank" rel="noopener noreferrer">
+                      <Gift className="mr-2 h-5 w-5"/> Donate to For Every Star, A Tree
+                  </a>
+              </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      <p className="mt-8 text-muted-foreground">
+        <sup>1</sup> <a href="https://www.xerces.org/press/study-finds-that-us-butterfly-populations-are-severely-declining" target="_blank">Since 2000, butterflies have declined by 22%.</a>
+      </p>
       <p className="mt-8 text-muted-foreground">
         "Butterfly Steps" is a fundraising initiative by the nonprofit ecofarm, <a href="https://foreveryStaratree.org" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">For Every Star, A Tree</a>. It was inspired by Pollinator Partnership's Pollinator Week as well as Monarch Joint Venture's Miles for Monarchs.
       </p>
