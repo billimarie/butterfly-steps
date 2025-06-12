@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { getAllTeams, getTeamMembersProfiles } from '@/lib/firebaseService'; // Updated import
+import { getAllTeams, getTeamMembersProfiles, joinTeam } from '@/lib/firebaseService'; 
 import type { Team, UserProfile } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -19,14 +19,14 @@ export default function TeamsPage() {
   const { user, userProfile, fetchUserProfile } = useAuth();
   const [teams, setTeams] = useState<Team[]>([]);
   const [creatorProfiles, setCreatorProfiles] = useState<Record<string, UserProfile | undefined>>({});
-  const [creatorProfiles, setCreatorProfiles] = useState<Record<string, UserProfile | undefined>>({});
   const [loading, setLoading] = useState(true);
-  const [showJoinForm, setShowJoinForm] = useState(false); // State to toggle join form
+  const [showJoinForm, setShowJoinForm] = useState(false); 
+  const [joiningTeamId, setJoiningTeamId] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
 
   useEffect(() => {
-    async function loadTeamsAndCreators() {
     async function loadTeamsAndCreators() {
       setLoading(true);
       try {
@@ -47,21 +47,44 @@ export default function TeamsPage() {
       } catch (error) {
         console.error("Failed to fetch teams or creators:", error);
         toast({ title: 'Error', description: 'Could not load teams data.', variant: 'destructive' });
-        console.error("Failed to fetch teams or creators:", error);
-        toast({ title: 'Error', description: 'Could not load teams data.', variant: 'destructive' });
       } finally {
         setLoading(false);
       }
     }
     if (user) { 
         loadTeamsAndCreators();
-    if (user) { 
-        loadTeamsAndCreators();
     } else {
-        setLoading(false); 
         setLoading(false); 
     }
   }, [user, toast]);
+
+  const handleJoinTeamFromList = async (teamId: string) => {
+    if (!user || !userProfile || userProfile.teamId) {
+      toast({ title: 'Cannot Join Team', description: userProfile?.teamId ? 'You are already on a team.' : 'Please log in to join a team.', variant: 'destructive' });
+      return;
+    }
+    setActionLoading(true);
+    setJoiningTeamId(teamId);
+    try {
+      const result = await joinTeam(user.uid, teamId, userProfile.currentSteps);
+      if (result) {
+        toast({ title: 'Joined Team!', description: `Successfully joined team "${result.teamName}".` });
+        await fetchUserProfile(user.uid);
+        // Refresh teams list to reflect new member counts/team sorting potentially
+        const fetchedTeams = await getAllTeams();
+        setTeams(fetchedTeams);
+        router.push(`/teams/${result.teamId}`);
+      } else {
+        toast({ title: 'Failed to Join', description: 'Could not join the team. Please verify the Team ID.', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Join Failed', description: (error as Error).message, variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
+      setJoiningTeamId(null);
+    }
+  };
+
 
   if (!user) {
      return (
@@ -99,7 +122,7 @@ export default function TeamsPage() {
               
               {!showJoinForm ? (
                 <Button onClick={() => setShowJoinForm(true)} className="flex-1">
-                  <LogIn className="mr-2 h-4 w-4" /> Join an Existing Team
+                  <LogIn className="mr-2 h-4 w-4" /> Join via Team ID
                 </Button>
               ) : (
                 <div className="flex-1 p-4 border rounded-lg bg-card">
@@ -107,7 +130,9 @@ export default function TeamsPage() {
                   <JoinTeamForm
                     onTeamJoined={async () => {
                         await fetchUserProfile(user.uid); 
-                        router.refresh(); 
+                        const fetchedTeams = await getAllTeams(); // Refresh list
+                        setTeams(fetchedTeams);
+                        setShowJoinForm(false); 
                     }}
                   />
                   <Button variant="outline" onClick={() => setShowJoinForm(false)} className="mt-2 w-full">
@@ -133,7 +158,7 @@ export default function TeamsPage() {
         <h2 className="text-2xl font-semibold mb-4 font-headline">All Teams</h2>
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => <Skeleton key={i} className="h-40 rounded-lg" />)}
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-48 rounded-lg" />)}
           </div>
         ) : teams.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -144,18 +169,10 @@ export default function TeamsPage() {
                   key={team.id} 
                   team={team} 
                   currentTeamId={userProfile?.teamId} 
-                  creatorDisplayName={creator?.displayName || null}
-                />
-              );
-            })}
-            {teams.map((team) => {
-              const creator = creatorProfiles[team.creatorUid];
-              return (
-                <TeamListItem 
-                  key={team.id} 
-                  team={team} 
-                  currentTeamId={userProfile?.teamId} 
-                  creatorDisplayName={creator?.displayName || null}
+                  creatorDisplayName={user ? (creator?.displayName || `User ${team.creatorUid.substring(0,6)}...`) : 'N/A'}
+                  onJoinTeam={handleJoinTeamFromList}
+                  isJoining={joiningTeamId === team.id && actionLoading}
+                  isUserLoggedIn={!!user}
                 />
               );
             })}
