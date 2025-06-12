@@ -11,7 +11,6 @@ import CommunityProgressCard from '@/components/dashboard/CommunityProgressCard'
 import StepSubmissionForm from '@/components/dashboard/StepSubmissionForm';
 import ButterflyAnimation from '@/components/dashboard/ButterflyAnimation';
 import InteractiveMap from '@/components/dashboard/InteractiveMap';
-// StreakDisplay is now a global modal, remove import and usage here
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { getCommunityStats } from '@/lib/firebaseService';
@@ -118,9 +117,17 @@ function LandingPage() {
              font-headline md:text-7xl font-bold mb-4">
                 Butterfly Steps
             </h1>
-            <p className="text-xl md:text-2xl mb-24 max-w-3xl text-neutral-600 uppercase mx-auto">
+            <p className="text-xl md:text-2xl mb-16 max-w-3xl text-neutral-600 uppercase mx-auto">
                 3.6 million steps<br />by October 31st, 2025
             </p>
+            <div className="space-x-16">
+              <Button size="lg" asChild>
+                <Link href="/signup">Get Started <ArrowRight className="ml-2 h-5 w-5"/></Link>
+              </Button>
+              <Button size="lg" variant="ghost" asChild>
+                <Link href="/feed">Our Migration Walk</Link>
+              </Button>
+            </div>
         </div>
 
         <div className="stage absolute">
@@ -142,28 +149,6 @@ function LandingPage() {
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="p-8 space-y-8 container mx-auto px-4">
-        <h2 className="text-4xl font-headline text-primary">Our Community's Journey</h2>
-        {statsLoading ? (
-          <div className="space-y-6">
-            <Skeleton className="h-56 w-full rounded-lg" />
-            <Skeleton className="h-24 w-full rounded-lg" />
-            <Skeleton className="h-64 w-full rounded-lg" /> 
-          </div>
-        ) : communityStats ? (
-          <div className="space-y-6">
-            <CommunityProgressCard communityStats={communityStats} />
-            <ButterflyAnimation type="community" totalCommunitySteps={communityStats.totalSteps} />
-            <InteractiveMap totalCommunitySteps={communityStats.totalSteps} className="mt-6" />
-          </div>
-        ) : (
-          <Card className="text-center">
-            <CardHeader><CardTitle className="font-headline">Community Progress Unavailable</CardTitle></CardHeader>
-            <CardContent><p className="text-muted-foreground">Could not load community progress at this time. Please check back later.</p></CardContent>
-          </Card>
-        )}
       </div>
 
       <div className="grid md:grid-cols-3 gap-8 text-left container mx-auto px-4">
@@ -195,6 +180,28 @@ function LandingPage() {
             </CardContent>
         </Card>
       </div>
+
+      <div className="p-8 space-y-8 container mx-auto px-4">
+        <h2 className="text-4xl font-headline text-primary">Our Community's Journey</h2>
+        {statsLoading ? (
+          <div className="space-y-6">
+            <Skeleton className="h-56 w-full rounded-lg" />
+            <Skeleton className="h-24 w-full rounded-lg" />
+            <Skeleton className="h-64 w-full rounded-lg" /> 
+          </div>
+        ) : communityStats ? (
+          <div className="space-y-6">
+            <CommunityProgressCard communityStats={communityStats} />
+            <ButterflyAnimation type="community" totalCommunitySteps={communityStats.totalSteps} />
+            <InteractiveMap totalCommunitySteps={communityStats.totalSteps} className="mt-6" />
+          </div>
+        ) : (
+          <Card className="text-center">
+            <CardHeader><CardTitle className="font-headline">Community Progress Unavailable</CardTitle></CardHeader>
+            <CardContent><p className="text-muted-foreground">Could not load community progress at this time. Please check back later.</p></CardContent>
+          </Card>
+        )}
+      </div>
       
       <Card className="shadow-lg container mx-auto px-4 py-8 bg-card">
         <CardHeader className="text-center">
@@ -213,17 +220,6 @@ function LandingPage() {
         </CardContent>
       </Card>
 
-      <div className="space-x-4">
-        <Button size="lg" asChild>
-          <Link href="/signup">Get Started <ArrowRight className="ml-2 h-5 w-5"/></Link>
-        </Button>
-        <Button size="lg" variant="outline" asChild>
-          <Link href="/login">Login</Link>
-        </Button>
-         <Button size="lg" variant="ghost" asChild>
-          <Link href="/feed">View Full Community Feed</Link>
-        </Button>
-      </div>
       <p className="mt-8 text-muted-foreground">
         "Butterfly Steps" is a fundraising initiative by the nonprofit ecofarm, <a href="https://foreveryStaratree.org" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">For Every Star, A Tree</a>. It was inspired by Pollinator Partnership's Pollinator Week as well as Monarch Joint Venture's Miles for Monarchs.
       </p>
