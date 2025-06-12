@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Leaf } from 'lucide-react'; // Using Leaf as a placeholder nature icon
+import { Leaf } from 'lucide-react';
 
 export default function Logo() {
   return (
