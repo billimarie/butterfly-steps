@@ -34,7 +34,7 @@ export default function CommunityProgressCard({ communityStats }: CommunityProgr
             Community Migration
           </CardTitle>
           <CardDescription className="text-slate-200">
-            Together, we're walking for the monarchs!
+            Together, we're walking for the monarchs
           </CardDescription>
         </div>
       </div>

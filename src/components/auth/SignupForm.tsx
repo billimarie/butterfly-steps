@@ -45,7 +45,7 @@ export default function SignupForm() {
       
       await createUserProfile(firebaseUser, { displayName: data.displayName });
       
-      toast({ title: 'Account Created!', description: "Welcome to Monarch Miles! Let's set up your profile." });
+      toast({ title: 'Account Created!', description: "Welcome to the Butterfly Steps challenge! Let's set up your profile." });
       
       // Redirect URL no longer appends invitedTeamId
       const profileRedirectUrl = '/profile';

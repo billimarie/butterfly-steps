@@ -19,8 +19,8 @@ export default function SignupPageContent() {
            <div className="mx-auto mb-4">
             <Logo />
           </div>
-          <CardTitle className="font-headline text-3xl">Join the Migration!</CardTitle>
-          <CardDescription>Create your Monarch Miles account to start tracking your steps.</CardDescription>
+          <CardTitle className="font-headline text-3xl">Join the Migration</CardTitle>
+          <CardDescription>Create your Butterfly Steps account to start tracking your steps.</CardDescription>
         </CardHeader>
         <CardContent>
           {/* invitedTeamId prop removed from SignupForm */}

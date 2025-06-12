@@ -1,4 +1,4 @@
-# **App Name**: The Mojave Monarch Steps Challenge
+# **App Name**: The Butterfly Steps Challenge
 
 ## Core Features:
 
