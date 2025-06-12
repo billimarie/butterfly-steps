@@ -153,8 +153,8 @@ function LandingPage() {
       <div className="gap-8 text-left container mx-auto px-4 pb-12 mb-6">
         <Card className="shadow-lg container mx-auto px-4 py-8 bg-card">
           <CardHeader>
-              <CardTitle className="font-headline text-2xl">Let's "Step It Up" for Butterflies!</CardTitle>
-              <CardDescription>The Butterfly Steps Challenge</CardDescription>
+              <CardTitle className="font-headline text-2xl">What is the "Butterfly Steps" challenge?</CardTitle>
+              <CardDescription>Let's step it up for butterflies!</CardDescription>
           </CardHeader>
           <CardContent>
               <p className="mb-4">Since 2000, butterflies have declined by 22%.<sup>1</sup></p>
