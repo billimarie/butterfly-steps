@@ -58,8 +58,8 @@ export default function FeedContent() {
       <div className="grid md:grid-cols-2 gap-8 mt-12">
         <Card className="shadow-lg text-center flex flex-col">
             <CardHeader>
-                <CardTitle className="font-headline text-2xl">Join the Migration!</CardTitle>
-                <CardDescription>Become a part of Monarch Miles and help us save the butterflies.</CardDescription>
+                <CardTitle className="font-headline text-2xl">Join the Migration</CardTitle>
+                <CardDescription>Become a part of the Butterfly Steps challenge and help us save the butterflies.</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow flex flex-col justify-center items-center">
                 <p className="mb-6 max-w-sm">

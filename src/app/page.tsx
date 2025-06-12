@@ -111,21 +111,21 @@ function LandingPage() {
 
   return (
     <div className="text-center pb-12 space-b-12">
-      <div className="relative w-full h-screen justify-center items-center flex">
-        <div className="mx-auto p-8 relative z-10 mb-24">
+      <div className="relative w-full h-auto justify-center items-center flex">
+        <div className="mx-auto p-8 relative z-10 my-24">
             <h1 className="text-5xl p-4 text-center font-bold from-orange-700 to-amber-400 bg-gradient-to-r bg-clip-text text-transparent
-             font-headline md:text-7xl font-bold mb-4">
+             font-headline md:text-7xl font-bold my-4">
                 Butterfly Steps
             </h1>
             <p className="text-xl md:text-2xl mb-16 max-w-3xl text-neutral-600 uppercase mx-auto">
                 3.6 million steps<br />by October 31st, 2025
             </p>
-            <div className="space-x-16">
+            <div className="space-y-8 md:space-x-16">
               <Button size="lg" asChild>
                 <Link href="/signup">Get Started <ArrowRight className="ml-2 h-5 w-5"/></Link>
               </Button>
               <Button size="lg" variant="ghost" asChild>
-                <Link href="/feed">Our Migration Walk</Link>
+                <Link href="/feed">Our Migration Walk <img src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1749691114/Cartoons/catti-the-caterpillar_b9skmk.png" className="w-12" /></Link>
               </Button>
             </div>
         </div>

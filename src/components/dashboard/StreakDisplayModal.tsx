@@ -77,14 +77,25 @@ export default function StreakDisplayModal() {
     <Dialog open={showStreakModal} onOpenChange={(isOpen) => setShowStreakModal(isOpen)}>
       <DialogOverlay className="bg-black/60 backdrop-blur-sm" />
       <DialogContent className="sm:max-w-md p-0 overflow-hidden shadow-2xl">
-        <DialogHeader className="p-6 pb-2 text-center bg-gradient-to-br from-primary/80 via-primary to-accent/80">
-          <DialogTitle className="font-headline text-3xl text-primary-foreground flex items-center justify-center">
+        <DialogHeader className="p-6 pb-2 text-center bg-gradient-to-br from-primary via-primary to-accent">
+          <DialogTitle className="font-headline text-3xl text-primary-foreground flex items-center justify-center mb-4">
             <Award className="mr-3 h-8 w-8 text-yellow-300" />
-            Daily Streak!
+            Daily Streak
           </DialogTitle>
         </DialogHeader>
-        <div className="p-6 space-y-6 text-center">
-            <div className="flex justify-around items-center">
+        <div className="pt-2 pb-6 px-6 space-y-6 text-center">
+
+            <div className="text-center space-y-2 pb-6">
+              <div className="flex items-center justify-center space-x-2 mt-1">
+                  <Leaf className="h-10 w-10 text-accent animate-pulse" data-ai-hint="butterfly monarch" />
+                  <span id="streak-modal-number" className="text-7xl font-bold text-primary">
+                  {animatedStreak}
+                  </span>
+              </div>
+              <p className="text-base text-muted-foreground">{animatedStreak === 1 ? 'day' : 'days'} in a row!</p>
+            </div>
+
+            <div className="flex justify-around items-center pb-4">
             {lastFiveDays.map(({ dateString, dayAbbrev }) => {
                 const isActive = streakDates.includes(dateString);
                 // Check if the date string is today or in the past relative to the current local "today"
@@ -96,7 +107,7 @@ export default function StreakDisplayModal() {
                     <div
                     className={cn(
                         "h-12 w-12 rounded-full border-2 flex items-center justify-center transition-all duration-300",
-                        isActive && isPastOrToday ? "bg-green-100 border-green-500 shadow-md" : "bg-muted/30 border-muted",
+                        isActive && isPastOrToday ? "bg-green-300 border-green-600 shadow-md" : "bg-muted/30 border-muted",
                          !isPastOrToday ? "opacity-50" : "" 
                     )}
                     >
@@ -108,28 +119,10 @@ export default function StreakDisplayModal() {
                 );
             })}
             </div>
-            <div className="text-center">
-            <p className="text-base text-muted-foreground">You've logged in for</p>
-            <div className="flex items-center justify-center space-x-2 mt-1">
-                <Leaf className="h-10 w-10 text-primary animate-pulse" data-ai-hint="butterfly monarch" />
-                <span id="streak-modal-number" className="text-5xl font-bold text-accent">
-                {animatedStreak}
-                </span>
-                <span className="text-3xl text-muted-foreground">
-                {animatedStreak === 1 ? 'day' : 'days'} in a row!
-                </span>
-            </div>
-            <p className="text-sm text-muted-foreground mt-2">Keep up the great work!</p>
-            </div>
         </div>
-        <DialogFooter className="p-6 bg-muted/30">
-          <Button 
-            size="lg" 
-            className="w-full text-lg" 
-            onClick={() => setShowStreakModal(false)}
-          >
-            Stepping for CattiPeper the Caterpillar!
-          </Button>
+        <DialogFooter className="px-6 pb-6 bg-muted/30 mx-auto flex justify-center items-center">
+          <p className="text-sm text-muted-foreground">Keep on flyin' high! 🦋</p>
+          <img src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1749691114/Cartoons/catti-the-caterpillar_b9skmk.png" className="w-12" />
         </DialogFooter>
       </DialogContent>
     </Dialog>

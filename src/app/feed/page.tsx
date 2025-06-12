@@ -4,7 +4,7 @@ import FeedContent from '@/components/feed/FeedContent';
 
 export const metadata: Metadata = {
   title: 'Community Feed | The Butterfly Walk',
-  description: 'See the collective progress of the Butterfly Walk community in the Stepping For Monarchs challenge. Track total steps and support monarch conservation.',
+  description: 'See the collective progress of the Butterfly Walk community in the Butterfly Steps challenge. Track total steps and support monarch conservation.',
   keywords: ['Butterfly Walk', 'community feed', 'monarch butterfly', 'conservation', 'step challenge', 'fundraising', 'foreveryStaratree'],
 };
 

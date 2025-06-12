@@ -5,8 +5,8 @@ import ProfilePageContent from '@/components/profile/ProfilePageContent';
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = {
-  title: 'Your Profile | Monarch Miles',
-  description: 'Manage your Monarch Miles profile, track your progress, and view your badges.',
+  title: 'Your Profile | Butterfly Steps',
+  description: 'Manage your Butterfly Steps profile, track your progress, and view your badges.',
 };
 
 function ProfilePageSkeleton() {

@@ -1,7 +1,7 @@
 'use server';
 
 /**
- * @fileOverview AI agent that generates personalized invite messages for users to share with their network to solicit sponsorships for their participation in the Stepping For Monarchs challenge.
+ * @fileOverview AI agent that generates personalized invite messages for users to share with their network to solicit sponsorships for their participation in the Butterfly Steps challenge.
  *
  * - generateInviteMessage - A function that generates personalized invite messages.
  * - GenerateInviteMessageInput - The input type for the generateInviteMessage function.
@@ -42,7 +42,7 @@ const prompt = ai.definePrompt({
   output: {schema: GenerateInviteMessageOutputSchema},
   prompt: `You are an expert fundraising copywriter for environmental nonprofits.
 
-You will use the following information to generate a personalized invite message for the user to share with their network to solicit sponsorships for their participation in the Stepping For Monarchs challenge.
+You will use the following information to generate a personalized invite message for the user to share with their network to solicit sponsorships for their participation in the Butterfly Steps challenge.
 
 User Name: {{{userName}}}
 Step Goal: {{{stepGoal}}}
