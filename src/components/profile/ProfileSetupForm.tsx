@@ -12,21 +12,26 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { updateUserProfile, incrementParticipantCount, getUserProfile } from '@/lib/firebaseService';
+import { createTeam, joinTeam, leaveTeam, getUserProfile } from '@/lib/firebaseService';
 import type { ActivityStatus, UserProfile } from '@/types';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { CheckCircle, Zap, TrendingUp, Target, Edit3 } from 'lucide-react';
+import { CheckCircle, Zap, TrendingUp, Target, Edit3, Users, LogOut, PlusCircle } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { ToastAction } from "@/components/ui/toast";
+import type { BadgeData, BadgeId } from '@/lib/badges';
+import { getBadgeDataById } from '@/lib/badges';
+import { db } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 
 const activityGoalsMap: Record<ActivityStatus, { label: string; goals: string[] }> = {
-  Sedentary: { label: 'Sedentary (Mostly sitting, little to no exercise)', goals: ['25,000 steps', '75,000 steps', '200,000 steps', 'Custom'] },
-  'Moderately Active': { label: 'Moderately Active (Light exercise / walking a few times a week)', goals: ['50,000 steps', '100,000 steps', '300,000 steps', 'Custom'] },
-  'Very Active': { label: 'Very Active (Regular vigorous exercise / active job)', goals: ['100,000 steps', '300,000 steps', '500,000 steps', 'Custom'] },
+  Sedentary: { label: 'Mostly sitting, little to no exercise', goals: ['25,000 steps', '75,000 steps', '200,000 steps', 'Custom'] },
+  'Moderately Active': { label: 'Light exercise / walking a few times a week', goals: ['50,000 steps', '100,000 steps', '300,000 steps', 'Custom'] },
+  'Very Active': { label: 'Regular vigorous exercise / active job', goals: ['100,000 steps', '300,000 steps', '500,000 steps', 'Custom'] },
 };
 
-const profileSetupSchema = z.object({
+const profileUpdateSchema = z.object({
   displayName: z.string().min(2, "Display name is required").max(50),
   activityStatus: z.enum(['Sedentary', 'Moderately Active', 'Very Active'], {
     required_error: 'Please select your activity status.',
@@ -36,6 +41,9 @@ const profileSetupSchema = z.object({
     (val) => (val === "" || val === undefined || val === null ? undefined : Number(String(val).replace(/,/g, ''))),
     z.number().positive('Custom goal must be a positive number.').optional()
   ),
+  teamAction: z.enum(['none', 'create', 'join']).default('none'),
+  newTeamName: z.string().min(3, "Team name must be at least 3 characters").max(50).optional(),
+  joinTeamId: z.string().min(5, "Team ID seems too short").optional(),
 }).refine(data => {
   if (data.stepGoalOption === 'Custom') {
     return data.customStepGoal !== undefined && data.customStepGoal > 0;
@@ -44,9 +52,17 @@ const profileSetupSchema = z.object({
 }, {
   message: 'Custom step goal is required when "Custom" is selected.',
   path: ['customStepGoal'],
-});
+}).refine(data => {
+    if (data.teamAction === 'create') return !!data.newTeamName;
+    return true;
+}, { message: 'Team name is required to create a team.', path: ['newTeamName']})
+.refine(data => {
+    if (data.teamAction === 'join') return !!data.joinTeamId;
+    return true;
+}, { message: 'Team ID is required to join a team.', path: ['joinTeamId']});
 
-type ProfileSetupFormInputs = z.infer<typeof profileSetupSchema>;
+
+type ProfileUpdateFormInputs = z.infer<typeof profileUpdateSchema>;
 
 interface ProfileSetupFormProps {
   isUpdate?: boolean;
@@ -58,32 +74,32 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
   const { toast } = useToast();
   const router = useRouter();
 
-  const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<ProfileSetupFormInputs>({
-    resolver: zodResolver(profileSetupSchema),
+  const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<ProfileUpdateFormInputs>({
+    resolver: zodResolver(profileUpdateSchema),
     defaultValues: {
-      displayName: '',
-      activityStatus: undefined,
+      displayName: userProfile?.displayName || '',
+      activityStatus: userProfile?.activityStatus || undefined,
       stepGoalOption: undefined,
       customStepGoal: undefined,
+      teamAction: 'none',
+      newTeamName: '',
+      joinTeamId: '',
     },
   });
 
   const selectedActivityStatus = watch('activityStatus');
   const selectedStepGoalOption = watch('stepGoalOption');
-
+  const selectedTeamAction = watch('teamAction');
 
   useEffect(() => {
-    if (user) {
-      const baseDisplayName = user.email?.split('@')[0] || '';
-      setValue('displayName', userProfile?.displayName || baseDisplayName);
-
-      if (userProfile?.activityStatus) {
+    if (userProfile) {
+      setValue('displayName', userProfile.displayName || user?.email?.split('@')[0] || '');
+      if (userProfile.activityStatus) {
         setValue('activityStatus', userProfile.activityStatus);
         if (userProfile.stepGoal) {
           const goalStr = `${userProfile.stepGoal.toLocaleString()} steps`;
           const currentActivityGoals = activityGoalsMap[userProfile.activityStatus];
-          const availableGoals = currentActivityGoals?.goals || [];
-          if (availableGoals.includes(goalStr)) {
+          if (currentActivityGoals?.goals?.includes(goalStr)) {
             setValue('stepGoalOption', goalStr);
             setValue('customStepGoal', undefined);
           } else {
@@ -91,72 +107,152 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
             setValue('customStepGoal', userProfile.stepGoal);
           }
         } else {
-          setValue('stepGoalOption', undefined);
-          setValue('customStepGoal', undefined);
+            setValue('stepGoalOption', undefined);
+            setValue('customStepGoal', undefined);
         }
       } else {
-        setValue('activityStatus', undefined);
-        setValue('stepGoalOption', undefined);
-        setValue('customStepGoal', undefined);
+        setValue('activityStatus', 'Moderately Active'); 
+        setValue('stepGoalOption', activityGoalsMap['Moderately Active'].goals[0]);
       }
+      setValue('teamAction', 'none');
+    } else if (user && !isUpdate) { 
+        setValue('displayName', user.email?.split('@')[0] || '');
+        setValue('activityStatus', 'Moderately Active'); 
+        setValue('stepGoalOption', activityGoalsMap['Moderately Active'].goals[0]);
     }
-  }, [user, userProfile, setValue]);
+  }, [user, userProfile, setValue, isUpdate]);
 
-  const onSubmit: SubmitHandler<ProfileSetupFormInputs> = async (data) => {
+
+  const onSubmit: SubmitHandler<ProfileUpdateFormInputs> = async (data) => {
     if (!user) {
-      toast({ title: 'Error', description: 'You must be logged in.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'User not authenticated. Please log in again.', variant: 'destructive' });
       return;
     }
     setLoading(true);
 
-    let finalStepGoal: number;
-    if (data.stepGoalOption === 'Custom') {
-      finalStepGoal = data.customStepGoal!;
-    } else {
-      finalStepGoal = parseInt(data.stepGoalOption.replace(/,/g, '').replace(' steps', ''));
-    }
-
-    const currentSteps = userProfile?.currentSteps ?? 0;
-    const profileUpdateData: Partial<UserProfile> = {
-      displayName: data.displayName,
-      activityStatus: data.activityStatus,
-      stepGoal: finalStepGoal,
-      profileComplete: true,
-      currentSteps: currentSteps, 
-      badgesEarned: userProfile?.badgesEarned || [],
-      // Preserve existing teamId and teamName if updating, or they will be null for new profiles
-      teamId: userProfile?.teamId || null,
-      teamName: userProfile?.teamName || null,
-    };
-
     try {
-      await updateUserProfile(user.uid, profileUpdateData);
-      
-      if (!isUpdate && !userProfile?.profileComplete) { 
-        await incrementParticipantCount();
+      let finalStepGoal: number;
+      if (data.stepGoalOption === 'Custom') {
+        finalStepGoal = data.customStepGoal!;
+      } else {
+        finalStepGoal = parseInt(data.stepGoalOption.replace(/,/g, '').replace(' steps', ''));
       }
+      
+      const baseProfile: UserProfile = userProfile ? { ...userProfile } : {
+        uid: user.uid,
+        email: user.email,
+        displayName: '', 
+        activityStatus: null, 
+        stepGoal: null, 
+        currentSteps: 0,
+        profileComplete: false, 
+        inviteLink: `${process.env.NEXT_PUBLIC_APP_URL || ''}/profile/${user.uid}`,
+        badgesEarned: [],
+        teamId: null,
+        teamName: null,
+        currentStreak: 0,
+        lastStreakLoginDate: null,
+        lastLoginTimestamp: null,
+      };
+      
+      const profileUpdateData: UserProfile = {
+        ...baseProfile, 
+        displayName: data.displayName,
+        activityStatus: data.activityStatus,
+        stepGoal: finalStepGoal,
+        profileComplete: true, 
+      };
+
+      let awardedTeamBadge: BadgeData | undefined = undefined;
+
+      if (!profileUpdateData.teamId) { 
+          if (data.teamAction === 'create' && data.newTeamName) {
+              const result = await createTeam(user.uid, data.newTeamName, profileUpdateData.currentSteps);
+              profileUpdateData.teamId = result.teamId;
+              profileUpdateData.teamName = result.teamName;
+              awardedTeamBadge = result.awardedTeamBadge;
+              toast({ title: 'Team Created!', description: `You've created and joined "${result.teamName}".` });
+          } else if (data.teamAction === 'join' && data.joinTeamId) {
+              const result = await joinTeam(user.uid, data.joinTeamId, profileUpdateData.currentSteps);
+              if (result) {
+                  profileUpdateData.teamId = result.teamId;
+                  profileUpdateData.teamName = result.teamName;
+                  awardedTeamBadge = result.awardedTeamBadge;
+                  toast({ title: 'Team Joined!', description: `You've joined "${result.teamName}".` });
+              } else {
+                  toast({ title: 'Failed to join team', description: 'Please check the Team ID and try again.', variant: 'destructive'});
+                  return; // Stop further execution in try block if team join fails.
+              }
+          }
+      }
+      
+      if (awardedTeamBadge && !profileUpdateData.badgesEarned?.includes(awardedTeamBadge.id as BadgeId)) {
+          profileUpdateData.badgesEarned = [...(profileUpdateData.badgesEarned || []), awardedTeamBadge.id as BadgeId];
+      }
+      
+      await setDoc(doc(db, "users", user.uid), profileUpdateData, { merge: true });
       
       const updatedFullProfile = await getUserProfile(user.uid);
       if (updatedFullProfile) {
         setUserProfileState(updatedFullProfile); 
+          if (awardedTeamBadge) { 
+              const badge = awardedTeamBadge;
+              toast({
+                  title: 'Badge Unlocked!',
+                  description: (
+                      <div className="flex items-center">
+                      <badge.icon className="mr-2 h-5 w-5 text-primary" />
+                      <span>You've earned the "{badge.name}" badge!</span>
+                      </div>
+                  ),
+                  action: (
+                      <ToastAction altText="View on Profile" onClick={() => router.push('/profile')}>
+                      View on Profile
+                      </ToastAction>
+                  ),
+              });
+          }
       }
 
-      toast({ title: 'Profile Updated!', description: 'Your Butterfly Steps profile is ready.' });
-      router.push('/');
-    } catch (error) { 
-      console.error('Profile update error:', error);
-      toast({ title: 'Update Failed', description: (error as Error).message || 'Could not update profile. Please try again.', variant: 'destructive' });
+      toast({ title: 'Profile Updated!', description: 'Your Butterfly Steps profile has been updated.' });
+      router.push('/profile'); 
+      
+    } catch (error) {
+        console.error('Profile update/team action error:', error);
+        toast({ title: 'Update Failed', description: (error as Error).message || 'Could not update profile or team. Please try again.', variant: 'destructive' });
+    } finally {
+        setLoading(false);
+    }
+  }; // This is line 216 from the error if the structure aligns with the user's error message
+  
+  const handleLeaveTeamAndResetForm = async () => {
+    if (!user || !userProfile?.teamId) return;
+    setLoading(true);
+    try {
+      await leaveTeam(user.uid, userProfile.teamId, userProfile.currentSteps);
+      toast({ title: 'Left Team', description: `You have left ${userProfile.teamName}.` });
+      setValue('teamAction', 'none'); 
+      setValue('joinTeamId', '');
+      setValue('newTeamName','');
+      await fetchUserProfile(user.uid); 
+    } catch (error) {
+      toast({ title: 'Error Leaving Team', description: (error as Error).message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
+
+
+  if (!userProfile && isUpdate) {
+    return <p>Loading profile or profile not found...</p>;
+  }
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
       <CardHeader>
         <CardTitle className="font-headline text-3xl flex items-center">
           {isUpdate ? <Edit3 className="mr-2 h-7 w-7 text-primary" /> : <Zap className="mr-2 h-7 w-7 text-primary" />}
-          {isUpdate ? 'Update Your Profile' : 'Set Up Your Profile'}
+          {isUpdate ? 'Update Your Profile' : 'Complete Your Profile Setup'}
         </CardTitle>
         <CardDescription>
           {isUpdate ? 'Modify your details for the Butterfly Steps challenge.' : 'Tell us a bit about yourself to get started with the Butterfly Steps challenge.'}
@@ -192,10 +288,10 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
                   {Object.entries(activityGoalsMap).map(([status, {label}]) => (
                     <Label
                       key={status}
-                      htmlFor={status}
+                      htmlFor={`update-${status}`}
                       className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer"
                     >
-                      <RadioGroupItem value={status} id={status} className="sr-only" />
+                      <RadioGroupItem value={status} id={`update-${status}`} className="sr-only" />
                        <span className="font-semibold text-center">{status}</span>
                        <span className="text-xs text-muted-foreground mt-1 text-center">{label}</span>
                     </Label>
@@ -258,12 +354,84 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
           )}
         
           <Separator />
-          
-          {/* Team options removed */}
 
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center"><Users className="mr-2 h-5 w-5 text-primary" /> Team Information</h3>
+            {userProfile?.teamId && userProfile?.teamName ? (
+              <div>
+                <p>You are currently on team: <strong className="text-accent">{userProfile.teamName}</strong>.</p>
+                <Button type="button" variant="outline" onClick={handleLeaveTeamAndResetForm} disabled={loading} className="mt-2">
+                  <LogOut className="mr-2 h-4 w-4" /> Leave Current Team
+                </Button>
+                <p className="text-xs text-muted-foreground mt-1">To join or create a new team, you must first leave your current team.</p>
+              </div>
+            ) : (
+              <>
+                <Controller
+                  name="teamAction"
+                  control={control}
+                  render={({ field }) => (
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      value={field.value} 
+                      className="space-y-2"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="none" id="profileTeamNone" />
+                        <Label htmlFor="profileTeamNone">No team action / Skip for now</Label>
+                      </div>
+                       <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="create" id="profileTeamCreate" />
+                        <Label htmlFor="profileTeamCreate">Create a new team</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="join" id="profileTeamJoin" />
+                        <Label htmlFor="profileTeamJoin">Join an existing team</Label>
+                      </div>
+                    </RadioGroup>
+                  )}
+                />
+
+                {selectedTeamAction === 'create' && (
+                  <div className="space-y-2 pl-6 pt-2">
+                    <Label htmlFor="newTeamName">New Team Name</Label>
+                    <Controller
+                        name="newTeamName"
+                        control={control}
+                        render={({ field }) => <Input id="newTeamName" placeholder="e.g., The Monarch Trackers" {...field} />}
+                    />
+                    {errors.newTeamName && <p className="text-sm text-destructive">{errors.newTeamName.message}</p>}
+                  </div>
+                )}
+
+                {selectedTeamAction === 'join' && (
+                  <div className="space-y-2 pl-6 pt-2">
+                        <Label htmlFor="joinTeamIdManual">Team ID to Join</Label>
+                        <Controller
+                            name="joinTeamId"
+                            control={control}
+                            render={({ field }) => (
+                                <Input
+                                    id="joinTeamIdManual"
+                                    placeholder="Enter Team ID"
+                                    {...field}
+                                    value={field.value || ''} 
+                                />
+                            )}
+                        />
+                        {errors.joinTeamId && <p className="text-sm text-destructive">{errors.joinTeamId.message}</p>}
+                        <p className="text-xs text-muted-foreground">Ask the team creator for the Team ID.</p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </CardContent>
-        <CardFooter>
-          <Button type="submit" className="w-full" disabled={loading}>
+        <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-3">
+          <Button type="button" variant="outline" onClick={() => router.push('/profile')} className="w-full sm:w-auto">
+            Cancel
+          </Button>
+          <Button type="submit" className="w-full sm:w-auto" disabled={loading}>
             {loading ? (isUpdate ? 'Updating...' : 'Saving...') : (<><CheckCircle className="mr-2 h-5 w-5" /> {isUpdate ? 'Update Profile' : 'Save Profile & Start Challenge'}</>)}
           </Button>
         </CardFooter>
@@ -271,3 +439,4 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
     </Card>
   );
 }
+    

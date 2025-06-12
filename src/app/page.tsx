@@ -109,9 +109,9 @@ function LandingPage() {
   }, [fetchLandingPageStats]);
 
   return (
-    <div className="text-center pb-12 space-b-12">
-      <div className="relative w-full h-auto justify-center items-center flex">
-        <div className="mx-auto p-8 relative z-10 my-24">
+    <div className="text-center pb-12 space-y-12">
+      <div className="relative w-full h-auto justify-center items-center flex mb-12">
+        <div className="mx-auto p-8 relative z-10 my-12 md:my-24">
             <h1 className="text-5xl p-4 text-center font-bold from-orange-700 to-amber-400 bg-gradient-to-r bg-clip-text text-transparent
              font-headline md:text-7xl font-bold my-4">
                 Butterfly Steps
@@ -119,12 +119,12 @@ function LandingPage() {
             <p className="text-xl md:text-2xl mb-16 max-w-3xl text-neutral-600 mx-auto">
                 A "step challenge" to help save<br />the western Monarch Butterfly
             </p>
-            <div className="space-y-8 md:space-x-16">
+            <div className="space-y-4 md:space-y-0 md:space-x-8">
               <Button size="lg" asChild>
                 <Link href="/signup">Join Us <ArrowRight className="ml-2 h-5 w-5"/></Link>
               </Button>
               <Button size="lg" variant="ghost" asChild>
-                <Link href="/feed">See Our Migration Walk <img src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1749691114/Cartoons/catti-the-caterpillar_b9skmk.png" className="w-12" /></Link>
+                <Link href="/feed">See Our Migration Walk <img src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1749691114/Cartoons/catti-the-caterpillar_b9skmk.png" className="w-12 ml-2" alt="Catti the Caterpillar" /></Link>
               </Button>
             </div>
         </div>
@@ -149,6 +149,10 @@ function LandingPage() {
           </div>
         </div>
       </div>
+      
+      <div className="container mx-auto px-4 -mt-8 mb-12"> {/* Adjusted margin for countdown */}
+        <CountdownTimer />
+      </div>
 
       <div className="gap-8 text-left container mx-auto px-4 pb-12 mb-6">
         <Card className="shadow-lg container mx-auto px-4 py-8 bg-card">
@@ -165,7 +169,7 @@ function LandingPage() {
               <p className="mb-4">In honor of their annual migration this October, we're matching the Monarch's journey over the summer&mdash;when school is out.</p>
               <p className="mb-4">Sign up, log your steps every day, and help us reach 3.6 million steps by Halloween!
               </p>
-              <Button size="lg" className="mt-10 mx-auto text-center flex w-full">
+              <Button size="lg" className="mt-10 mx-auto text-center flex w-full md:w-auto">
                 <Link href="/signup" className="inline-flex">Log Your Steps <Footprints className="ml-2 h-5 w-5" /></Link>
               </Button>
           </CardContent>
@@ -188,16 +192,8 @@ function LandingPage() {
         ) : communityStats ? (
           <div className="space-y-6">
             <InteractiveMap totalCommunitySteps={communityStats.totalSteps} className="mt-6" />
-
-
-
-
             <ButterflyAnimation type="community" totalCommunitySteps={communityStats.totalSteps} />
-
-
-
-            <CommunityProgressCard communityStats={communityStats} />
-            
+            {/* CommunityProgressCard is already shown above, might be redundant here unless specifically desired */}
           </div>
         ) : (
           <Card className="text-center">

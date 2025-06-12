@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -33,7 +34,7 @@ export default function LoginForm() {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, data.email, data.password);
-      toast({ title: 'Login Successful', description: "Welcome back!" });
+      // "Login Successful" toast is now handled by AuthContext to avoid double notifications
       router.push('/'); // Redirect to dashboard or profile setup via AuthContext logic
     } catch (error) {
       const authError = error as AuthError;

@@ -1,13 +1,14 @@
+
 'use client';
 
 import type { User as FirebaseUser, AuthError } from 'firebase/auth';
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
-import type { UserProfile, AuthContextType } from '@/types';
+import type { UserProfile, AuthContextType, StreakUpdateResults } from '@/types';
 import { getUserProfile, updateUserStreakOnLogin } from '@/lib/firebaseService';
 import { useRouter } from 'next/navigation';
-
+import { useToast } from '@/hooks/use-toast'; // Import useToast
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -18,67 +19,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<AuthError | null>(null);
   const [showStreakModal, setShowStreakModal] = useState(false);
   const router = useRouter();
+  const { toast } = useToast(); // Initialize useToast
 
   const fetchUserProfile = useCallback(async (uid: string, initialLogin: boolean = false) => {
-    setLoading(true); // Ensure loading is true while fetching profile details
+    setLoading(true); // Keep setLoading(true) at the beginning
     try {
-      let profileDataFromDb = await getUserProfile(uid);
-      const previousStreak = profileDataFromDb?.currentStreak || 0;
+      let finalProfile: UserProfile | null = null;
+      let streakUpdateResults: StreakUpdateResults | null = null;
 
       if (initialLogin) {
-        const streakUpdateResults = await updateUserStreakOnLogin(uid);
-        if (!profileDataFromDb && streakUpdateResults.updatedLastStreakLoginDate) {
-            profileDataFromDb = await getUserProfile(uid); 
-        }
+        streakUpdateResults = await updateUserStreakOnLogin(uid);
+        finalProfile = await getUserProfile(uid);
 
-        if (profileDataFromDb) {
-          profileDataFromDb = {
-            ...profileDataFromDb,
+        if (finalProfile && streakUpdateResults) {
+          finalProfile = {
+            ...finalProfile,
             currentStreak: streakUpdateResults.updatedStreakCount,
             lastStreakLoginDate: streakUpdateResults.updatedLastStreakLoginDate,
             lastLoginTimestamp: streakUpdateResults.updatedLastLoginTimestamp,
           };
         }
-         // Determine if modal should be shown
-        if (profileDataFromDb && profileDataFromDb.profileComplete) { // Only show for complete profiles
-            const newStreak = streakUpdateResults.updatedStreakCount;
-            if (newStreak > 0 && (newStreak > previousStreak || (newStreak === 1 && previousStreak === 0))) {
-                 // Only show modal if streak is active and has advanced or just started.
-                if (streakUpdateResults.updatedLastStreakLoginDate === new Date().toISOString().split('T')[0]) {
-                     setShowStreakModal(true);
-                }
-            }
-        }
-      }
-      
-      if (profileDataFromDb) {
-        const validatedProfile: UserProfile = {
-          uid: profileDataFromDb.uid,
-          email: profileDataFromDb.email,
-          displayName: profileDataFromDb.displayName,
-          activityStatus: profileDataFromDb.activityStatus,
-          stepGoal: profileDataFromDb.stepGoal,
-          currentSteps: typeof profileDataFromDb.currentSteps === 'number' ? profileDataFromDb.currentSteps : 0,
-          profileComplete: !!profileDataFromDb.profileComplete,
-          inviteLink: profileDataFromDb.inviteLink,
-          badgesEarned: Array.isArray(profileDataFromDb.badgesEarned) ? profileDataFromDb.badgesEarned : [],
-          teamId: profileDataFromDb.teamId || null,
-          teamName: profileDataFromDb.teamName || null,
-          currentStreak: profileDataFromDb.currentStreak || 0,
-          lastStreakLoginDate: profileDataFromDb.lastStreakLoginDate || null,
-          lastLoginTimestamp: profileDataFromDb.lastLoginTimestamp || null,
-        };
-        setUserProfile(validatedProfile);
       } else {
-        setUserProfile(null);
+        finalProfile = await getUserProfile(uid);
+      }
+
+      setUserProfile(finalProfile);
+
+      if (initialLogin && streakUpdateResults) {
+        const { streakProcessedForToday } = streakUpdateResults;
+        if (streakProcessedForToday && finalProfile && finalProfile.profileComplete) {
+          setShowStreakModal(true);
+        } else {
+          // Only show "Login Successful" toast if it was an initial login
+          // AND the streak modal isn't being shown.
+          toast({ title: 'Login Successful', description: "Welcome back!" });
+        }
       }
     } catch (e) {
       console.error("Failed to fetch/update user profile:", e);
       setUserProfile(null);
+      if (initialLogin) { // If profile fetch failed on initial login, still show generic success
+        toast({ title: 'Login Successful', description: "Welcome back! (Profile loading issue)" });
+      }
     } finally {
-        setLoading(false); // Set loading to false after all profile operations
+        setLoading(false); 
     }
-  }, []); 
+  }, [toast]); // Add toast to useCallback dependencies
   
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -86,17 +72,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setError(null);
       if (firebaseUser) {
         setUser(firebaseUser);
+        // Pass true for initialLogin only if it's a new user session or different user
+        // For simplicity here, we'll consider any auth state change with a user as needing initial processing.
+        // More sophisticated logic could check if firebaseUser.uid is different from previous user.uid.
         await fetchUserProfile(firebaseUser.uid, true); 
       } else {
         setUser(null);
         setUserProfile(null);
+        setShowStreakModal(false); 
         setLoading(false); 
       }
-      // setLoading(false); // Moved to finally block in fetchUserProfile
     }, (authError) => {
       setError(authError);
       setUser(null);
       setUserProfile(null);
+      setShowStreakModal(false);
       setLoading(false);
     });
 
@@ -111,15 +101,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       await firebaseSignOut(auth);
-      setUser(null);
-      setUserProfile(null);
-      setShowStreakModal(false); // Reset modal on logout
-      router.push('/login'); 
     } catch (e) {
       setError(e as AuthError);
       console.error("Logout failed:", e);
+      setUser(null);
+      setUserProfile(null);
+      setShowStreakModal(false);
     } finally {
       setLoading(false);
+      router.push('/login'); 
     }
   };
 
