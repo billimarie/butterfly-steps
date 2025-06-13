@@ -13,8 +13,8 @@ import { useAuth } from '@/context/AuthContext';
 import { createTeam } from '@/lib/firebaseService';
 import { useRouter } from 'next/navigation';
 import { PlusCircle } from 'lucide-react';
-import { ToastAction } from "@/components/ui/toast";
-import type { BadgeData } from '@/lib/badges';
+import type { TeamActionResult } from '@/types'; // Import TeamActionResult
+// ToastAction removed
 
 const createTeamSchema = z.object({
   teamName: z.string().min(3, "Team name must be at least 3 characters").max(50, "Team name is too long"),
@@ -23,7 +23,7 @@ const createTeamSchema = z.object({
 type CreateTeamFormInputs = z.infer<typeof createTeamSchema>;
 
 export default function CreateTeamForm() {
-  const { user, userProfile, fetchUserProfile } = useAuth();
+  const { user, userProfile, fetchUserProfile, setShowNewBadgeModal } = useAuth();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -44,28 +44,11 @@ export default function CreateTeamForm() {
 
     setLoading(true);
     try {
-      const result = await createTeam(user.uid, data.teamName, userProfile.currentSteps);
+      const result: TeamActionResult = await createTeam(user.uid, data.teamName, userProfile.currentSteps);
       toast({ title: 'Team Created!', description: `Team "${result.teamName}" has been successfully created.` });
       
       if (result.awardedTeamBadge) {
-        const badge = result.awardedTeamBadge;
-        toast({
-            title: 'Badge Unlocked!',
-            description: (
-              <div className="flex items-center">
-                <badge.icon className="mr-2 h-5 w-5 text-primary" />
-                <span>You've earned the "{badge.name}" badge!</span>
-              </div>
-            ),
-            action: (
-              <ToastAction
-                altText="View on Profile"
-                onClick={() => router.push('/profile')}
-              >
-                View on Profile
-              </ToastAction>
-            ),
-          });
+        setShowNewBadgeModal(result.awardedTeamBadge);
       }
 
       await fetchUserProfile(user.uid); 

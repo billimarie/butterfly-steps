@@ -5,7 +5,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/AuthContext';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
-import StreakDisplayModal from '@/components/dashboard/StreakDisplayModal'; // Import the modal
+import StreakDisplayModal from '@/components/dashboard/StreakDisplayModal';
+import DailyGoalMetModal from '@/components/modals/DailyGoalMetModal';
+import BadgeDetailModalRenderer from '@/components/profile/BadgeDetailModalRenderer'; // Renamed for clarity
 
 export const metadata: Metadata = {
   title: 'Butterfly Steps',
@@ -33,7 +35,9 @@ export default function RootLayout({
           </main>
           <Footer />
           <Toaster />
-          <StreakDisplayModal /> {/* Render the modal globally */}
+          <StreakDisplayModal />
+          <DailyGoalMetModal />
+          <BadgeDetailModalRenderer /> {/* Render the modal that shows newly earned badges */}
         </AuthProvider>
       </body>
     </html>

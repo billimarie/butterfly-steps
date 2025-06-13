@@ -24,8 +24,8 @@ export interface BadgeData {
 
 export const ALL_BADGES: BadgeData[] = [
   { id: 'first-step', name: 'First Step', milestone: 1, description: 'You\'ve taken your first step on the journey!', icon: Footprints },
-  { id: 'hundred-steps', name: 'Pathfinder', milestone: 100, description: '100 steps recorded!', icon: Award },
-  { id: 'thousand-steps', name: 'Trail Mixer', milestone: 1000, description: '1,000 steps achieved!', icon: Star },
+  { id: 'hundred-steps', name: 'Pathfinder', milestone: 100, description: 'You earned the Pathfinder badge!', icon: Award },
+  { id: 'thousand-steps', name: 'Trail Mixer', milestone: 1000, description: 'You earned the Trail Mixer badge!', icon: Star },
   { id: 'trailblazer-la', name: 'Trailblazer (LA)', milestone: 139999, description: 'Reached the equivalent of Downtown LA!', icon: MapPin },
   { id: 'explorer-disney', name: 'Explorer (Anaheim)', milestone: 180000, description: 'Stepped your way to "The Happiest Place on Earth"!', icon: Sparkles },
   { id: 'voyager-sd', name: 'Voyager (San Diego)', milestone: 360000, description: 'You\'ve made it to sunny San Diego!', icon: Anchor },
