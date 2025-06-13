@@ -69,9 +69,9 @@ export default function TopSteppersLeaderboard({ count }: TopSteppersLeaderboard
             <Link
               key={user.uid}
               href={`/profile/${user.uid}`}
-              className="block focus:outline-none focus:ring-2 focus:ring-primary rounded-lg"
+              className="block rounded-lg transition-shadow hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
             >
-              <Card className="shadow-md hover:shadow-lg transition-shadow cursor-pointer">
+              <Card className="shadow-md"> {/* Removed hover, transition, and cursor styles from Card */}
                 <CardHeader className="flex flex-row items-center justify-between space-x-4 pb-3 pt-4 px-4">
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10 border">

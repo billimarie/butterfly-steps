@@ -37,9 +37,12 @@ export default function BadgeDetailModal({ isOpen, onOpenChange, badge }: BadgeD
           <div className="p-3 bg-muted/30 rounded-md border">
             <p className="text-sm font-semibold text-foreground">Milestone Reached:</p>
             <p className="text-sm text-muted-foreground">
-              {badge.id === 'team-player' ? 'Joined or created a team' : 
-               badge.milestone === 1 && badge.id === 'first-step' ? 'Logged your first step' : 
-               `${badge.milestone.toLocaleString()} steps`}
+            {
+              badge.id === 'team-player' ? 'Joined or created a team'
+              : badge.id === 'social-butterfly' ? 'Just fluttering on by'
+              : badge.milestone === 1 && badge.id === 'first-step' ? 'Logged your first step'
+              : `${badge.milestone.toLocaleString()} steps`
+            }
             </p>
           </div>
         </div>

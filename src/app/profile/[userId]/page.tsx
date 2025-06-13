@@ -34,10 +34,11 @@ function ProfilePageSkeleton() {
   );
 }
 
-export default function UserProfilePage({ params }: { params: { userId: string } }) {
+export default async function UserProfilePage({ params: { userId } }: { params: { userId: string } }) {
+  // userId is now directly available from the destructured params
   return (
     <Suspense fallback={<ProfilePageSkeleton />}>
-      <ProfilePageContent viewedUserId={params.userId} />
+      <ProfilePageContent viewedUserId={userId} />
     </Suspense>
   );
 }

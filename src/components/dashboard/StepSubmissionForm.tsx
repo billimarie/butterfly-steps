@@ -25,10 +25,11 @@ const stepSubmissionSchema = z.object({
 type StepSubmissionFormInputs = z.infer<typeof stepSubmissionSchema>;
 
 interface StepSubmissionFormProps {
-  onStepSubmit?: () => void; // Callback to refresh dashboard data
+  onStepSubmit?: () => void | Promise<void>; // Callback, can be async
+  isModalVersion?: boolean; // Optional prop to indicate if it's used in a modal
 }
 
-export default function StepSubmissionForm({ onStepSubmit }: StepSubmissionFormProps) {
+export default function StepSubmissionForm({ onStepSubmit, isModalVersion = false }: StepSubmissionFormProps) {
   const { user, userProfile, setShowDailyGoalMetModal, setShowNewBadgeModal } = useAuth();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -50,8 +51,10 @@ export default function StepSubmissionForm({ onStepSubmit }: StepSubmissionFormP
       }
 
       if (result.newlyAwardedBadges && result.newlyAwardedBadges.length > 0) {
+        // AuthContext handles showing the first new badge.
+        // Subsequent new badges from the same submission could be toasted here if needed.
         setShowNewBadgeModal(result.newlyAwardedBadges[0]);
-        if (result.newlyAwardedBadges.length > 1) {
+         if (result.newlyAwardedBadges.length > 1) {
             for (let i = 1; i < result.newlyAwardedBadges.length; i++) {
                 const badge = result.newlyAwardedBadges[i];
                  toast({
@@ -68,7 +71,9 @@ export default function StepSubmissionForm({ onStepSubmit }: StepSubmissionFormP
       }
 
       reset();
-      onStepSubmit?.();
+      if (onStepSubmit) {
+        await onStepSubmit(); // Await if it's a promise
+      }
     } catch (error) {
       console.error('Step submission error:', error);
       toast({ title: 'Submission Failed', description: (error as Error).message || 'Could not submit steps. Please try again.', variant: 'destructive' });
@@ -77,7 +82,8 @@ export default function StepSubmissionForm({ onStepSubmit }: StepSubmissionFormP
     }
   };
 
-  if (!userProfile?.profileComplete) {
+  // If it's not modal version and profile is incomplete, show the card version.
+  if (!isModalVersion && !userProfile?.profileComplete) {
     return (
       <Card>
         <CardHeader>
@@ -88,6 +94,47 @@ export default function StepSubmissionForm({ onStepSubmit }: StepSubmissionFormP
     );
   }
 
+  // Common form structure for both modal and card versions
+  const formContent = (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="steps">Number of Steps</Label>
+        <div className="relative">
+            <Footprints className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              id="steps"
+              type="number"
+              placeholder="e.g., 5000"
+              {...register('steps')}
+              className="pl-10"
+            />
+        </div>
+        {errors.steps && <p className="text-sm text-destructive">{errors.steps.message}</p>}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        You can submit steps multiple times. They will be added to your total.
+      </p>
+    </>
+  );
+
+  const formFooter = (
+     <Button type="submit" className="w-full" disabled={loading}>
+        {loading ? 'Submitting...' : 'Submit Steps'}
+      </Button>
+  );
+
+  if (isModalVersion) {
+    return (
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2"> {/* Adjusted padding for modal */}
+        {formContent}
+        <div className="pt-2"> {/* Add padding top to separate button from input */}
+         {formFooter}
+        </div>
+      </form>
+    );
+  }
+
+  // Default Card version for dashboard page etc.
   return (
     <Card className="shadow-lg">
       <CardHeader>
@@ -99,28 +146,10 @@ export default function StepSubmissionForm({ onStepSubmit }: StepSubmissionFormP
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="steps">Number of Steps</Label>
-            <div className="relative">
-                <Footprints className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  id="steps"
-                  type="number"
-                  placeholder="e.g., 5000"
-                  {...register('steps')}
-                  className="pl-10"
-                />
-            </div>
-            {errors.steps && <p className="text-sm text-destructive">{errors.steps.message}</p>}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            You can submit steps multiple times. They will be added to your total.
-          </p>
+          {formContent}
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Submitting...' : 'Submit Steps'}
-          </Button>
+          {formFooter}
         </CardFooter>
       </form>
     </Card>

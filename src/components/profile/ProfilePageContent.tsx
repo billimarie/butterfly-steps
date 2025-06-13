@@ -9,8 +9,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 import { useState, useEffect } from 'react';
 import type { UserProfile } from '@/types';
-import { getUserProfile } from '@/lib/firebaseService';
+import { getUserProfile, awardSpecificBadgeIfUnearned } from '@/lib/firebaseService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { BadgeId } from '@/lib/badges';
 
 function ProfilePageSkeleton() {
   return (
@@ -31,12 +32,12 @@ function ProfilePageSkeleton() {
 }
 
 interface ProfilePageContentProps {
-  viewedUserId: string; // From URL params, always present for this dynamic route
+  viewedUserId: string; 
 }
 
 export default function ProfilePageContent({ viewedUserId }: ProfilePageContentProps) {
-  const { user: authUser, userProfile: authUserProfile, loading: authLoading } = useAuth();
-  useAuthRedirect({ requireAuth: true }); // All profile views require login for now
+  const { user: authUser, userProfile: authUserProfile, loading: authLoading, fetchUserProfile, setShowNewBadgeModal } = useAuth();
+  useAuthRedirect({ requireAuth: true }); 
 
   const searchParams = useSearchParams();
   const editMode = searchParams.get('edit') === 'true';
@@ -48,32 +49,21 @@ export default function ProfilePageContent({ viewedUserId }: ProfilePageContentP
 
 
   useEffect(() => {
-    if (authLoading) return; // Wait for auth state to be resolved
+    if (authLoading) return; 
 
     if (!authUser) {
-      // This case should ideally be handled by useAuthRedirect if requireAuth is true,
-      // but as a safeguard:
       setIsLoadingTargetProfile(false);
       setProfileError("You must be logged in to view profiles.");
       return;
     }
 
-    // Determine if the viewed profile is the authenticated user's own profile
     const ownProfile = viewedUserId === authUser.uid;
     setIsOwnProfileView(ownProfile);
 
     if (ownProfile) {
-      if (authUserProfile) {
-        setProfileToDisplay(authUserProfile);
-      } else if (!authLoading) {
-        // Auth is loaded, authUser exists, but no authUserProfile. This might be mid-fetch or an error.
-        // AuthContext's fetchUserProfile should handle setting authUserProfile.
-        // If it's consistently null here, there might be an issue in AuthContext.
-        // For now, rely on authUserProfile being set by AuthContext.
-      }
-      setIsLoadingTargetProfile(authLoading); // Own profile loading state is tied to authLoading
+      setProfileToDisplay(authUserProfile);
+      setIsLoadingTargetProfile(false); 
     } else {
-      // Viewing someone else's profile
       setIsLoadingTargetProfile(true);
       getUserProfile(viewedUserId)
         .then(profile => {
@@ -92,6 +82,30 @@ export default function ProfilePageContent({ viewedUserId }: ProfilePageContentP
         });
     }
   }, [viewedUserId, authUser, authUserProfile, authLoading]);
+
+  useEffect(() => {
+    // Award 'social-butterfly' badge if viewing another profile for the first time
+    if (!authLoading && authUser && authUserProfile && profileToDisplay && !isOwnProfileView) {
+      const socialButterflyBadgeId: BadgeId = 'social-butterfly';
+      const alreadyHasBadge = authUserProfile.badgesEarned?.includes(socialButterflyBadgeId);
+
+      if (!alreadyHasBadge) {
+        const attemptAward = async () => {
+          try {
+            const awardedBadge = await awardSpecificBadgeIfUnearned(authUser.uid, socialButterflyBadgeId);
+            if (awardedBadge) {
+              setShowNewBadgeModal(awardedBadge);
+              // Refresh authUserProfile to include the new badge for future checks
+              await fetchUserProfile(authUser.uid);
+            }
+          } catch (error) {
+            console.error("Error attempting to award social-butterfly badge:", error);
+          }
+        };
+        attemptAward();
+      }
+    }
+  }, [authLoading, authUser, authUserProfile, profileToDisplay, isOwnProfileView, setShowNewBadgeModal, fetchUserProfile, viewedUserId]);
 
 
   if (authLoading || isLoadingTargetProfile) {
@@ -112,10 +126,7 @@ export default function ProfilePageContent({ viewedUserId }: ProfilePageContentP
   }
 
   if (!profileToDisplay) {
-    // This can happen if authUser exists but authUserProfile is null (e.g. during initial load of own profile)
-    // or if fetching another user's profile returned null and didn't set an error.
-    // The Skeleton handles loading, so this implies a "not found" or unexpected state if not loading.
-    if (!isOwnProfileView) { // Only show "not found" for other users' profiles
+    if (!isOwnProfileView) { 
         return (
             <Card className="w-full max-w-lg mx-auto">
                 <CardHeader><CardTitle>Profile Not Found</CardTitle></CardHeader>
@@ -123,16 +134,12 @@ export default function ProfilePageContent({ viewedUserId }: ProfilePageContentP
             </Card>
         );
     }
-    // For own profile, if profileToDisplay is null but auth is loaded, something is wrong or still loading, skeleton should cover.
-    // This state should ideally be brief for own profile.
     return <ProfilePageSkeleton />;
   }
 
-  // If viewing own profile and it's incomplete, or if in editMode for own profile:
   if (isOwnProfileView && (!profileToDisplay.profileComplete || editMode)) {
     return <ProfileSetupForm isUpdate={!!profileToDisplay.profileComplete && editMode} />;
   }
 
-  // Display the profile (own or other's)
   return <ProfileDisplay profileData={profileToDisplay} isOwnProfile={isOwnProfileView} />;
 }
