@@ -1,10 +1,10 @@
 
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { getCommunityStats } from '@/lib/firebaseService';
@@ -91,11 +91,11 @@ function LandingPage() {
 
       <div className="gap-8 text-left container mx-auto px-4 pb-12 mb-6">
         <Card className="shadow-lg container mx-auto px-4 py-8 bg-card">
-          <CardHeader>
+          <CardHeader className="text-left">
               <CardTitle className="font-headline text-2xl">What is the "Butterfly Steps" challenge?</CardTitle>
               <CardDescription>Let's step it up for butterflies!</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="text-left">
               <p className="mb-4">Since 2000, butterflies have declined by 22%.<sup>1</sup></p>
               <p className="mb-4">That's why we're hosting our first "Butterfly Steps" challenge: to "step" together and help grow desertified land into thriving Butterfly Habitats.</p>
               <p className="mb-4">Our goal is <strong>3,600,000</strong> steps. Here's why: our <a href="https://foreverystaratree.org" target="_blank" className="underline">nonprofit ecofarm</a> is located in the Mojave Desert&mdash;one of the hottest, most uninhabitable places on Earth.</p>
@@ -116,7 +116,7 @@ function LandingPage() {
       </div>
 
       <div className="p-8 space-y-8 container mx-auto px-4">
-        <h2 className="text-4xl font-headline text-primary">Our Migration</h2>
+        <h2 className="text-4xl font-headline text-primary text-center">Our Migration</h2>
         {statsLoading ? (
           <div className="space-y-6">
             <Skeleton className="h-56 w-full rounded-lg" />
@@ -130,37 +130,37 @@ function LandingPage() {
           </div>
         ) : (
           <Card className="text-center">
-            <CardHeader><CardTitle className="font-headline">Community Progress Unavailable</CardTitle></CardHeader>
-            <CardContent><p className="text-muted-foreground">Could not load community progress at this time. Please check back later.</p></CardContent>
+            <CardHeader className="text-left"><CardTitle className="font-headline text-2xl flex items-center"><Users className="mr-2 h-6 w-6 text-primary" />Community Progress Unavailable</CardTitle></CardHeader>
+            <CardContent className="text-left"><p className="text-muted-foreground">Could not load community progress at this time. Please check back later.</p></CardContent>
           </Card>
         )}
       </div>
       
       <div className="grid md:grid-cols-3 gap-8 text-left container mx-auto px-4 pb-12 mb-6">
         <Card className="shadow-lg hover:shadow-xl transition-shadow">
-            <CardHeader>
+            <CardHeader className="text-left">
                 <Footprints className="h-12 w-12 text-primary mb-3"/>
                 <CardTitle className="font-headline">Track Your Steps</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="text-left">
                 <p>"Step" closer to your personal goal as we embark on a symbolic migration&mdash;together.</p>
             </CardContent>
         </Card>
         <Card className="shadow-lg hover:shadow-xl transition-shadow">
-            <CardHeader>
+            <CardHeader className="text-left">
                 <Users className="h-12 w-12 text-primary mb-3"/>
                 <CardTitle className="font-headline">Join A Team</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="text-left">
                 <p>Log your daily steps with your friends! You can create your own team, or join an existing one.</p>
             </CardContent>
         </Card>
         <Card className="shadow-lg hover:shadow-xl transition-shadow">
-            <CardHeader>
+            <CardHeader className="text-left">
                 <Gift className="h-12 w-12 text-primary mb-3"/>
                 <CardTitle className="font-headline">1 Step Raises $1</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="text-left">
                 <p>Your steps have a <strong>real</strong> impact. In 2024, we raised enough funds to plant a quarter-acre Butterfly Garden!</p>
             </CardContent>
         </Card>
@@ -168,11 +168,11 @@ function LandingPage() {
 
       <div className="gap-8 text-left container mx-auto px-4 pb-12 mb-6">
         <Card className="shadow-lg container mx-auto px-4 py-8 bg-card">
-          <CardHeader>
-              <CardTitle className="font-headline text-2xl">Support the Monarchs</CardTitle>
+          <CardHeader className="text-left">
+              <CardTitle className="font-headline text-2xl flex items-center"><Gift className="mr-2 h-6 w-6 text-primary" />Support the Monarchs</CardTitle>
               <CardDescription>Every Step Counts!</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="text-left">
               <p className="mb-4">
                   Our nonprofit ecofarm plants Butterfly Habitats in the Mojave Desert. You can help us plant native milkweed and turn desertified land into a thriving ecosystem!
               </p>
@@ -195,15 +195,18 @@ function LandingPage() {
   );
 }
 
-export default function HomePage() {
+
+function AuthenticatedHomepageContent() {
   const { user, userProfile, loading: authLoading } = useAuth();
-  useAuthRedirect({ requireAuth: false });
-  
   const [initialCommunityStats, setInitialCommunityStats] = useState<CommunityStats | null>(null);
   const [communityStatsLoading, setCommunityStatsLoading] = useState(true);
 
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentTabQueryParam = searchParams.get('tab');
+  const initialTab = currentTabQueryParam === 'community' ? 'community' : 'dashboard';
+
 
   useEffect(() => {
     if (!authLoading && user && (!userProfile || !userProfile.profileComplete) && pathname !== '/profile' && !pathname.startsWith('/profile/')) {
@@ -255,7 +258,7 @@ export default function HomePage() {
     } else {
       // Logged-in, profile complete view with TABS
       return (
-        <Tabs defaultValue="dashboard" className="w-full space-y-4">
+        <Tabs key={initialTab} defaultValue={initialTab} className="w-full space-y-4">
           <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="community">Community</TabsTrigger>
@@ -290,4 +293,20 @@ export default function HomePage() {
   } else {
      return <LandingPage />;
   }
+}
+
+
+export default function HomePage() {
+  useAuthRedirect({ requireAuth: false });
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col justify-center items-center min-h-[calc(100vh-20rem)] text-center">
+        <div className="mb-4"> <Logo /> </div>
+        <p className="text-xl font-semibold text-foreground mb-2">Loading Page...</p>
+        <Skeleton className="h-32 w-1/2 rounded-lg" />
+      </div>
+    }>
+      <AuthenticatedHomepageContent />
+    </Suspense>
+  );
 }

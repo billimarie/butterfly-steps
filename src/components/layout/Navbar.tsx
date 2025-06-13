@@ -24,7 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, X, User, LogOut, LayoutDashboard, Users, ShoppingCart, Plus } from 'lucide-react';
+import { Menu, X, User, LogOut, LayoutDashboard, ShoppingCart, Plus, Settings as SettingsIcon, BarChart3 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Navbar() {
@@ -117,13 +117,10 @@ export default function Navbar() {
           ) : (
             // Desktop View
             loading ? (
-              <div className="h-8 w-32 bg-muted rounded animate-pulse"></div> 
+              <div className="h-8 w-32 bg-muted rounded animate-pulse"></div>
             ) : user ? (
               <>
                 <LogStepsButton />
-                <Button variant="ghost" asChild>
-                  <Link href="/shop">Shop</Link>
-                </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-10 w-10 rounded-full">
@@ -142,21 +139,19 @@ export default function Navbar() {
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link href="/"><LayoutDashboard className="mr-2 h-4 w-4" />Dashboard</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                    {userProfile?.teamId && userProfile?.teamName ? (
-                      <Link href={`/teams/${userProfile.teamId}`} onClick={() => setMobileMenuOpen(false)} className="block">
-                        <Users className="mr-3 h-5 w-5" />{userProfile.teamName}
-                      </Link>
-                      ) : (
-                        <Link href="/teams" onClick={() => setMobileMenuOpen(false)} className="block">
-                          <Users className="mr-3 h-5 w-5" />Team Hub
-                        </Link>
-                      )}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
                       <Link href={profileLink}><User className="mr-2 h-4 w-4" />Profile</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/?tab=dashboard"><LayoutDashboard className="mr-2 h-4 w-4" />Dashboard</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/?tab=community"><BarChart3 className="mr-2 h-4 w-4" />Leaderboard</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/shop"><ShoppingCart className="mr-2 h-4 w-4" />Shop</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/settings"><SettingsIcon className="mr-2 h-4 w-4" />Settings</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={logout} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
@@ -186,23 +181,20 @@ export default function Navbar() {
                 <div className="h-8 w-full bg-muted rounded animate-pulse my-1"></div>
               ) : user ? (
                 <>
-                  <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block">
-                    <Button variant="ghost" className="w-full justify-start text-base py-3"><LayoutDashboard className="mr-3 h-5 w-5" />Dashboard</Button>
-                  </Link>
-                  {userProfile?.teamId && userProfile?.teamName ? (
-                  <Link href={`/teams/${userProfile.teamId}`} onClick={() => setMobileMenuOpen(false)} className="block">
-                    <Button variant="ghost" className="w-full justify-start text-base py-3"><Users className="mr-3 h-5 w-5" />{userProfile.teamName}</Button>
-                  </Link>
-                  ) : (
-                    <Link href="/teams" onClick={() => setMobileMenuOpen(false)} className="block">
-                      <Button variant="ghost" className="w-full justify-start text-base py-3"><Users className="mr-3 h-5 w-5" />Team Hub</Button>
-                    </Link>
-                  )}
-                   <Link href="/shop" onClick={() => setMobileMenuOpen(false)} className="block">
-                    <Button variant="ghost" className="w-full justify-start text-base py-3"><ShoppingCart className="mr-3 h-5 w-5" />Shop</Button>
-                  </Link>
                   <Link href={profileLink} onClick={() => setMobileMenuOpen(false)} className="block">
                     <Button variant="ghost" className="w-full justify-start text-base py-3"><User className="mr-3 h-5 w-5" />Profile</Button>
+                  </Link>
+                  <Link href="/?tab=dashboard" onClick={() => setMobileMenuOpen(false)} className="block">
+                    <Button variant="ghost" className="w-full justify-start text-base py-3"><LayoutDashboard className="mr-3 h-5 w-5" />Dashboard</Button>
+                  </Link>
+                  <Link href="/?tab=community" onClick={() => setMobileMenuOpen(false)} className="block">
+                    <Button variant="ghost" className="w-full justify-start text-base py-3"><BarChart3 className="mr-3 h-5 w-5" />Leaderboard</Button>
+                  </Link>
+                  <Link href="/shop" onClick={() => setMobileMenuOpen(false)} className="block">
+                    <Button variant="ghost" className="w-full justify-start text-base py-3"><ShoppingCart className="mr-3 h-5 w-5" />Shop</Button>
+                  </Link>
+                  <Link href="/settings" onClick={() => setMobileMenuOpen(false)} className="block">
+                    <Button variant="ghost" className="w-full justify-start text-base py-3"><SettingsIcon className="mr-3 h-5 w-5" />Settings</Button>
                   </Link>
                   <DropdownMenuSeparator className="my-1"/>
                   <Button variant="ghost" onClick={() => { logout(); setMobileMenuOpen(false); }} className="w-full justify-start text-base py-3 text-destructive hover:text-destructive focus:bg-destructive/10 focus:text-destructive">
