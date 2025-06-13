@@ -69,12 +69,12 @@ interface ProfileDisplayProps {
 }
 
 export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDisplayProps) {
-  const { user: authUser, fetchUserProfile: fetchAuthUserProfile } = useAuth(); // Renamed to avoid conflict
+  const { user: authUser, fetchUserProfile: fetchAuthUserProfile } = useAuth();
   const { toast } = useToast();
   const [leavingTeam, setLeavingTeam] = useState(false);
   const [dailyStepsData, setDailyStepsData] = useState<DailyStep[]>([]);
   const [isLoadingChart, setIsLoadingChart] = useState(true);
-  
+
   const [isExistingBadgeModalOpen, setIsExistingBadgeModalOpen] = useState(false);
   const [selectedExistingBadge, setSelectedExistingBadge] = useState<BadgeData | null>(null);
 
@@ -98,7 +98,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     try {
       await leaveTeam(authUser.uid, profileData.teamId, profileData.currentSteps);
       toast({ title: 'Left Team', description: `You have left ${profileData.teamName}.` });
-      await fetchAuthUserProfile(authUser.uid); // Refresh logged-in user's profile
+      await fetchAuthUserProfile(authUser.uid);
     } catch (error) {
       toast({ title: 'Error Leaving Team', description: (error as Error).message, variant: "destructive" });
     } finally {
@@ -107,10 +107,13 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   };
 
   const fetchChartData = useCallback(async () => {
-    // Chart data is always for the profileData.uid, whether it's own or other's
+    if (!isOwnProfile) { // Only fetch chart data for own profile
+      setIsLoadingChart(false);
+      return;
+    }
     setIsLoadingChart(true);
     try {
-      const data = await getUserDailySteps(profileData.uid, 30); // Fetch last 30 days for the viewed profile
+      const data = await getUserDailySteps(profileData.uid, 30);
       setDailyStepsData(data);
     } catch (error) {
       console.error("Failed to fetch daily steps data:", error);
@@ -118,28 +121,33 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     } finally {
       setIsLoadingChart(false);
     }
-  }, [profileData.uid, toast]);
+  }, [profileData.uid, toast, isOwnProfile]);
 
   useEffect(() => {
     fetchChartData();
   }, [fetchChartData]);
 
   const handleStepSubmit = async () => {
-    if (authUser && isOwnProfile) { // Ensure only own profile gets refreshed this way
+    if (authUser && isOwnProfile) {
       await fetchAuthUserProfile(authUser.uid);
-      await fetchChartData(); // Re-fetch chart for the current profile (which is own profile)
+      await fetchChartData();
     }
   };
 
   const handleExistingBadgeClick = (badge: BadgeData) => {
-    setSelectedExistingBadge(badge);
-    setIsExistingBadgeModalOpen(true);
+    if (isOwnProfile) { // Only allow modal opening for own profile
+        setSelectedExistingBadge(badge);
+        setIsExistingBadgeModalOpen(true);
+    }
   };
 
   const earnedBadgeIds = profileData.badgesEarned || [];
   const earnedBadgesDetails: BadgeData[] = earnedBadgeIds
     .map(id => ALL_BADGES.find(b => b.id === id))
     .filter(b => b !== undefined) as BadgeData[];
+
+  const hasAnyStreakAchievement = STREAK_ACHIEVEMENTS.some(ach => profileData.currentStreak >= ach.requiredStreak);
+  const showStreakMilestonesSection = isOwnProfile || (!isOwnProfile && hasAnyStreakAchievement);
 
   return (
     <>
@@ -169,7 +177,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
 
         <CardContent className="space-y-6">
 
-          <div className="flex flex-col md:flex-row gap-6">
+          <div className="flex flex-col sm:flex-row gap-6 sm:space-x-6">
               <div className="md:w-1/3 space-y-2">
                 <h3 className="text-lg font-semibold flex items-center"><Target className="mr-2 h-5 w-5 text-primary" />Step Goal</h3>
                 <p className="text-2xl font-bold text-primary">{profileData.stepGoal?.toLocaleString() || 'Not set'} steps</p>
@@ -193,49 +201,53 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
             </div>
           )}
 
-          <Separator className="my-6" />
+          {isOwnProfile && <Separator className="my-6" />}
           
-          <div className="space-y-3">
-            <h3 className="text-lg font-semibold flex items-center"><CalendarDays className="mr-2 h-5 w-5 text-primary" /> Streak Milestones</h3>
-            {profileData.currentStreak > 0 ? (
-              <p className="text-sm text-muted-foreground">Current login streak: <strong className="text-accent">{profileData.currentStreak} day{profileData.currentStreak === 1 ? '' : 's'}</strong></p>
-            ) : (
-              <p className="text-sm text-muted-foreground">This user hasn't started a login streak yet.</p>
-            )}
-            <div className="flex flex-wrap gap-3 justify-center">
-              {STREAK_ACHIEVEMENTS.map((achievement) => {
-                const isUnlocked = profileData.currentStreak >= achievement.requiredStreak;
-                const AchievementIconComponent = achievement.icon;
-                return (
-                  <TooltipProvider key={achievement.id}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className={cn(
-                          "p-3 bg-muted/30 rounded-lg flex flex-col items-center w-32 text-center shadow-sm hover:shadow-md transition-shadow",
-                          isUnlocked ? "opacity-100" : "opacity-50"
-                        )}>
-                          <AchievementIconComponent className={cn("h-10 w-10 mb-1", isUnlocked ? "text-primary" : "text-muted-foreground")} />
-                          <span className={cn("text-xs font-medium", isUnlocked ? "text-foreground" : "text-muted-foreground")}>{achievement.name}</span>
-                          {isUnlocked && <span className="text-xs text-green-500 mt-0.5">Unlocked!</span>}
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="font-semibold">{achievement.name}</p>
-                        <p className="text-sm text-muted-foreground">{achievement.description}</p>
-                        <p className="text-xs text-muted-foreground">Requires: {achievement.requiredStreak} day streak</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                );
-              })}
+          {showStreakMilestonesSection && (
+            <div className="space-y-3">
+              <h3 className="text-lg font-semibold flex items-center"><CalendarDays className="mr-2 h-5 w-5 text-primary" /> Streak Milestones</h3>
+              {profileData.currentStreak > 0 ? (
+                <p className="text-sm text-muted-foreground">Current login streak: <strong className="text-accent">{profileData.currentStreak} day{profileData.currentStreak === 1 ? '' : 's'}</strong></p>
+              ) : (
+                isOwnProfile && <p className="text-sm text-muted-foreground">This user hasn't started a login streak yet.</p> 
+              )}
+              <div className="flex flex-wrap gap-3 justify-center">
+                {STREAK_ACHIEVEMENTS.map((achievement) => {
+                  const isUnlocked = profileData.currentStreak >= achievement.requiredStreak;
+                  const AchievementIconComponent = achievement.icon;
+                  return (
+                    <TooltipProvider key={achievement.id}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className={cn(
+                            "p-3 bg-muted/30 rounded-lg flex flex-col items-center w-32 text-center shadow-sm hover:shadow-md transition-shadow",
+                            isUnlocked ? "opacity-100" : "opacity-50"
+                          )}>
+                            <AchievementIconComponent className={cn("h-10 w-10 mb-1", isUnlocked ? "text-primary" : "text-muted-foreground")} />
+                            <span className={cn("text-xs font-medium", isUnlocked ? "text-foreground" : "text-muted-foreground")}>{achievement.name}</span>
+                            {isUnlocked && <span className="text-xs text-green-500 mt-0.5">Unlocked!</span>}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="font-semibold">{achievement.name}</p>
+                          <p className="text-sm text-muted-foreground">{achievement.description}</p>
+                          <p className="text-xs text-muted-foreground">Requires: {achievement.requiredStreak} day streak</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
-          <Separator className="my-6" />
+          {isOwnProfile && <Separator className="my-6" />}
 
-          <div>
-            <DailyStepChart dailyStepsData={dailyStepsData} isLoading={isLoadingChart} userProfile={profileData} />
-          </div>
+          {isOwnProfile && (
+            <div>
+              <DailyStepChart dailyStepsData={dailyStepsData} isLoading={isLoadingChart} userProfile={profileData} />
+            </div>
+          )}
 
           <Separator className="my-6" />
 
@@ -279,16 +291,26 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
               <div className="flex flex-wrap gap-3 justify-center">
                 {earnedBadgesDetails.map((badge) => {
                   const BadgeIconComponent = badge.icon;
+                  const commonBadgeClasses = "p-3 bg-muted/30 rounded-lg flex flex-col items-center w-28 text-center shadow-sm transition-all";
+                  const interactiveBadgeClasses = "hover:shadow-md hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer";
+                  const nonInteractiveBadgeClasses = "cursor-default";
+
                   return (
-                    <button
+                    <div // Changed from button to div for easier conditional interaction
                       key={badge.id}
-                      onClick={() => handleExistingBadgeClick(badge)}
-                      className="p-3 bg-muted/30 rounded-lg flex flex-col items-center w-28 text-center shadow-sm hover:shadow-md hover:bg-muted/50 transition-all focus:outline-none focus:ring-2 focus:ring-primary"
-                      aria-label={`View details for ${badge.name} badge`}
+                      onClick={isOwnProfile ? () => handleExistingBadgeClick(badge) : undefined}
+                      className={cn(
+                        commonBadgeClasses,
+                        isOwnProfile ? interactiveBadgeClasses : nonInteractiveBadgeClasses
+                      )}
+                      role={isOwnProfile ? "button" : "img"} // Adjust role for accessibility
+                      tabIndex={isOwnProfile ? 0 : -1}
+                      aria-label={isOwnProfile ? `View details for ${badge.name} badge` : badge.name}
+                      onKeyDown={isOwnProfile ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleExistingBadgeClick(badge); } : undefined}
                     >
                       <BadgeIconComponent className="h-10 w-10 text-primary mb-1" />
                       <span className="text-xs font-medium">{badge.name}</span>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -297,7 +319,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
             )}
           </div>
           
-          {profileData.inviteLink && (
+          {isOwnProfile && profileData.inviteLink && (
             <div className="space-y-2">
               <h3 className="text-lg font-semibold flex items-center"><Share2 className="mr-2 h-5 w-5 text-primary" />Share Profile</h3>
               <div className="flex items-center space-x-2">
@@ -322,11 +344,13 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
         )}
       </Card>
       
-      <BadgeDetailModal
-        isOpen={isExistingBadgeModalOpen}
-        onOpenChange={setIsExistingBadgeModalOpen}
-        badge={selectedExistingBadge}
-      />
+      {isOwnProfile && (
+        <BadgeDetailModal
+            isOpen={isExistingBadgeModalOpen}
+            onOpenChange={setIsExistingBadgeModalOpen}
+            badge={selectedExistingBadge}
+        />
+      )}
     </>
   );
 }
