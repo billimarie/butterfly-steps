@@ -136,7 +136,12 @@ export default function StreakDisplayModal() {
         </div>
         <DialogFooter className="px-6 py-4 bg-muted/30 flex justify-center items-center space-x-2">
           <p className="text-sm text-muted-foreground">Keep on flyin' high!</p>
-          <img src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1749691114/Cartoons/catti-the-caterpillar_b9skmk.png" className="w-10 h-10" alt="Catti the Caterpillar"/>
+          <img 
+            src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1749691114/Cartoons/catti-the-caterpillar_b9skmk.png" 
+            className="w-10 h-10 animate-catti-wiggle" 
+            alt="Catti the Caterpillar"
+            data-ai-hint="caterpillar cartoon"
+          />
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -4,7 +4,7 @@
 import type { Team, UserProfile } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Footprints, Crown, LogIn, LogOut, PlusCircle, Share2 } from 'lucide-react';
+import { Users, Footprints, Crown as CreatorCrownIcon, LogIn, LogOut, PlusCircle, Share2 } from 'lucide-react'; // Renamed Crown to avoid conflict if needed
 import TeamMemberListItem from '@/components/teams/TeamMemberListItem';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -13,10 +13,10 @@ import { useEffect, useState } from 'react';
 
 interface TeamDetailsDisplayProps {
     team: Team;
-    members: UserProfile[];
+    members: UserProfile[]; // Assumed to be sorted by steps descending
     isUserMember: boolean;
     canJoin: boolean;
-    isCreator: boolean;
+    isCreator: boolean; // Is the current logged-in user the creator of this team
     onJoinTeam: () => Promise<void>;
     onLeaveTeam: () => Promise<void>;
     actionLoading: boolean;
@@ -28,7 +28,7 @@ export default function TeamDetailsDisplay({
     members,
     isUserMember,
     canJoin,
-    isCreator,
+    isCreator: isViewingUserCreator, // Renamed to avoid confusion with member.isCreator
     onJoinTeam,
     onLeaveTeam,
     actionLoading,
@@ -60,7 +60,7 @@ export default function TeamDetailsDisplay({
   };
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
+    <div className="space-y-6">
       <Card className="shadow-xl">
         <CardHeader className="border-b">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -94,9 +94,9 @@ export default function TeamDetailsDisplay({
                 <Button asChild><Link href="/login"><LogIn className="mr-2 h-4 w-4"/> Login to Join</Link></Button>
             )}
           </div>
-           {isCreator && (
+           {isViewingUserCreator && ( // Use the renamed prop here
             <div className="mt-2 text-sm text-yellow-600 flex items-center">
-              <Crown className="mr-1 h-4 w-4" /> You are the creator of this team.
+              <CreatorCrownIcon className="mr-1 h-4 w-4" /> You are the creator of this team.
             </div>
           )}
         </CardHeader>
@@ -106,8 +106,13 @@ export default function TeamDetailsDisplay({
           </h3>
           {members.length > 0 ? (
             <ul className="space-y-3">
-              {members.map(member => (
-                <TeamMemberListItem key={member.uid} member={member} isCreator={member.uid === team.creatorUid} />
+              {members.map((member, index) => (
+                <TeamMemberListItem 
+                  key={member.uid} 
+                  member={member} 
+                  isCreator={member.uid === team.creatorUid} 
+                  isTopStepper={index === 0} // Top member in the sorted list
+                />
               ))}
             </ul>
           ) : (

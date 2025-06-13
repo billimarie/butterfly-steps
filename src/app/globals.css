@@ -136,6 +136,17 @@
       transform: scale(1) translateY(0);
     }
   }
+
+  .animate-catti-wiggle {
+    animation: catti-wiggle 1.5s ease-in-out infinite;
+  }
+
+  @keyframes catti-wiggle {
+    0%, 100% { transform: translateX(0) rotate(0deg) scale(1); }
+    25% { transform: translateX(-2px) rotate(-3deg) scale(1.05); }
+    50% { transform: translateX(0) rotate(0deg) scale(1); }
+    75% { transform: translateX(2px) rotate(3deg) scale(1.05); }
+  }
 }
 
 /* Mariposa Animation by Monet Fort : https://codepen.io/mfort/pen/yLqRXoN */

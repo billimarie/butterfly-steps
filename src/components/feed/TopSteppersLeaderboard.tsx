@@ -19,9 +19,10 @@ const getInitials = (name: string | null | undefined) => {
 
 interface TopSteppersLeaderboardProps {
   count: number;
+  isPublicView?: boolean; // New prop
 }
 
-export default function TopSteppersLeaderboard({ count }: TopSteppersLeaderboardProps) {
+export default function TopSteppersLeaderboard({ count, isPublicView = false }: TopSteppersLeaderboardProps) {
   const [topUsers, setTopUsers] = useState<UserProfile[]>([]);
   const [loadingTopUsers, setLoadingTopUsers] = useState(true);
 
@@ -64,32 +65,42 @@ export default function TopSteppersLeaderboard({ count }: TopSteppersLeaderboard
         </div>
       ) : topUsers.length > 0 ? (
         <div className="space-y-4">
-          {topUsers.map((user, index) => (
-            <Card key={user.uid} className="shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between space-x-4 pb-3 pt-4 px-4">
-                <div className="flex items-center space-x-3">
-                  <Avatar className="h-10 w-10 border">
-                    <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm font-medium leading-none">{user.displayName || 'Anonymous User'}</p>
-                    {user.teamName && (
-                      <p className="text-xs text-muted-foreground flex items-center mt-0.5">
-                        <TeamIcon className="mr-1 h-3 w-3" /> {user.teamName}
-                      </p>
-                    )}
+          {topUsers.map((user, index) => {
+            const displayNameToShow = isPublicView 
+              ? `Top Walker #${index + 1}` 
+              : user.displayName || 'Anonymous User';
+            
+            const avatarFallbackContent = isPublicView 
+              ? `#${index + 1}`.slice(0,2) // Ensure it's not too long for avatar
+              : getInitials(user.displayName);
+
+            return (
+              <Card key={user.uid} className="shadow-md hover:shadow-lg transition-shadow">
+                <CardHeader className="flex flex-row items-center justify-between space-x-4 pb-3 pt-4 px-4">
+                  <div className="flex items-center space-x-3">
+                    <Avatar className="h-10 w-10 border">
+                      <AvatarFallback>{avatarFallbackContent}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-medium leading-none">{displayNameToShow}</p>
+                      {user.teamName && !isPublicView && (
+                        <p className="text-xs text-muted-foreground flex items-center mt-0.5">
+                          <TeamIcon className="mr-1 h-3 w-3" /> {user.teamName}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center text-primary">
-                  {index === 0 && <Medal className="mr-2 h-5 w-5 text-yellow-400" />}
-                  {index === 1 && <Medal className="mr-2 h-5 w-5 text-slate-400" />}
-                  {index === 2 && <Medal className="mr-2 h-5 w-5 text-orange-400" />}
-                  <span className="text-lg font-semibold">{user.currentSteps.toLocaleString()}</span>
-                  <Footprints className="ml-1 h-4 w-4 text-muted-foreground" />
-                </div>
-              </CardHeader>
-            </Card>
-          ))}
+                  <div className="flex items-center text-primary">
+                    {index === 0 && <Medal className="mr-2 h-5 w-5 text-yellow-400" />}
+                    {index === 1 && <Medal className="mr-2 h-5 w-5 text-slate-400" />}
+                    {index === 2 && <Medal className="mr-2 h-5 w-5 text-orange-400" />}
+                    <span className="text-lg font-semibold">{user.currentSteps.toLocaleString()}</span>
+                    <Footprints className="ml-1 h-4 w-4 text-muted-foreground" />
+                  </div>
+                </CardHeader>
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <p className="text-muted-foreground text-center">No top users to display yet. Be the first!</p>
