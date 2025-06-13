@@ -30,6 +30,8 @@ export default function Navbar() {
     return parts.join('').toUpperCase();
   };
 
+  const profileLink = user ? `/profile/${user.uid}` : '/login';
+
   return (
     <header className="bg-background/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
       <nav className="container mx-auto px-4 py-3 flex justify-between items-center">
@@ -112,7 +114,7 @@ export default function Navbar() {
                       )}
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/profile"><User className="mr-2 h-4 w-4" />Profile</Link>
+                      <Link href={profileLink}><User className="mr-2 h-4 w-4" />Profile</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={logout} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
@@ -164,7 +166,7 @@ export default function Navbar() {
                   <Link href="/shop" onClick={() => setMobileMenuOpen(false)} className="block">
                     <Button variant="ghost" className="w-full justify-start text-base py-3"><ShoppingCart className="mr-3 h-5 w-5" />Shop</Button>
                   </Link>
-                  <Link href="/profile" onClick={() => setMobileMenuOpen(false)} className="block">
+                  <Link href={profileLink} onClick={() => setMobileMenuOpen(false)} className="block">
                     <Button variant="ghost" className="w-full justify-start text-base py-3"><User className="mr-3 h-5 w-5" />Profile</Button>
                   </Link>
                   <DropdownMenuSeparator className="my-1"/>

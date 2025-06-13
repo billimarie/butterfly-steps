@@ -7,6 +7,10 @@ import { useAuth } from '@/context/AuthContext';
 import { useSearchParams } from 'next/navigation';
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
+import { useState, useEffect } from 'react';
+import type { UserProfile } from '@/types';
+import { getUserProfile } from '@/lib/firebaseService';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 function ProfilePageSkeleton() {
   return (
@@ -26,32 +30,109 @@ function ProfilePageSkeleton() {
   );
 }
 
-export default function ProfilePageContent() {
-  const { user, userProfile, loading } = useAuth();
-  useAuthRedirect({ requireAuth: true }); 
-  
+interface ProfilePageContentProps {
+  viewedUserId: string; // From URL params, always present for this dynamic route
+}
+
+export default function ProfilePageContent({ viewedUserId }: ProfilePageContentProps) {
+  const { user: authUser, userProfile: authUserProfile, loading: authLoading } = useAuth();
+  useAuthRedirect({ requireAuth: true }); // All profile views require login for now
+
   const searchParams = useSearchParams();
   const editMode = searchParams.get('edit') === 'true';
 
-  if (loading || !user) {
+  const [profileToDisplay, setProfileToDisplay] = useState<UserProfile | null>(null);
+  const [isLoadingTargetProfile, setIsLoadingTargetProfile] = useState(true);
+  const [isOwnProfileView, setIsOwnProfileView] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+
+  useEffect(() => {
+    if (authLoading) return; // Wait for auth state to be resolved
+
+    if (!authUser) {
+      // This case should ideally be handled by useAuthRedirect if requireAuth is true,
+      // but as a safeguard:
+      setIsLoadingTargetProfile(false);
+      setProfileError("You must be logged in to view profiles.");
+      return;
+    }
+
+    // Determine if the viewed profile is the authenticated user's own profile
+    const ownProfile = viewedUserId === authUser.uid;
+    setIsOwnProfileView(ownProfile);
+
+    if (ownProfile) {
+      if (authUserProfile) {
+        setProfileToDisplay(authUserProfile);
+      } else if (!authLoading) {
+        // Auth is loaded, authUser exists, but no authUserProfile. This might be mid-fetch or an error.
+        // AuthContext's fetchUserProfile should handle setting authUserProfile.
+        // If it's consistently null here, there might be an issue in AuthContext.
+        // For now, rely on authUserProfile being set by AuthContext.
+      }
+      setIsLoadingTargetProfile(authLoading); // Own profile loading state is tied to authLoading
+    } else {
+      // Viewing someone else's profile
+      setIsLoadingTargetProfile(true);
+      getUserProfile(viewedUserId)
+        .then(profile => {
+          if (profile) {
+            setProfileToDisplay(profile);
+          } else {
+            setProfileError("User profile not found.");
+          }
+        })
+        .catch(err => {
+          console.error("Error fetching viewed user's profile:", err);
+          setProfileError("Could not load user profile.");
+        })
+        .finally(() => {
+          setIsLoadingTargetProfile(false);
+        });
+    }
+  }, [viewedUserId, authUser, authUserProfile, authLoading]);
+
+
+  if (authLoading || isLoadingTargetProfile) {
     return <ProfilePageSkeleton />;
   }
 
-  // If user exists but profile is not complete, OR if in editMode, show the setup/update form.
-  // The `isUpdate` prop for ProfileSetupForm determines its behavior (initial setup vs. update).
-  // For initial setup, `isUpdate` will be false. For edits, it will be true.
-  if (!userProfile?.profileComplete || editMode) {
-    return <ProfileSetupForm isUpdate={!!userProfile?.profileComplete && editMode} />;
+  if (profileError) {
+     return (
+      <Card className="w-full max-w-lg mx-auto">
+        <CardHeader>
+          <CardTitle>Profile Error</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-destructive">{profileError}</p>
+        </CardContent>
+      </Card>
+    );
   }
-  
-  // If profile is complete and not in edit mode, display the profile.
-  if (userProfile?.profileComplete && !editMode) {
-    return <ProfileDisplay />;
-  }
-  
-  // Fallback, should ideally be covered by above conditions or redirection.
-  // This would render the form for initial setup if somehow profile is null but user exists.
-  return <ProfileSetupForm isUpdate={false} />;
-}
 
-    
+  if (!profileToDisplay) {
+    // This can happen if authUser exists but authUserProfile is null (e.g. during initial load of own profile)
+    // or if fetching another user's profile returned null and didn't set an error.
+    // The Skeleton handles loading, so this implies a "not found" or unexpected state if not loading.
+    if (!isOwnProfileView) { // Only show "not found" for other users' profiles
+        return (
+            <Card className="w-full max-w-lg mx-auto">
+                <CardHeader><CardTitle>Profile Not Found</CardTitle></CardHeader>
+                <CardContent><p>The user profile you are looking for does not exist or could not be loaded.</p></CardContent>
+            </Card>
+        );
+    }
+    // For own profile, if profileToDisplay is null but auth is loaded, something is wrong or still loading, skeleton should cover.
+    // This state should ideally be brief for own profile.
+    return <ProfilePageSkeleton />;
+  }
+
+  // If viewing own profile and it's incomplete, or if in editMode for own profile:
+  if (isOwnProfileView && (!profileToDisplay.profileComplete || editMode)) {
+    return <ProfileSetupForm isUpdate={!!profileToDisplay.profileComplete && editMode} />;
+  }
+
+  // Display the profile (own or other's)
+  return <ProfileDisplay profileData={profileToDisplay} isOwnProfile={isOwnProfileView} />;
+}
