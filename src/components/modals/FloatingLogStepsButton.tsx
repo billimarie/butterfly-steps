@@ -37,12 +37,15 @@ export default function FloatingLogStepsButton() {
       </DialogTrigger>
       <DialogOverlay className="bg-black/60 backdrop-blur-sm" />
       <DialogContent className="sm:max-w-md p-0">
-      <DialogHeader className="p-6 pb-4">
-      </DialogHeader>
-        <div className="px-6 pt-0 pb-6"> {/* Reduced vertical padding for content */}
-          <StepSubmissionForm onStepSubmit={handleFormSubmitSuccess} />
+        <DialogHeader className="p-6 pb-4 border-b">
+          <DialogTitle className="font-headline text-2xl">Log Your Steps</DialogTitle>
+           <DialogClose className="hidden">
+            
+          </DialogClose>
+        </DialogHeader>
+        <div className="px-6 py-2"> {/* Reduced vertical padding for content */}
+          <StepSubmissionForm onStepSubmit={handleFormSubmitSuccess} isModalVersion={true}/>
         </div>
-        {/* Footer is part of StepSubmissionForm now */}
       </DialogContent>
     </Dialog>
   );

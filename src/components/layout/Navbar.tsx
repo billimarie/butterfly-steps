@@ -8,6 +8,15 @@ import { Button } from '@/components/ui/button';
 import Logo from '@/components/ui/Logo';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
+import StepSubmissionForm from '@/components/dashboard/StepSubmissionForm';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -15,12 +24,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, X, User, LogOut, LayoutDashboard, Gift, Users, ShoppingCart } from 'lucide-react';
+import { Menu, X, User, LogOut, LayoutDashboard, Gift, Users, ShoppingCart, Plus } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Navbar() {
-  const { user, userProfile, logout, loading } = useAuth();
+  const { user, userProfile, logout, loading, fetchUserProfile } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [logStepsNavbarModalOpen, setLogStepsNavbarModalOpen] = useState(false);
   const isMobile = useIsMobile();
 
   const getInitials = (name: string | null | undefined) => {
@@ -32,6 +42,40 @@ export default function Navbar() {
 
   const profileLink = user ? `/profile/${user.uid}` : '/login';
 
+  const handleNavbarStepSubmitSuccess = async () => {
+    if (user?.uid) {
+      await fetchUserProfile(user.uid);
+    }
+    setLogStepsNavbarModalOpen(false);
+  };
+
+  const LogStepsButton = () => (
+    user && userProfile?.profileComplete && (
+      <Dialog open={logStepsNavbarModalOpen} onOpenChange={setLogStepsNavbarModalOpen}>
+        <DialogTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-full text-muted-foreground hover:text-primary hover:bg-accent"
+            aria-label="Log Steps"
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-md p-0">
+          <DialogHeader className="p-6 pb-4 border-b">
+            <DialogTitle className="font-headline text-2xl">Log Your Steps</DialogTitle>
+            <DialogClose asChild>
+            </DialogClose>
+          </DialogHeader>
+          <div className="px-6 py-2">
+            <StepSubmissionForm onStepSubmit={handleNavbarStepSubmitSuccess} isModalVersion={true} />
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  );
+
   return (
     <header className="bg-background/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
       <nav className="container mx-auto px-4 py-3 flex justify-between items-center">
@@ -39,43 +83,44 @@ export default function Navbar() {
 
         <div className="flex items-center space-x-2">
           {isMobile ? (
-            // Mobile View: Avatar or Hamburger toggle
-            loading ? (
-              <div className="h-9 w-9 bg-muted rounded-full animate-pulse"></div>
-            ) : user ? (
-              <Button
-                variant="ghost"
-                className="relative h-9 w-9 rounded-full p-0"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                aria-label="Toggle Mobile Menu"
-              >
-                <Avatar className="h-9 w-9">
-                  <AvatarImage src={user.photoURL || undefined} alt={userProfile?.displayName || user.email || 'User'} />
-                  <AvatarFallback>{getInitials(userProfile?.displayName || user.email)}</AvatarFallback>
-                </Avatar>
-              </Button>
-            ) : (
-              <>
-                <Button variant="ghost" asChild className="p-1.5 text-muted-foreground hover:text-primary">
-                  <Link href="/shop"><ShoppingCart className="w-6 h-6" /></Link>
-                </Button>
+            // Mobile View
+            <>
+              <LogStepsButton />
+              {loading ? (
+                <div className="h-9 w-9 bg-muted rounded-full animate-pulse"></div>
+              ) : user ? (
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 text-muted-foreground hover:text-primary"
+                  className="relative h-9 w-9 rounded-full p-0"
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                   aria-label="Toggle Mobile Menu"
                 >
-                  {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                  <Avatar className="h-9 w-9">
+                    <AvatarImage src={user.photoURL || undefined} alt={userProfile?.displayName || user.email || 'User'} />
+                    <AvatarFallback>{getInitials(userProfile?.displayName || user.email)}</AvatarFallback>
+                  </Avatar>
                 </Button>
-              </>
-            )
+              ) : (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-muted-foreground hover:text-primary"
+                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                    aria-label="Toggle Mobile Menu"
+                  >
+                    {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                  </Button>
+                </>
+              )}
+            </>
           ) : (
-            // Desktop View: Full navigation
+            // Desktop View
             loading ? (
-              <div className="h-8 w-24 bg-muted rounded animate-pulse"></div>
+              <div className="h-8 w-32 bg-muted rounded animate-pulse"></div> // Placeholder for buttons and avatar
             ) : user ? (
               <>
+                <LogStepsButton />
                 <Button variant="ghost" asChild>
                   <Link href="/feed">Feed</Link>
                 </Button>
@@ -103,7 +148,7 @@ export default function Navbar() {
                       <Link href="/"><LayoutDashboard className="mr-2 h-4 w-4" />Your Dashboard</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                    {userProfile.teamId && userProfile.teamName ? (
+                    {userProfile?.teamId && userProfile?.teamName ? ( // Check userProfile existence
                       <Link href={`/teams/${userProfile.teamId}`} onClick={() => setMobileMenuOpen(false)} className="block">
                         <Users className="mr-3 h-5 w-5" />{userProfile.teamName}
                       </Link>
@@ -129,9 +174,6 @@ export default function Navbar() {
                 <Button variant="ghost" asChild>
                   <Link href="/login">Login</Link>
                 </Button>
-                <Button variant="ghost" asChild className="p-1.5 text-muted-foreground hover:text-primary">
-                  <Link href="/shop"><ShoppingCart className="w-6 h-6" /></Link>
-                </Button>
                 <Button asChild className="ml-2">
                   <Link href="/signup">Sign Up</Link>
                 </Button>
@@ -151,7 +193,7 @@ export default function Navbar() {
                   <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block">
                     <Button variant="ghost" className="w-full justify-start text-base py-3"><LayoutDashboard className="mr-3 h-5 w-5" />Your Dashboard</Button>
                   </Link>
-                  {userProfile.teamId && userProfile.teamName ? (
+                  {userProfile?.teamId && userProfile?.teamName ? ( // Check userProfile existence
                   <Link href={`/teams/${userProfile.teamId}`} onClick={() => setMobileMenuOpen(false)} className="block">
                     <Button variant="ghost" className="w-full justify-start text-base py-3"><Users className="mr-3 h-5 w-5" />{userProfile.teamName}</Button>
                   </Link>
@@ -163,7 +205,7 @@ export default function Navbar() {
                   <Link href="/feed" onClick={() => setMobileMenuOpen(false)} className="block">
                     <Button variant="ghost" className="w-full justify-start text-base py-3"><LayoutDashboard className="mr-3 h-5 w-5" />Feed</Button>
                   </Link>
-                  <Link href="/shop" onClick={() => setMobileMenuOpen(false)} className="block">
+                   <Link href="/shop" onClick={() => setMobileMenuOpen(false)} className="block">
                     <Button variant="ghost" className="w-full justify-start text-base py-3"><ShoppingCart className="mr-3 h-5 w-5" />Shop</Button>
                   </Link>
                   <Link href={profileLink} onClick={() => setMobileMenuOpen(false)} className="block">
@@ -176,18 +218,11 @@ export default function Navbar() {
                 </>
               ) : (
                 <>
-                  <Link href="/feed" onClick={() => setMobileMenuOpen(false)} className="block">
-                    <Button variant="ghost" className="w-full justify-start text-base py-3"><Users className="mr-3 h-5 w-5" />Community Feed</Button>
-                  </Link>
-                  <Link href="/shop" onClick={() => setMobileMenuOpen(false)} className="block">
-                    <Button variant="ghost" className="w-full justify-start text-base py-3"><ShoppingCart className="mr-3 h-5 w-5" />Shop</Button>
-                  </Link>
-                  <DropdownMenuSeparator className="my-1"/>
                   <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="block">
-                    <Button variant="ghost" className="w-full justify-start text-base py-3">Login</Button>
+                    <Button className="w-full text-base py-3 bg-primary">Login</Button>
                   </Link>
                   <Link href="/signup" onClick={() => setMobileMenuOpen(false)} className="block">
-                    <Button className="w-full text-base py-3 mt-1">Sign Up</Button>
+                    <Button variant="ghost" className="w-full text-base py-3 mt-1">Sign Up</Button>
                   </Link>
                 </>
               )}
