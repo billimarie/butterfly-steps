@@ -4,7 +4,7 @@
 import type { Team, UserProfile } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Footprints, Crown as CreatorCrownIcon, LogIn, LogOut, PlusCircle, Share2 } from 'lucide-react'; // Renamed Crown to avoid conflict if needed
+import { Users, Footprints, Crown as CreatorCrownIcon, LogIn, LogOut, PlusCircle, Share2 } from 'lucide-react';
 import TeamMemberListItem from '@/components/teams/TeamMemberListItem';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -28,7 +28,7 @@ export default function TeamDetailsDisplay({
     members,
     isUserMember,
     canJoin,
-    isCreator: isViewingUserCreator, // Renamed to avoid confusion with member.isCreator
+    isCreator: isViewingUserCreator,
     onJoinTeam,
     onLeaveTeam,
     actionLoading,
@@ -94,7 +94,7 @@ export default function TeamDetailsDisplay({
                 <Button asChild><Link href="/login"><LogIn className="mr-2 h-4 w-4"/> Login to Join</Link></Button>
             )}
           </div>
-           {isViewingUserCreator && ( // Use the renamed prop here
+           {isViewingUserCreator && (
             <div className="mt-2 text-sm text-yellow-600 flex items-center">
               <CreatorCrownIcon className="mr-1 h-4 w-4" /> You are the creator of this team.
             </div>
@@ -105,16 +105,16 @@ export default function TeamDetailsDisplay({
             <Users className="mr-2 h-5 w-5 text-primary" /> Team Members ({members.length})
           </h3>
           {members.length > 0 ? (
-            <ul className="space-y-3">
+            <div className="space-y-3">
               {members.map((member, index) => (
-                <TeamMemberListItem 
-                  key={member.uid} 
-                  member={member} 
-                  isCreator={member.uid === team.creatorUid} 
-                  isTopStepper={index === 0} // Top member in the sorted list
+                <TeamMemberListItem
+                  key={member.uid}
+                  member={member}
+                  isCreator={member.uid === team.creatorUid}
+                  index={index}
                 />
               ))}
-            </ul>
+            </div>
           ) : (
             <p className="text-muted-foreground">This team has no members yet.</p>
           )}

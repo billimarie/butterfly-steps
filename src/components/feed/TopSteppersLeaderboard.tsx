@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Medal, Footprints, Users as TeamIcon } from 'lucide-react';
@@ -19,10 +20,9 @@ const getInitials = (name: string | null | undefined) => {
 
 interface TopSteppersLeaderboardProps {
   count: number;
-  isPublicView?: boolean; // New prop
 }
 
-export default function TopSteppersLeaderboard({ count, isPublicView = false }: TopSteppersLeaderboardProps) {
+export default function TopSteppersLeaderboard({ count }: TopSteppersLeaderboardProps) {
   const [topUsers, setTopUsers] = useState<UserProfile[]>([]);
   const [loadingTopUsers, setLoadingTopUsers] = useState(true);
 
@@ -47,8 +47,8 @@ export default function TopSteppersLeaderboard({ count, isPublicView = false }: 
     <div className="mt-12">
       <h2 className="text-3xl font-headline text-primary mb-6 text-center">Top Steppers</h2>
       {loadingTopUsers ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(Math.min(count, 3))].map((_, i) => ( 
+        <div className="space-y-4">
+          {[...Array(Math.min(count, 3))].map((_, i) => (
             <Card key={`skeleton-${i}`} className="shadow-lg">
               <CardHeader className="flex flex-row items-center space-x-3 pb-2">
                 <Skeleton className="h-10 w-10 rounded-full" />
@@ -65,25 +65,21 @@ export default function TopSteppersLeaderboard({ count, isPublicView = false }: 
         </div>
       ) : topUsers.length > 0 ? (
         <div className="space-y-4">
-          {topUsers.map((user, index) => {
-            const displayNameToShow = isPublicView 
-              ? `Top Walker #${index + 1}` 
-              : user.displayName || 'Anonymous User';
-            
-            const avatarFallbackContent = isPublicView 
-              ? `#${index + 1}`.slice(0,2) // Ensure it's not too long for avatar
-              : getInitials(user.displayName);
-
-            return (
-              <Card key={user.uid} className="shadow-md hover:shadow-lg transition-shadow">
+          {topUsers.map((user, index) => (
+            <Link
+              key={user.uid}
+              href={`/profile/${user.uid}`}
+              className="block rounded-lg transition-shadow hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+            >
+              <Card className="shadow-md"> {/* Removed hover, transition, and cursor styles from Card */}
                 <CardHeader className="flex flex-row items-center justify-between space-x-4 pb-3 pt-4 px-4">
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10 border">
-                      <AvatarFallback>{avatarFallbackContent}</AvatarFallback>
+                      <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="text-sm font-medium leading-none">{displayNameToShow}</p>
-                      {user.teamName && !isPublicView && (
+                      <p className="text-sm font-medium leading-none">{user.displayName || 'Anonymous User'}</p>
+                      {user.teamName && (
                         <p className="text-xs text-muted-foreground flex items-center mt-0.5">
                           <TeamIcon className="mr-1 h-3 w-3" /> {user.teamName}
                         </p>
@@ -99,8 +95,8 @@ export default function TopSteppersLeaderboard({ count, isPublicView = false }: 
                   </div>
                 </CardHeader>
               </Card>
-            );
-          })}
+            </Link>
+          ))}
         </div>
       ) : (
         <p className="text-muted-foreground text-center">No top users to display yet. Be the first!</p>

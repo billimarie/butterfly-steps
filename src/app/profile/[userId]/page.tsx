@@ -4,10 +4,17 @@ import { Suspense } from 'react';
 import ProfilePageContent from '@/components/profile/ProfilePageContent';
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const metadata: Metadata = {
-  title: 'Your Profile | Butterfly Steps',
-  description: 'Manage your Butterfly Steps profile, track your progress, and view your badges.',
-};
+// This function can be used to generate metadata dynamically based on params
+// For now, we'll keep it generic, but it could fetch user's name for title
+export async function generateMetadata({ params }: { params: { userId: string } }): Promise<Metadata> {
+  // In a real app, you might fetch user's name using params.userId
+  // const userName = await fetchUserName(params.userId);
+  // For now, a generic title:
+  return {
+    title: `User Profile | Butterfly Steps`,
+    description: 'View user profile, progress, and badges in the Butterfly Steps challenge.',
+  };
+}
 
 function ProfilePageSkeleton() {
   return (
@@ -27,10 +34,11 @@ function ProfilePageSkeleton() {
   );
 }
 
-export default function ProfilePage() {
+export default async function UserProfilePage({ params: { userId } }: { params: { userId: string } }) {
+  // userId is now directly available from the destructured params
   return (
     <Suspense fallback={<ProfilePageSkeleton />}>
-      <ProfilePageContent />
+      <ProfilePageContent viewedUserId={userId} />
     </Suspense>
   );
 }

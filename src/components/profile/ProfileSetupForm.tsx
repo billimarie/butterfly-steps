@@ -18,9 +18,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { CheckCircle, Zap, TrendingUp, Target, Edit3, Users, LogOut, PlusCircle } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-// ToastAction removed
 import type { BadgeData, BadgeId } from '@/lib/badges';
-// getBadgeDataById removed
 import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
@@ -125,7 +123,7 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
 
   const onSubmit: SubmitHandler<ProfileUpdateFormInputs> = async (data) => {
     if (!user) {
-      toast({ title: 'Error', description: 'User not authenticated. Please log in again.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'User not authenticated. Please log in again.', variant: "destructive" });
       return;
     }
     setLoading(true);
@@ -180,8 +178,8 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
                   awardedTeamBadgeFromAction = result.awardedTeamBadge;
                   toast({ title: 'Team Joined!', description: `You've joined "${result.teamName}".` });
               } else {
-                  toast({ title: 'Failed to join team', description: 'Please check the Team ID and try again.', variant: 'destructive'});
-                  setLoading(false); // Release loading state
+                  toast({ title: 'Failed to join team', description: 'Please check the Team ID and try again.', variant: "destructive"});
+                  setLoading(false); 
                   return; 
               }
           }
@@ -202,11 +200,11 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       }
 
       toast({ title: 'Profile Updated!', description: 'Your Butterfly Steps profile has been updated.' });
-      router.push('/profile'); 
+      router.push(`/profile/${user.uid}`); 
       
     } catch (error) {
         console.error('Profile update/team action error:', error);
-        toast({ title: 'Update Failed', description: (error as Error).message || 'Could not update profile or team. Please try again.', variant: 'destructive' });
+        toast({ title: 'Update Failed', description: (error as Error).message || 'Could not update profile or team. Please try again.', variant: "destructive" });
     } finally {
         setLoading(false);
     }
@@ -223,16 +221,19 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       setValue('newTeamName','');
       await fetchUserProfile(user.uid); 
     } catch (error) {
-      toast({ title: 'Error Leaving Team', description: (error as Error).message, variant: 'destructive' });
+      toast({ title: 'Error Leaving Team', description: (error as Error).message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
 
-  if (!userProfile && isUpdate) {
+  if (!userProfile && isUpdate && !user) { // Added !user check for initial load scenario
     return <p>Loading profile or profile not found...</p>;
   }
+  
+  const cancelLink = user ? `/profile/${user.uid}` : '/';
+
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
@@ -415,7 +416,7 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
           </div>
         </CardContent>
         <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-3">
-          <Button type="button" variant="outline" onClick={() => router.push('/profile')} className="w-full sm:w-auto">
+          <Button type="button" variant="outline" onClick={() => router.push(cancelLink)} className="w-full sm:w-auto">
             Cancel
           </Button>
           <Button type="submit" className="w-full sm:w-auto" disabled={loading}>
