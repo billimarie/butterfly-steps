@@ -238,7 +238,7 @@ export default function ProfileDisplay() {
           <Separator className="my-6" />
 
           <div>
-            <DailyStepChart dailyStepsData={dailyStepsData} isLoading={isLoadingChart} />
+            <DailyStepChart dailyStepsData={dailyStepsData} isLoading={isLoadingChart} userProfile={userProfile} />
           </div>
 
           <Separator className="my-6" />

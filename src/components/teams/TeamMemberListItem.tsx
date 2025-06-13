@@ -3,19 +3,25 @@
 
 import type { UserProfile } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Footprints, User as UserIcon, Crown } from 'lucide-react';
+import { Footprints, Crown } from 'lucide-react';
 
 interface TeamMemberListItemProps {
   member: UserProfile;
-  isCreator: boolean;
+  isCreator: boolean; // Retained in case a different creator visual cue is desired later
+  isTopStepper: boolean;
 }
 
 const getInitials = (name: string | null | undefined) => {
     if (!name) return 'U';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+    // Ensure that we only take the first letter of each part of the name
+    const parts = name.split(' ').filter(Boolean).map(part => part[0]);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].toUpperCase();
+    // For multiple parts, take the first letter of the first and last parts
+    return (parts[0] + parts[parts.length - 1]).toUpperCase();
 };
 
-export default function TeamMemberListItem({ member, isCreator }: TeamMemberListItemProps) {
+export default function TeamMemberListItem({ member, isCreator, isTopStepper }: TeamMemberListItemProps) {
   return (
     <li className="flex items-center justify-between py-3 bg-card rounded-md shadow-sm hover:bg-muted/50 transition-colors">
       <div className="flex items-center space-x-3">
@@ -26,7 +32,10 @@ export default function TeamMemberListItem({ member, isCreator }: TeamMemberList
         <div>
           <p className="font-semibold text-sm flex items-center">
             {member.displayName || 'Unnamed User'}
-            {isCreator && <Crown className="ml-2 h-4 w-4 text-yellow-500" title="Team Creator"/>}
+            {isTopStepper && <Crown className="ml-2 h-4 w-4 text-yellow-500" title="Top Stepper"/>}
+            {/* Example: If you still want to show creator status differently: 
+               isCreator && !isTopStepper && <UserCheck className="ml-2 h-4 w-4 text-blue-500" title="Team Creator" /> 
+            */}
           </p>
         </div>
       </div>
@@ -38,4 +47,3 @@ export default function TeamMemberListItem({ member, isCreator }: TeamMemberList
     </li>
   );
 }
-

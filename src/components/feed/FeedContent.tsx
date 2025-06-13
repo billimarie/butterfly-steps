@@ -54,7 +54,7 @@ export default function FeedContent() {
         </Card>
       )}
 
-      <TopSteppersLeaderboard count={5} />
+      <TopSteppersLeaderboard count={5} isPublicView={true} />
 
       <div className="grid md:grid-cols-2 gap-8 mt-12">
         <Card className="shadow-lg text-center flex flex-col">
