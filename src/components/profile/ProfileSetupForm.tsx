@@ -13,14 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { createTeam, joinTeam, leaveTeam, getUserProfile } from '@/lib/firebaseService';
-import type { ActivityStatus, UserProfile } from '@/types';
+import type { ActivityStatus, UserProfile, TeamActionResult } from '@/types';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { CheckCircle, Zap, TrendingUp, Target, Edit3, Users, LogOut, PlusCircle } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { ToastAction } from "@/components/ui/toast";
+// ToastAction removed
 import type { BadgeData, BadgeId } from '@/lib/badges';
-import { getBadgeDataById } from '@/lib/badges';
+// getBadgeDataById removed
 import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
@@ -69,7 +69,7 @@ interface ProfileSetupFormProps {
 }
 
 export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormProps) {
-  const { user, userProfile, fetchUserProfile, setUserProfileState } = useAuth();
+  const { user, userProfile, fetchUserProfile, setUserProfileState, setShowNewBadgeModal } = useAuth();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -163,31 +163,32 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
         profileComplete: true, 
       };
 
-      let awardedTeamBadge: BadgeData | undefined = undefined;
+      let awardedTeamBadgeFromAction: BadgeData | null | undefined = undefined;
 
       if (!profileUpdateData.teamId) { 
           if (data.teamAction === 'create' && data.newTeamName) {
-              const result = await createTeam(user.uid, data.newTeamName, profileUpdateData.currentSteps);
+              const result: TeamActionResult = await createTeam(user.uid, data.newTeamName, profileUpdateData.currentSteps);
               profileUpdateData.teamId = result.teamId;
               profileUpdateData.teamName = result.teamName;
-              awardedTeamBadge = result.awardedTeamBadge;
+              awardedTeamBadgeFromAction = result.awardedTeamBadge;
               toast({ title: 'Team Created!', description: `You've created and joined "${result.teamName}".` });
           } else if (data.teamAction === 'join' && data.joinTeamId) {
-              const result = await joinTeam(user.uid, data.joinTeamId, profileUpdateData.currentSteps);
+              const result: TeamActionResult | null = await joinTeam(user.uid, data.joinTeamId, profileUpdateData.currentSteps);
               if (result) {
                   profileUpdateData.teamId = result.teamId;
                   profileUpdateData.teamName = result.teamName;
-                  awardedTeamBadge = result.awardedTeamBadge;
+                  awardedTeamBadgeFromAction = result.awardedTeamBadge;
                   toast({ title: 'Team Joined!', description: `You've joined "${result.teamName}".` });
               } else {
                   toast({ title: 'Failed to join team', description: 'Please check the Team ID and try again.', variant: 'destructive'});
-                  return; // Stop further execution in try block if team join fails.
+                  setLoading(false); // Release loading state
+                  return; 
               }
           }
       }
       
-      if (awardedTeamBadge && !profileUpdateData.badgesEarned?.includes(awardedTeamBadge.id as BadgeId)) {
-          profileUpdateData.badgesEarned = [...(profileUpdateData.badgesEarned || []), awardedTeamBadge.id as BadgeId];
+      if (awardedTeamBadgeFromAction && !profileUpdateData.badgesEarned?.includes(awardedTeamBadgeFromAction.id as BadgeId)) {
+          profileUpdateData.badgesEarned = [...(profileUpdateData.badgesEarned || []), awardedTeamBadgeFromAction.id as BadgeId];
       }
       
       await setDoc(doc(db, "users", user.uid), profileUpdateData, { merge: true });
@@ -195,22 +196,8 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       const updatedFullProfile = await getUserProfile(user.uid);
       if (updatedFullProfile) {
         setUserProfileState(updatedFullProfile); 
-          if (awardedTeamBadge) { 
-              const badge = awardedTeamBadge;
-              toast({
-                  title: 'Badge Unlocked!',
-                  description: (
-                      <div className="flex items-center">
-                      <badge.icon className="mr-2 h-5 w-5 text-primary" />
-                      <span>You've earned the "{badge.name}" badge!</span>
-                      </div>
-                  ),
-                  action: (
-                      <ToastAction altText="View on Profile" onClick={() => router.push('/profile')}>
-                      View on Profile
-                      </ToastAction>
-                  ),
-              });
+          if (awardedTeamBadgeFromAction) { 
+             setShowNewBadgeModal(awardedTeamBadgeFromAction);
           }
       }
 
@@ -223,7 +210,7 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
     } finally {
         setLoading(false);
     }
-  }; // This is line 216 from the error if the structure aligns with the user's error message
+  };
   
   const handleLeaveTeamAndResetForm = async () => {
     if (!user || !userProfile?.teamId) return;
@@ -439,4 +426,3 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
     </Card>
   );
 }
-    

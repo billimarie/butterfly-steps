@@ -75,16 +75,10 @@ export default function Navbar() {
             ) : user ? (
               <>
                 <Button variant="ghost" asChild>
-                  <Link href="/">Dashboard</Link>
-                </Button>
-                <Button variant="ghost" asChild>
-                  <Link href="/teams">Teams</Link>
+                  <Link href="/feed">Feed</Link>
                 </Button>
                 <Button variant="ghost" asChild>
                   <Link href="/shop">Shop</Link>
-                </Button>
-                <Button variant="ghost" asChild>
-                  <Link href="/invite">Invite Sponsors</Link>
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -104,16 +98,21 @@ export default function Navbar() {
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link href="/"><LayoutDashboard className="mr-2 h-4 w-4" />Dashboard</Link>
+                      <Link href="/"><LayoutDashboard className="mr-2 h-4 w-4" />Your Dashboard</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/teams"><Users className="mr-2 h-4 w-4" />Team Hub</Link>
+                    {userProfile.teamId && userProfile.teamName ? (
+                      <Link href={`/teams/${userProfile.teamId}`} onClick={() => setMobileMenuOpen(false)} className="block">
+                        <Users className="mr-3 h-5 w-5" />{userProfile.teamName}
+                      </Link>
+                      ) : (
+                        <Link href="/teams" onClick={() => setMobileMenuOpen(false)} className="block">
+                          <Users className="mr-3 h-5 w-5" />Team Hub
+                        </Link>
+                      )}
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link href="/profile"><User className="mr-2 h-4 w-4" />Profile</Link>
-                    </DropdownMenuItem>
-                     <DropdownMenuItem asChild>
-                      <Link href="/invite"><Gift className="mr-2 h-4 w-4" />Invite Sponsors</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={logout} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
@@ -148,19 +147,25 @@ export default function Navbar() {
               ) : user ? (
                 <>
                   <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block">
-                    <Button variant="ghost" className="w-full justify-start text-base py-3"><LayoutDashboard className="mr-3 h-5 w-5" />Dashboard</Button>
+                    <Button variant="ghost" className="w-full justify-start text-base py-3"><LayoutDashboard className="mr-3 h-5 w-5" />Your Dashboard</Button>
                   </Link>
-                  <Link href="/teams" onClick={() => setMobileMenuOpen(false)} className="block">
-                    <Button variant="ghost" className="w-full justify-start text-base py-3"><Users className="mr-3 h-5 w-5" />Team Hub</Button>
+                  {userProfile.teamId && userProfile.teamName ? (
+                  <Link href={`/teams/${userProfile.teamId}`} onClick={() => setMobileMenuOpen(false)} className="block">
+                    <Button variant="ghost" className="w-full justify-start text-base py-3"><Users className="mr-3 h-5 w-5" />{userProfile.teamName}</Button>
+                  </Link>
+                  ) : (
+                    <Link href="/teams" onClick={() => setMobileMenuOpen(false)} className="block">
+                      <Button variant="ghost" className="w-full justify-start text-base py-3"><Users className="mr-3 h-5 w-5" />Team Hub</Button>
+                    </Link>
+                  )}
+                  <Link href="/feed" onClick={() => setMobileMenuOpen(false)} className="block">
+                    <Button variant="ghost" className="w-full justify-start text-base py-3"><LayoutDashboard className="mr-3 h-5 w-5" />Feed</Button>
                   </Link>
                   <Link href="/shop" onClick={() => setMobileMenuOpen(false)} className="block">
                     <Button variant="ghost" className="w-full justify-start text-base py-3"><ShoppingCart className="mr-3 h-5 w-5" />Shop</Button>
                   </Link>
                   <Link href="/profile" onClick={() => setMobileMenuOpen(false)} className="block">
                     <Button variant="ghost" className="w-full justify-start text-base py-3"><User className="mr-3 h-5 w-5" />Profile</Button>
-                  </Link>
-                   <Link href="/invite" onClick={() => setMobileMenuOpen(false)} className="block">
-                    <Button variant="ghost" className="w-full justify-start text-base py-3"><Gift className="mr-3 h-5 w-5" />Invite Sponsors</Button>
                   </Link>
                   <DropdownMenuSeparator className="my-1"/>
                   <Button variant="ghost" onClick={() => { logout(); setMobileMenuOpen(false); }} className="w-full justify-start text-base py-3 text-destructive hover:text-destructive focus:bg-destructive/10 focus:text-destructive">

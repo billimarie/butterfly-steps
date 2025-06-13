@@ -15,15 +15,15 @@ import { createUserWithEmailAndPassword, type AuthError } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { createTeam, joinTeam, incrementParticipantCount, getUserProfile } from '@/lib/firebaseService';
-import type { ActivityStatus, UserProfile } from '@/types';
+import type { ActivityStatus, UserProfile, TeamActionResult } from '@/types';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Mail, Lock, UserPlus, User as UserIcon, CheckCircle, Zap, TrendingUp, Target, Users, PlusCircle, LogIn } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Separator } from '@/components/ui/separator';
-import { ToastAction } from "@/components/ui/toast";
+// ToastAction removed
 import type { BadgeData, BadgeId } from '@/lib/badges';
-import { getBadgeDataById } from '@/lib/badges';
+// getBadgeDataById removed as not directly used here for modal data
 
 
 const activityGoalsMap: Record<ActivityStatus, { label: string; goals: string[] }> = {
@@ -75,7 +75,7 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
-  const { fetchUserProfile } = useAuth(); 
+  const { fetchUserProfile, setShowNewBadgeModal } = useAuth(); 
 
   const [invitedTeamDetailsLoading, setInvitedTeamDetailsLoading] = useState(false);
   const [fetchedInvitedTeamName, setFetchedInvitedTeamName] = useState<string | null>(null);
@@ -197,19 +197,19 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
         lastLoginTimestamp: null,
       };
 
-      let awardedTeamBadge: BadgeData | undefined = undefined;
+      let awardedTeamBadgeFromAction: BadgeData | null | undefined = undefined;
 
       if (data.teamAction === 'create' && data.newTeamName) {
-        const teamResult = await createTeam(firebaseUser.uid, data.newTeamName, 0);
+        const teamResult: TeamActionResult = await createTeam(firebaseUser.uid, data.newTeamName, 0);
         fullProfileData.teamId = teamResult.teamId;
         fullProfileData.teamName = teamResult.teamName;
-        awardedTeamBadge = teamResult.awardedTeamBadge;
+        awardedTeamBadgeFromAction = teamResult.awardedTeamBadge;
       } else if (data.teamAction === 'join' && data.joinTeamId) {
-        const teamResult = await joinTeam(firebaseUser.uid, data.joinTeamId, 0);
+        const teamResult: TeamActionResult | null = await joinTeam(firebaseUser.uid, data.joinTeamId, 0);
         if (teamResult) {
           fullProfileData.teamId = teamResult.teamId;
           fullProfileData.teamName = teamResult.teamName;
-          awardedTeamBadge = teamResult.awardedTeamBadge;
+          awardedTeamBadgeFromAction = teamResult.awardedTeamBadge;
         } else {
           toast({ title: 'Failed to Join Team', description: 'Please check the Team ID and try again, or the team may no longer exist.', variant: 'destructive'});
           setLoading(false);
@@ -217,8 +217,8 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
         }
       }
 
-      if (awardedTeamBadge && !fullProfileData.badgesEarned?.includes(awardedTeamBadge.id as BadgeId)) {
-        fullProfileData.badgesEarned = [...(fullProfileData.badgesEarned || []), awardedTeamBadge.id as BadgeId];
+      if (awardedTeamBadgeFromAction && !fullProfileData.badgesEarned?.includes(awardedTeamBadgeFromAction.id as BadgeId)) {
+        fullProfileData.badgesEarned = [...(fullProfileData.badgesEarned || []), awardedTeamBadgeFromAction.id as BadgeId];
       }
       
       await setDoc(doc(db, "users", firebaseUser.uid), fullProfileData);
@@ -226,22 +226,8 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
       
       toast({ title: 'Account Created & Profile Setup!', description: "Welcome to the Butterfly Steps challenge!" });
 
-      if (awardedTeamBadge) {
-         const badge = awardedTeamBadge;
-         toast({
-            title: 'Badge Unlocked!',
-            description: (
-              <div className="flex items-center">
-                <badge.icon className="mr-2 h-5 w-5 text-primary" />
-                <span>You've earned the "{badge.name}" badge!</span>
-              </div>
-            ),
-            action: (
-              <ToastAction altText="View on Profile" onClick={() => router.push('/profile')}>
-                View on Profile
-              </ToastAction>
-            ),
-        });
+      if (awardedTeamBadgeFromAction) {
+         setShowNewBadgeModal(awardedTeamBadgeFromAction);
       }
       
       await fetchUserProfile(firebaseUser.uid, true); 

@@ -46,26 +46,16 @@ function Dashboard({ userProfile, initialCommunityStats }: { userProfile: UserPr
 
   return (
     <div className="space-y-8">
-      <CountdownTimer />
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <CommunityProgressCard communityStats={communityStats} />
-           {communityStats && <ButterflyAnimation type="community" totalCommunitySteps={communityStats.totalSteps} />}
-           {communityStats && <InteractiveMap totalCommunitySteps={communityStats.totalSteps} className="mt-6" />}
+      <div className="flex flex-col sm:flex-row w-full space-y-8 sm:space-y-0 sm:space-x-8">
+        <div className="flex-shrink">
+          <CountdownTimer />
         </div>
-        <div className="space-y-6">
-          <UserProgressCard userProfile={userProfile} />
-          <StepSubmissionForm onStepSubmit={refreshDashboardData} />
+        <div className="flex-grow">
+          <UserProgressCard userProfile={userProfile} className="flex-grow" />
         </div>
       </div>
-      {userProfile.profileComplete && (userProfile.stepGoal || userProfile.currentSteps > 0) && (
-        <ButterflyAnimation 
-          type="user" 
-          userCurrentSteps={userProfile.currentSteps} 
-          userStepGoal={userProfile.stepGoal} 
-        />
-      )}
+      <StepSubmissionForm onStepSubmit={refreshDashboardData} />
+      
       
       <Card className="shadow-lg">
         <CardHeader>
@@ -325,7 +315,7 @@ export default function HomePage() {
         return (
           <div className="space-y-8">
             <CountdownTimer />
-            {/* Skeleton for StreakDisplay removed as it's a modal now */}
+             <Skeleton className="h-56 w-full rounded-lg" />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                     <Skeleton className="h-56 w-full rounded-lg" /> 
@@ -334,7 +324,6 @@ export default function HomePage() {
                 </div>
                 <div className="space-y-6">
                     <Skeleton className="h-48 w-full rounded-lg" /> 
-                    <Skeleton className="h-56 w-full rounded-lg" /> 
                 </div>
             </div>
           </div>

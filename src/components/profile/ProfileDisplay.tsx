@@ -20,8 +20,7 @@ import DailyStepChart from '@/components/profile/DailyStepChart';
 import type { DailyStep } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import BadgeDetailModal from '@/components/profile/BadgeDetailModal';
-
+import BadgeDetailModal from '@/components/profile/BadgeDetailModal'; // This is for clicking on existing badges
 
 // Custom WormIcon as Lucide doesn't have a direct caterpillar
 const WormIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -74,8 +73,8 @@ export default function ProfileDisplay() {
   const [dailyStepsData, setDailyStepsData] = useState<DailyStep[]>([]);
   const [isLoadingChart, setIsLoadingChart] = useState(true);
   
-  const [isBadgeModalOpen, setIsBadgeModalOpen] = useState(false);
-  const [selectedBadge, setSelectedBadge] = useState<BadgeData | null>(null);
+  const [isExistingBadgeModalOpen, setIsExistingBadgeModalOpen] = useState(false);
+  const [selectedExistingBadge, setSelectedExistingBadge] = useState<BadgeData | null>(null);
 
   if (!userProfile) {
     return (
@@ -144,9 +143,9 @@ export default function ProfileDisplay() {
     }
   };
 
-  const handleBadgeClick = (badge: BadgeData) => {
-    setSelectedBadge(badge);
-    setIsBadgeModalOpen(true);
+  const handleExistingBadgeClick = (badge: BadgeData) => {
+    setSelectedExistingBadge(badge);
+    setIsExistingBadgeModalOpen(true);
   };
 
   const earnedBadgeIds = userProfile.badgesEarned || [];
@@ -282,7 +281,7 @@ export default function ProfileDisplay() {
                   return (
                     <button
                       key={badge.id}
-                      onClick={() => handleBadgeClick(badge)}
+                      onClick={() => handleExistingBadgeClick(badge)}
                       className="p-3 bg-muted/30 rounded-lg flex flex-col items-center w-28 text-center shadow-sm hover:shadow-md hover:bg-muted/50 transition-all focus:outline-none focus:ring-2 focus:ring-primary"
                       aria-label={`View details for ${badge.name} badge`}
                     >
@@ -320,10 +319,11 @@ export default function ProfileDisplay() {
         </CardFooter>
       </Card>
       
+      {/* Modal for displaying details of badges ALREADY EARNED and clicked on from the profile */}
       <BadgeDetailModal
-        isOpen={isBadgeModalOpen}
-        onOpenChange={setIsBadgeModalOpen}
-        badge={selectedBadge}
+        isOpen={isExistingBadgeModalOpen}
+        onOpenChange={setIsExistingBadgeModalOpen}
+        badge={selectedExistingBadge}
       />
     </>
   );

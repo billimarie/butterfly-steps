@@ -1,11 +1,11 @@
 
 'use client';
 
-import type { User as FirebaseUser, AuthError } from 'firebase/auth';
+import type { User as FirebaseUser } from 'firebase/auth'; // AuthError removed
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
-import type { UserProfile, AuthContextType, StreakUpdateResults } from '@/types';
+import type { UserProfile, AuthContextType, StreakUpdateResults, BadgeData } from '@/types';
 import { getUserProfile, updateUserStreakOnLogin } from '@/lib/firebaseService';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -16,9 +16,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<AuthError | null>(null);
+  const [error, setError] = useState<Error | null>(null); // Changed AuthError to Error
   const [showStreakModal, setShowStreakModal] = useState(false);
-  const [showDailyGoalMetModal, setShowDailyGoalMetModal] = useState(false); // New state for daily goal modal
+  const [showDailyGoalMetModal, setShowDailyGoalMetModal] = useState(false);
+  const [newlyEarnedBadgeToShow, setNewlyEarnedBadgeToShow] = useState<BadgeData | null>(null);
+  const [showNewBadgeModalState, setShowNewBadgeModalState] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -30,7 +32,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (initialLogin) {
         streakUpdateResults = await updateUserStreakOnLogin(uid);
-        // Fetch profile *after* streak update to get latest streak data
         finalProfile = await getUserProfile(uid);
       } else {
         finalProfile = await getUserProfile(uid);
@@ -41,18 +42,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (initialLogin && streakUpdateResults && finalProfile) {
         if (finalProfile.profileComplete && streakUpdateResults.streakProcessedForToday) {
           setShowStreakModal(true);
-          // Do not show "Login Successful" toast if streak modal is shown
         } else {
-          // Show "Login Successful" only if streak modal isn't shown
           toast({ title: 'Login Successful', description: "Welcome back!" });
         }
       } else if (initialLogin && !streakUpdateResults) {
-        // Fallback toast if streak processing somehow failed but it was an initial login
         toast({ title: 'Login Successful', description: "Welcome back!" });
       }
     } catch (e) {
       console.error("Failed to fetch/update user profile:", e);
       setUserProfile(null);
+      setError(e as Error);
       if (initialLogin) {
         toast({ title: 'Login Successful', description: "Welcome back! (Profile loading issue)" });
       }
@@ -72,15 +71,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setUserProfile(null);
         setShowStreakModal(false);
-        setShowDailyGoalMetModal(false); // Reset daily goal modal on logout
+        setShowDailyGoalMetModal(false);
+        setShowNewBadgeModalState(false);
+        setNewlyEarnedBadgeToShow(null);
         setLoading(false);
       }
     }, (authError) => {
-      setError(authError);
+      setError(authError as Error); // Cast to Error
       setUser(null);
       setUserProfile(null);
       setShowStreakModal(false);
       setShowDailyGoalMetModal(false);
+      setShowNewBadgeModalState(false);
+      setNewlyEarnedBadgeToShow(null);
       setLoading(false);
     });
 
@@ -95,18 +98,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       await firebaseSignOut(auth);
-      // user, userProfile, and modal states are reset by onAuthStateChanged
     } catch (e) {
-      setError(e as AuthError);
+      setError(e as Error);
       console.error("Logout failed:", e);
-      // Ensure states are cleared even if onAuthStateChanged doesn't fire as expected
       setUser(null);
       setUserProfile(null);
       setShowStreakModal(false);
       setShowDailyGoalMetModal(false);
+      setShowNewBadgeModalState(false);
+      setNewlyEarnedBadgeToShow(null);
     } finally {
       setLoading(false);
       router.push('/login');
+    }
+  };
+
+  const setShowNewBadgeModal = (badge: BadgeData | null) => {
+    if (badge) {
+      setNewlyEarnedBadgeToShow(badge);
+      setShowNewBadgeModalState(true);
+    } else {
+      setShowNewBadgeModalState(false);
+      // Delay clearing the badge data to allow modal to fade out smoothly
+      setTimeout(() => setNewlyEarnedBadgeToShow(null), 300);
     }
   };
 
@@ -122,7 +136,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       showStreakModal,
       setShowStreakModal,
       showDailyGoalMetModal,
-      setShowDailyGoalMetModal // Provide new state and setter
+      setShowDailyGoalMetModal,
+      newlyEarnedBadgeToShow,
+      setShowNewBadgeModal
     }}>
       {children}
     </AuthContext.Provider>

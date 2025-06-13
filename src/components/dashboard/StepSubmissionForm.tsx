@@ -13,10 +13,7 @@ import { useAuth } from '@/context/AuthContext';
 import { submitSteps } from '@/lib/firebaseService';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlusCircle, Footprints } from 'lucide-react';
-import type { BadgeData } from '@/lib/badges';
 import type { StepSubmissionResult } from '@/types';
-import { useRouter } from 'next/navigation';
-import { ToastAction } from "@/components/ui/toast";
 
 const stepSubmissionSchema = z.object({
   steps: z.preprocess(
@@ -32,10 +29,9 @@ interface StepSubmissionFormProps {
 }
 
 export default function StepSubmissionForm({ onStepSubmit }: StepSubmissionFormProps) {
-  const { user, userProfile, setShowDailyGoalMetModal } = useAuth();
+  const { user, userProfile, setShowDailyGoalMetModal, setShowNewBadgeModal } = useAuth();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const router = useRouter();
   const { register, handleSubmit, reset, formState: { errors } } = useForm<StepSubmissionFormInputs>({
     resolver: zodResolver(stepSubmissionSchema),
   });
@@ -48,28 +44,23 @@ export default function StepSubmissionForm({ onStepSubmit }: StepSubmissionFormP
     setLoading(true);
     try {
       const result: StepSubmissionResult = await submitSteps(user.uid, data.steps);
-      toast({ title: 'Steps Submitted!', description: `${data.steps.toLocaleString()} steps added to your total.` });
+
+      if (!result.dailyGoalAchieved) {
+        toast({ title: 'Steps Submitted!', description: `${data.steps.toLocaleString()} steps added to your total.` });
+      }
 
       if (result.newlyAwardedBadges && result.newlyAwardedBadges.length > 0) {
-        result.newlyAwardedBadges.forEach(badge => {
-          toast({
-            title: 'Badge Unlocked!',
-            description: (
-              <div className="flex items-center">
-                <badge.icon className="mr-2 h-5 w-5 text-primary" />
-                <span>You've earned the "{badge.name}" badge!</span>
-              </div>
-            ),
-            action: (
-              <ToastAction
-                altText="View on Profile"
-                onClick={() => router.push('/profile')}
-              >
-                View on Profile
-              </ToastAction>
-            ),
-          });
-        });
+        setShowNewBadgeModal(result.newlyAwardedBadges[0]);
+        if (result.newlyAwardedBadges.length > 1) {
+            for (let i = 1; i < result.newlyAwardedBadges.length; i++) {
+                const badge = result.newlyAwardedBadges[i];
+                 toast({
+                    title: 'Another Badge Unlocked!',
+                    description: `You've also earned the "${badge.name}" badge! View it on your profile.`,
+                    duration: 5000,
+                 });
+            }
+        }
       }
 
       if (result.dailyGoalAchieved) {

@@ -6,7 +6,8 @@ import { AuthProvider } from '@/context/AuthContext';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import StreakDisplayModal from '@/components/dashboard/StreakDisplayModal';
-import DailyGoalMetModal from '@/components/modals/DailyGoalMetModal'; // Import the new modal
+import DailyGoalMetModal from '@/components/modals/DailyGoalMetModal';
+import BadgeDetailModalRenderer from '@/components/profile/BadgeDetailModalRenderer'; // Renamed for clarity
 
 export const metadata: Metadata = {
   title: 'Butterfly Steps',
@@ -35,7 +36,8 @@ export default function RootLayout({
           <Footer />
           <Toaster />
           <StreakDisplayModal />
-          <DailyGoalMetModal /> {/* Render the new daily goal modal globally */}
+          <DailyGoalMetModal />
+          <BadgeDetailModalRenderer /> {/* Render the modal that shows newly earned badges */}
         </AuthProvider>
       </body>
     </html>
