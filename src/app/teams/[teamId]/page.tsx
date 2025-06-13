@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Users, Footprints, User as UserIcon, Crown, ShieldCheck, LogIn, LogOut, PlusCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+// import TeamMemberListItem from '@/components/teams/TeamMemberListItem'; // Included in TeamDetailsDisplay
 import TeamDetailsDisplay from '@/components/teams/TeamDetailsDisplay';
 
 
@@ -47,7 +48,7 @@ export default function TeamDetailsPage() {
       }
     }
     loadTeamData();
-  }, [teamId, toast]); // Removed userProfile from dependency array
+  }, [teamId, toast, userProfile]); // Added userProfile to dependency array
 
   const handleJoinTeam = async () => {
     if (!user || !userProfile || !team) return;
@@ -119,8 +120,6 @@ export default function TeamDetailsPage() {
     );
   }
   
-  // These derived values will re-evaluate correctly if userProfile changes,
-  // without triggering a re-fetch of team data.
   const isUserMember = userProfile?.teamId === team.id;
   const canJoin = user && userProfile && userProfile.profileComplete && userProfile.teamId !== team.id && !userProfile.teamId ;
   const isCreator = team.creatorUid === user?.uid;
@@ -131,7 +130,7 @@ export default function TeamDetailsPage() {
         team={team}
         members={members}
         isUserMember={isUserMember}
-        canJoin={!!canJoin} 
+        canJoin={!!canJoin} // Ensure boolean
         isCreator={isCreator}
         onJoinTeam={handleJoinTeam}
         onLeaveTeam={handleLeaveTeam}

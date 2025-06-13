@@ -43,8 +43,14 @@ export default function BadgeDetailModal({ isOpen, onOpenChange, badge }: BadgeD
             </p>
           </div>
         </div>
-        <DialogFooter className="px-6 py-4 bg-muted/20 border-t rounded-b-lg flex justify-center">
-          <Button onClick={() => onOpenChange(false)} variant="outline" className="w-full sm:w-auto">Close</Button>
+        <DialogFooter className="px-6 py-4 bg-muted/20 border-t rounded-b-lg flex flex-col sm:flex-row items-center justify-center gap-4">
+          <Button onClick={() => onOpenChange(false)} variant="outline" className="order-2 sm:order-1 w-full sm:w-auto">Close</Button>
+          <img
+            src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1749691114/Cartoons/catti-the-caterpillar_b9skmk.png"
+            alt="Catti the Caterpillar"
+            className="w-12 h-12 order-1 sm:order-2 animate-catti-wiggle"
+            data-ai-hint="caterpillar cartoon"
+          />
         </DialogFooter>
       </DialogContent>
     </Dialog>

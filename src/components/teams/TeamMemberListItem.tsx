@@ -17,7 +17,7 @@ const getInitials = (name: string | null | undefined) => {
 
 export default function TeamMemberListItem({ member, isCreator }: TeamMemberListItemProps) {
   return (
-    <li className="flex items-center justify-between p-3 bg-card rounded-md shadow-sm hover:bg-muted/50 transition-colors">
+    <li className="flex items-center justify-between py-3 bg-card rounded-md shadow-sm hover:bg-muted/50 transition-colors">
       <div className="flex items-center space-x-3">
         <Avatar className="h-10 w-10">
           {/* Add AvatarImage if user profiles have photoURLs later */}
@@ -26,7 +26,7 @@ export default function TeamMemberListItem({ member, isCreator }: TeamMemberList
         <div>
           <p className="font-semibold text-sm flex items-center">
             {member.displayName || 'Unnamed User'}
-            {isCreator && <Crown className="ml-2 h-4 w-4 text-yellow-500" titleAccess="Team Creator"/>}
+            {isCreator && <Crown className="ml-2 h-4 w-4 text-yellow-500" title="Team Creator"/>}
           </p>
         </div>
       </div>
@@ -38,3 +38,4 @@ export default function TeamMemberListItem({ member, isCreator }: TeamMemberList
     </li>
   );
 }
+
