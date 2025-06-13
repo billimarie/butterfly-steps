@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 // This function can be used to generate metadata dynamically based on params
 // For now, we'll keep it generic, but it could fetch user's name for title
-export async function generateMetadata({ params }: { params: { userId: string } }): Promise<Metadata> {
+export async function generateMetadata({ params: { userId } }: { params: { userId: string } }): Promise<Metadata> {
   // In a real app, you might fetch user's name using params.userId
   // const userName = await fetchUserName(params.userId);
   // For now, a generic title:
@@ -34,7 +34,8 @@ function ProfilePageSkeleton() {
   );
 }
 
-export default async function UserProfilePage({ params: { userId } }: { params: { userId: string } }) {
+// Changed from async function to a regular function
+export default function UserProfilePage({ params: { userId } }: { params: { userId: string } }) {
   // userId is now directly available from the destructured params
   return (
     <Suspense fallback={<ProfilePageSkeleton />}>

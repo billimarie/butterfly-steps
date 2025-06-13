@@ -12,12 +12,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ALL_BADGES, type BadgeData } from '@/lib/badges';
 import type { BadgeId } from '@/lib/badges';
-import { leaveTeam, getUserDailySteps } from '@/lib/firebaseService';
+import { leaveTeam } from '@/lib/firebaseService';
 import { useState, useEffect, useCallback } from 'react';
 import StepSubmissionForm from '@/components/dashboard/StepSubmissionForm';
 import { Separator } from '@/components/ui/separator';
-import DailyStepChart from '@/components/profile/DailyStepChart';
-import type { DailyStep, UserProfile } from '@/types';
+import type { UserProfile } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import BadgeDetailModal from '@/components/profile/BadgeDetailModal';
@@ -72,8 +71,6 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   const { user: authUser, fetchUserProfile: fetchAuthUserProfile } = useAuth();
   const { toast } = useToast();
   const [leavingTeam, setLeavingTeam] = useState(false);
-  const [dailyStepsData, setDailyStepsData] = useState<DailyStep[]>([]);
-  const [isLoadingChart, setIsLoadingChart] = useState(true);
 
   const [isExistingBadgeModalOpen, setIsExistingBadgeModalOpen] = useState(false);
   const [selectedExistingBadge, setSelectedExistingBadge] = useState<BadgeData | null>(null);
@@ -106,31 +103,10 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     }
   };
 
-  const fetchChartData = useCallback(async () => {
-    if (!isOwnProfile) { // Only fetch chart data for own profile
-      setIsLoadingChart(false);
-      return;
-    }
-    setIsLoadingChart(true);
-    try {
-      const data = await getUserDailySteps(profileData.uid, 30);
-      setDailyStepsData(data);
-    } catch (error) {
-      console.error("Failed to fetch daily steps data:", error);
-      toast({ title: 'Chart Error', description: 'Could not load daily step data.', variant: "destructive" });
-    } finally {
-      setIsLoadingChart(false);
-    }
-  }, [profileData.uid, toast, isOwnProfile]);
-
-  useEffect(() => {
-    fetchChartData();
-  }, [fetchChartData]);
-
   const handleStepSubmit = async () => {
     if (authUser && isOwnProfile) {
       await fetchAuthUserProfile(authUser.uid);
-      await fetchChartData();
+      // Removed fetchChartData call
     }
   };
 
@@ -177,7 +153,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
 
         <CardContent className="space-y-6">
 
-          <div className="flex flex-col sm:flex-row gap-6 sm:space-x-6">
+          <div className="flex flex-col md:flex-row gap-6">
               <div className="md:w-1/3 space-y-2">
                 <h3 className="text-lg font-semibold flex items-center"><Target className="mr-2 h-5 w-5 text-primary" />Step Goal</h3>
                 <p className="text-2xl font-bold text-primary">{profileData.stepGoal?.toLocaleString() || 'Not set'} steps</p>
@@ -195,13 +171,9 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
               </div>
           </div>
 
-          {isOwnProfile && (
-            <div>
-              <StepSubmissionForm onStepSubmit={handleStepSubmit} />
-            </div>
-          )}
+          
 
-          {isOwnProfile && <Separator className="my-6" />}
+          <Separator className="my-6" />
           
           {showStreakMilestonesSection && (
             <div className="space-y-3">
@@ -241,14 +213,6 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
             </div>
           )}
 
-          {isOwnProfile && <Separator className="my-6" />}
-
-          {isOwnProfile && (
-            <div>
-              <DailyStepChart dailyStepsData={dailyStepsData} isLoading={isLoadingChart} userProfile={profileData} />
-            </div>
-          )}
-
           <Separator className="my-6" />
 
           <div className="space-y-3">
@@ -283,6 +247,8 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
             )}
           </div>
 
+          <Separator className="my-6" />
+          
           <div className="space-y-3">
             <h3 className="text-lg font-semibold flex items-center">
               <AwardIconLucide className="mr-2 h-5 w-5 text-primary" /> Badges Earned ({earnedBadgesDetails.length})
@@ -296,14 +262,14 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                   const nonInteractiveBadgeClasses = "cursor-default";
 
                   return (
-                    <div // Changed from button to div for easier conditional interaction
+                    <div 
                       key={badge.id}
                       onClick={isOwnProfile ? () => handleExistingBadgeClick(badge) : undefined}
                       className={cn(
                         commonBadgeClasses,
                         isOwnProfile ? interactiveBadgeClasses : nonInteractiveBadgeClasses
                       )}
-                      role={isOwnProfile ? "button" : "img"} // Adjust role for accessibility
+                      role={isOwnProfile ? "button" : "img"} 
                       tabIndex={isOwnProfile ? 0 : -1}
                       aria-label={isOwnProfile ? `View details for ${badge.name} badge` : badge.name}
                       onKeyDown={isOwnProfile ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleExistingBadgeClick(badge); } : undefined}
@@ -333,15 +299,6 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
           )}
 
         </CardContent>
-        {isOwnProfile && (
-            <CardFooter className="flex justify-end">
-            <Button asChild>
-                <Link href="/invite">
-                Generate Sponsorship Invite
-                </Link>
-            </Button>
-            </CardFooter>
-        )}
       </Card>
       
       {isOwnProfile && (

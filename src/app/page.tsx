@@ -13,28 +13,50 @@ import ButterflyAnimation from '@/components/dashboard/ButterflyAnimation';
 import InteractiveMap from '@/components/dashboard/InteractiveMap';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { getCommunityStats } from '@/lib/firebaseService';
-import type { CommunityStats, UserProfile } from '@/types';
+import { getCommunityStats, getUserDailySteps } from '@/lib/firebaseService';
+import type { CommunityStats, UserProfile, DailyStep } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, Footprints, Users, Gift } from 'lucide-react';
 import Logo from '@/components/ui/Logo';
+import DailyStepChart from '@/components/profile/DailyStepChart';
 
 
 function Dashboard({ userProfile, initialCommunityStats }: { userProfile: UserProfile, initialCommunityStats: CommunityStats | null }) {
   const [communityStats, setCommunityStats] = useState<CommunityStats | null>(initialCommunityStats);
-  const { fetchUserProfile } = useAuth();
+  const { fetchUserProfile: refreshAuthUserProfile } = useAuth(); // Renamed to avoid conflict
+  const [dailyStepsData, setDailyStepsData] = useState<DailyStep[]>([]);
+  const [isLoadingChart, setIsLoadingChart] = useState(true);
 
   const refreshDashboardData = useCallback(async () => {
     const stats = await getCommunityStats();
     setCommunityStats(stats);
     if (userProfile?.uid) {
-      // Pass false for initialLogin to prevent re-triggering modal on manual refresh
-      await fetchUserProfile(userProfile.uid, false); 
+      await refreshAuthUserProfile(userProfile.uid, false); 
     }
-  }, [userProfile?.uid, fetchUserProfile]);
+  }, [userProfile?.uid, refreshAuthUserProfile]);
 
+  const fetchChartData = useCallback(async () => {
+    if (userProfile?.uid) {
+      setIsLoadingChart(true);
+      try {
+        const data = await getUserDailySteps(userProfile.uid, 30); // Get last 30 days
+        setDailyStepsData(data);
+      } catch (error) {
+        console.error("Failed to fetch daily steps data for chart:", error);
+      } finally {
+        setIsLoadingChart(false);
+      }
+    } else {
+      setDailyStepsData([]);
+      setIsLoadingChart(false);
+    }
+  }, [userProfile?.uid]);
+
+  useEffect(() => {
+    fetchChartData();
+  }, [fetchChartData]);
 
   useEffect(() => {
     if (!initialCommunityStats) {
@@ -46,15 +68,46 @@ function Dashboard({ userProfile, initialCommunityStats }: { userProfile: UserPr
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row w-full space-y-8 sm:space-y-0 sm:space-x-8">
-        <div className="flex-shrink">
-          <CountdownTimer />
+      
+      <CountdownTimer />
+      
+        
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+        <div className="space-y-6">
+          <StepSubmissionForm onStepSubmit={refreshDashboardData} />
+          <UserProgressCard userProfile={userProfile} />
         </div>
-        <div className="flex-grow">
-          <UserProgressCard userProfile={userProfile} className="flex-grow" />
+
+        <div className="">
+          {userProfile && (
+            <DailyStepChart 
+              dailyStepsData={dailyStepsData} 
+              isLoading={isLoadingChart} 
+              userProfile={userProfile} 
+            />
+          )}
+        </div>
+
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="space-y-2">
+          {userProfile.profileComplete && (userProfile.stepGoal || userProfile.currentSteps > 0) && (
+            <ButterflyAnimation 
+              type="user" 
+              userCurrentSteps={userProfile.currentSteps} 
+              userStepGoal={userProfile.stepGoal} 
+            />
+          )}
+
+           {communityStats && <InteractiveMap totalCommunitySteps={communityStats.totalSteps} className="mt-6" />}
+        </div>
+        <div className="">
+          <CommunityProgressCard communityStats={communityStats} />
         </div>
       </div>
-      <StepSubmissionForm onStepSubmit={refreshDashboardData} />
+
       
       
       <Card className="shadow-lg">
@@ -169,7 +222,6 @@ function LandingPage() {
       <div className="p-8 space-y-8 container mx-auto px-4">
         <CommunityProgressCard communityStats={communityStats} />
       </div>
-      
 
       <div className="p-8 space-y-8 container mx-auto px-4">
         <h2 className="text-4xl font-headline text-primary">Our Migration</h2>
@@ -183,7 +235,6 @@ function LandingPage() {
           <div className="space-y-6">
             <InteractiveMap totalCommunitySteps={communityStats.totalSteps} className="mt-6" />
             <ButterflyAnimation type="community" totalCommunitySteps={communityStats.totalSteps} />
-            {/* CommunityProgressCard is already shown above, might be redundant here unless specifically desired */}
           </div>
         ) : (
           <Card className="text-center">
@@ -193,7 +244,6 @@ function LandingPage() {
         )}
       </div>
       
-
       <div className="grid md:grid-cols-3 gap-8 text-left container mx-auto px-4 pb-12 mb-6">
         <Card className="shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader>
@@ -264,8 +314,8 @@ export default function HomePage() {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!authLoading && user && (!userProfile || !userProfile.profileComplete) && pathname !== '/profile') {
-      router.push('/profile');
+    if (!authLoading && user && (!userProfile || !userProfile.profileComplete) && pathname !== '/profile' && !pathname.startsWith('/profile/')) { // Adjusted condition for dynamic profile routes
+      router.push(`/profile/${user.uid}?setup=true`); // Redirect to specific profile page
     }
   }, [user, userProfile, authLoading, router, pathname]);
 
@@ -282,7 +332,7 @@ export default function HomePage() {
         setCommunityStatsLoading(false);
       }
     } else {
-      setCommunityStatsLoading(false); // No user or profile incomplete, so no specific dashboard stats to load
+      setCommunityStatsLoading(false); 
     }
   }, [user, userProfile?.profileComplete]);
 
@@ -315,7 +365,8 @@ export default function HomePage() {
         return (
           <div className="space-y-8">
             <CountdownTimer />
-             <Skeleton className="h-56 w-full rounded-lg" />
+            <Skeleton className="h-56 w-full rounded-lg" />
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                     <Skeleton className="h-56 w-full rounded-lg" /> 
@@ -324,6 +375,7 @@ export default function HomePage() {
                 </div>
                 <div className="space-y-6">
                     <Skeleton className="h-48 w-full rounded-lg" /> 
+                    <Skeleton className="h-80 w-full rounded-lg" /> {/* Placeholder for DailyStepChart */}
                 </div>
             </div>
           </div>
