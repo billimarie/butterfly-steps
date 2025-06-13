@@ -44,8 +44,7 @@ export default function TopSteppersLeaderboard({ count }: TopSteppersLeaderboard
   }, [fetchTopUsersData]);
 
   return (
-    <div className="mt-12">
-      <h2 className="text-3xl font-headline text-primary mb-6 text-center">Top Steppers</h2>
+    <div>
       {loadingTopUsers ? (
         <div className="space-y-4">
           {[...Array(Math.min(count, 3))].map((_, i) => (

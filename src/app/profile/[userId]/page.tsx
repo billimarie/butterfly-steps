@@ -5,14 +5,11 @@ import ProfilePageContent from '@/components/profile/ProfilePageContent';
 import { Skeleton } from "@/components/ui/skeleton";
 
 // This function can be used to generate metadata dynamically based on params
-// For now, we'll keep it generic, but it could fetch user's name for title
-export async function generateMetadata({ params: { userId } }: { params: { userId: string } }): Promise<Metadata> {
-  // In a real app, you might fetch user's name using params.userId
-  // const userName = await fetchUserName(params.userId);
-  // For now, a generic title:
+export async function generateMetadata({ params }: { params: { userId: string } }): Promise<Metadata> {
+  const userId = params.userId; // Explicit access
   return {
-    title: `User Profile | Butterfly Steps`,
-    description: 'View user profile, progress, and badges in the Butterfly Steps challenge.',
+    title: `Profile: ${userId} | Butterfly Steps`, // Dynamic title
+    description: `View user profile (${userId}), progress, and badges in the Butterfly Steps challenge.`,
   };
 }
 
@@ -34,12 +31,12 @@ function ProfilePageSkeleton() {
   );
 }
 
-// Changed from async function to a regular function
-export default function UserProfilePage({ params: { userId } }: { params: { userId: string } }) {
-  // userId is now directly available from the destructured params
+export default async function UserProfilePage({ params }: { params: { userId: string } }) {
+  const userId = params.userId; // Explicit access
   return (
     <Suspense fallback={<ProfilePageSkeleton />}>
       <ProfilePageContent viewedUserId={userId} />
     </Suspense>
   );
 }
+

@@ -22,7 +22,6 @@ import type { BadgeData, BadgeId } from '@/lib/badges';
 import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
-
 const activityGoalsMap: Record<ActivityStatus, { label: string; goals: string[] }> = {
   Sedentary: { label: 'Mostly sitting, little to no exercise', goals: ['25,000 steps', '75,000 steps', '200,000 steps', 'Custom'] },
   'Moderately Active': { label: 'Light exercise / walking a few times a week', goals: ['50,000 steps', '100,000 steps', '300,000 steps', 'Custom'] },
@@ -30,7 +29,11 @@ const activityGoalsMap: Record<ActivityStatus, { label: string; goals: string[] 
 };
 
 const profileUpdateSchema = z.object({
-  displayName: z.string().min(2, "Display name is required").max(50),
+  displayName: z
+    .string()
+    .min(2, { message: "Display name must be at least 2 characters." })
+    .max(50, { message: "Display name cannot exceed 50 characters."})
+    .regex(/^[a-zA-Z0-9_-]+$/, { message: "Display name can only contain letters, numbers, hyphens (-), and underscores (_)." }),
   activityStatus: z.enum(['Sedentary', 'Moderately Active', 'Very Active'], {
     required_error: 'Please select your activity status.',
   }),
@@ -51,13 +54,13 @@ const profileUpdateSchema = z.object({
   message: 'Custom step goal is required when "Custom" is selected.',
   path: ['customStepGoal'],
 }).refine(data => {
-    if (data.teamAction === 'create') return !!data.newTeamName;
+    if (data.teamAction === 'create') return !!data.newTeamName && data.newTeamName.length >=3;
     return true;
-}, { message: 'Team name is required to create a team.', path: ['newTeamName']})
+}, { message: 'Team name is required and must be at least 3 characters to create a team.', path: ['newTeamName']})
 .refine(data => {
-    if (data.teamAction === 'join') return !!data.joinTeamId;
+    if (data.teamAction === 'join') return !!data.joinTeamId && data.joinTeamId.length >= 5;
     return true;
-}, { message: 'Team ID is required to join a team.', path: ['joinTeamId']});
+}, { message: 'Team ID is required and seems too short to join a team.', path: ['joinTeamId']});
 
 
 type ProfileUpdateFormInputs = z.infer<typeof profileUpdateSchema>;
@@ -72,58 +75,84 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
   const { toast } = useToast();
   const router = useRouter();
 
-  const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<ProfileUpdateFormInputs>({
+  const { control, handleSubmit, watch, setValue, formState, trigger, reset } = useForm<ProfileUpdateFormInputs>({
     resolver: zodResolver(profileUpdateSchema),
+    mode: 'onChange',
     defaultValues: {
-      displayName: userProfile?.displayName || '',
-      activityStatus: userProfile?.activityStatus || undefined,
+      displayName: '',
+      activityStatus: undefined,
       stepGoalOption: undefined,
       customStepGoal: undefined,
       teamAction: 'none',
-      newTeamName: '',
-      joinTeamId: '',
+      newTeamName: undefined,
+      joinTeamId: undefined,
     },
   });
+  const { errors, isDirty, isValid } = formState;
 
   const selectedActivityStatus = watch('activityStatus');
   const selectedStepGoalOption = watch('stepGoalOption');
   const selectedTeamAction = watch('teamAction');
 
+
   useEffect(() => {
-    if (userProfile) {
-      setValue('displayName', userProfile.displayName || user?.email?.split('@')[0] || '');
-      if (userProfile.activityStatus) {
-        setValue('activityStatus', userProfile.activityStatus);
+    if (userProfile && (isUpdate || !userProfile.profileComplete)) {
+        let determinedActivityStatus: ActivityStatus = userProfile.activityStatus || 'Moderately Active';
+        let goalOpt: string | undefined = undefined;
+        let customGoalVal: number | undefined = undefined;
+
         if (userProfile.stepGoal) {
-          const goalStr = `${userProfile.stepGoal.toLocaleString()} steps`;
-          const currentActivityGoals = activityGoalsMap[userProfile.activityStatus];
-          if (currentActivityGoals?.goals?.includes(goalStr)) {
-            setValue('stepGoalOption', goalStr);
-            setValue('customStepGoal', undefined);
-          } else {
-            setValue('stepGoalOption', 'Custom');
-            setValue('customStepGoal', userProfile.stepGoal);
-          }
+            const goalStr = `${userProfile.stepGoal.toLocaleString()} steps`;
+            const currentActivityGoals = activityGoalsMap[determinedActivityStatus];
+            if (currentActivityGoals?.goals?.includes(goalStr)) {
+                goalOpt = goalStr;
+            } else {
+                goalOpt = 'Custom';
+                customGoalVal = userProfile.stepGoal;
+            }
         } else {
-            setValue('stepGoalOption', undefined);
-            setValue('customStepGoal', undefined);
+             goalOpt = activityGoalsMap[determinedActivityStatus]?.goals?.[0];
         }
-      } else {
-        setValue('activityStatus', 'Moderately Active'); 
-        setValue('stepGoalOption', activityGoalsMap['Moderately Active'].goals[0]);
-      }
-      setValue('teamAction', 'none');
-    } else if (user && !isUpdate) { 
-        setValue('displayName', user.email?.split('@')[0] || '');
-        setValue('activityStatus', 'Moderately Active'); 
-        setValue('stepGoalOption', activityGoalsMap['Moderately Active'].goals[0]);
+        
+        const resetValues: ProfileUpdateFormInputs = {
+            displayName: userProfile.displayName || user?.email?.split('@')[0] || '',
+            activityStatus: determinedActivityStatus,
+            stepGoalOption: goalOpt!,
+            customStepGoal: customGoalVal,
+            teamAction: 'none', 
+            newTeamName: undefined,
+            joinTeamId: undefined,
+        };
+        reset(resetValues);
+        trigger(); 
+
+    } else if (user && !isUpdate && !userProfile) { 
+        const defaultDisplayName = user.email?.split('@')[0] || '';
+        const defaultActivityStatus: ActivityStatus = 'Moderately Active';
+        const defaultStepGoalOption = activityGoalsMap[defaultActivityStatus].goals[0];
+        const resetValues: ProfileUpdateFormInputs = {
+            displayName: defaultDisplayName,
+            activityStatus: defaultActivityStatus,
+            stepGoalOption: defaultStepGoalOption,
+            customStepGoal: undefined,
+            teamAction: 'none',
+            newTeamName: undefined,
+            joinTeamId: undefined,
+        };
+        reset(resetValues);
+        trigger();
     }
-  }, [user, userProfile, setValue, isUpdate]);
+  }, [user, userProfile, isUpdate, reset, trigger]);
 
 
   const onSubmit: SubmitHandler<ProfileUpdateFormInputs> = async (data) => {
     if (!user) {
       toast({ title: 'Error', description: 'User not authenticated. Please log in again.', variant: "destructive" });
+      return;
+    }
+
+    if (isUpdate && !userProfile) {
+      toast({ title: 'Profile Error', description: 'Your profile data could not be loaded for the update. Please try refreshing.', variant: "destructive" });
       return;
     }
     setLoading(true);
@@ -139,11 +168,11 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       const baseProfile: UserProfile = userProfile ? { ...userProfile } : {
         uid: user.uid,
         email: user.email,
-        displayName: '', 
-        activityStatus: null, 
-        stepGoal: null, 
+        displayName: '',
+        activityStatus: null,
+        stepGoal: null,
         currentSteps: 0,
-        profileComplete: false, 
+        profileComplete: false,
         inviteLink: `${process.env.NEXT_PUBLIC_APP_URL || ''}/profile/${user.uid}`,
         badgesEarned: [],
         teamId: null,
@@ -154,16 +183,22 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       };
       
       const profileUpdateData: UserProfile = {
-        ...baseProfile, 
+        ...baseProfile,
         displayName: data.displayName,
         activityStatus: data.activityStatus,
         stepGoal: finalStepGoal,
         profileComplete: true, 
       };
 
-      let awardedTeamBadgeFromAction: BadgeData | null | undefined = undefined;
+      if (profileUpdateData.inviteLink === undefined) {
+        profileUpdateData.inviteLink = `${process.env.NEXT_PUBLIC_APP_URL || ''}/profile/${user.uid}`;
+      }
 
-      if (!profileUpdateData.teamId) { 
+      let awardedTeamBadgeFromAction: BadgeData | null | undefined = undefined;
+      
+      const canPerformTeamAction = !profileUpdateData.teamId; 
+
+      if (canPerformTeamAction && data.teamAction !== 'none') {
           if (data.teamAction === 'create' && data.newTeamName) {
               const result: TeamActionResult = await createTeam(user.uid, data.newTeamName, profileUpdateData.currentSteps);
               profileUpdateData.teamId = result.teamId;
@@ -179,10 +214,12 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
                   toast({ title: 'Team Joined!', description: `You've joined "${result.teamName}".` });
               } else {
                   toast({ title: 'Failed to join team', description: 'Please check the Team ID and try again.', variant: "destructive"});
-                  setLoading(false); 
+                  setLoading(false);
                   return; 
               }
           }
+      } else if (profileUpdateData.teamId && data.teamAction !== 'none' && (data.newTeamName || data.joinTeamId)) {
+        toast({ title: 'Team Action Skipped', description: 'You are already on a team. Leave your current team to create or join another.', variant: 'default' });
       }
       
       if (awardedTeamBadgeFromAction && !profileUpdateData.badgesEarned?.includes(awardedTeamBadgeFromAction.id as BadgeId)) {
@@ -190,20 +227,21 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       }
       
       await setDoc(doc(db, "users", user.uid), profileUpdateData, { merge: true });
+      toast({ title: 'Profile Updated!', description: 'Your Butterfly Steps profile has been successfully saved.' });
       
       const updatedFullProfile = await getUserProfile(user.uid);
       if (updatedFullProfile) {
-        setUserProfileState(updatedFullProfile); 
-          if (awardedTeamBadgeFromAction) { 
+        setUserProfileState(updatedFullProfile);
+        if (awardedTeamBadgeFromAction) {
              setShowNewBadgeModal(awardedTeamBadgeFromAction);
-          }
+        }
+      } else {
+        toast({ title: 'Profile Saved', description: 'Profile was saved, but there was an issue refreshing the display. Please manually refresh if needed.', variant: 'default' });
       }
-
-      toast({ title: 'Profile Updated!', description: 'Your Butterfly Steps profile has been updated.' });
-      router.push(`/profile/${user.uid}`); 
+      
+      router.push(`/profile/${user.uid}`);
       
     } catch (error) {
-        console.error('Profile update/team action error:', error);
         toast({ title: 'Update Failed', description: (error as Error).message || 'Could not update profile or team. Please try again.', variant: "destructive" });
     } finally {
         setLoading(false);
@@ -211,15 +249,22 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
   };
   
   const handleLeaveTeamAndResetForm = async () => {
-    if (!user || !userProfile?.teamId) return;
+    if (!user || !userProfile?.teamId) {
+      return;
+    }
     setLoading(true);
     try {
       await leaveTeam(user.uid, userProfile.teamId, userProfile.currentSteps);
-      toast({ title: 'Left Team', description: `You have left ${userProfile.teamName}.` });
-      setValue('teamAction', 'none'); 
-      setValue('joinTeamId', '');
-      setValue('newTeamName','');
-      await fetchUserProfile(user.uid); 
+      toast({ title: 'Left Team', description: `You have left ${userProfile.teamName}. You can now create or join a new team.` });
+      
+      const tempProfile = {...userProfile, teamId: null, teamName: null};
+      setUserProfileState(tempProfile);
+
+      setValue('teamAction', 'none');
+      setValue('joinTeamId', undefined);
+      setValue('newTeamName', undefined);
+      trigger();
+
     } catch (error) {
       toast({ title: 'Error Leaving Team', description: (error as Error).message, variant: "destructive" });
     } finally {
@@ -227,13 +272,7 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
     }
   };
 
-
-  if (!userProfile && isUpdate && !user) { // Added !user check for initial load scenario
-    return <p>Loading profile or profile not found...</p>;
-  }
-  
   const cancelLink = user ? `/profile/${user.uid}` : '/';
-
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
@@ -267,8 +306,10 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
                 <RadioGroup
                   onValueChange={(value) => {
                     field.onChange(value as ActivityStatus);
-                    setValue('stepGoalOption', undefined); 
+                    const newActivityStatus = value as ActivityStatus;
+                    setValue('stepGoalOption', activityGoalsMap[newActivityStatus]?.goals?.[0]);
                     setValue('customStepGoal', undefined);
+                    trigger(['activityStatus', 'stepGoalOption', 'customStepGoal']);
                   }}
                   value={field.value}
                   className="grid grid-cols-1 md:grid-cols-3 gap-4"
@@ -297,13 +338,14 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
                 name="stepGoalOption"
                 control={control}
                 render={({ field }) => (
-                  <Select 
+                  <Select
                     onValueChange={(value) => {
                       field.onChange(value);
                       if (value !== 'Custom') {
                         setValue('customStepGoal', undefined);
                       }
-                    }} 
+                      trigger(['stepGoalOption', 'customStepGoal']);
+                    }}
                     value={field.value}
                   >
                     <SelectTrigger id="stepGoalOption">
@@ -328,10 +370,10 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
                 name="customStepGoal"
                 control={control}
                 render={({ field }) => (
-                  <Input 
-                    id="customStepGoal" 
-                    type="number" 
-                    placeholder="e.g., 150000" 
+                  <Input
+                    id="customStepGoal"
+                    type="number"
+                    placeholder="e.g., 150000"
                     value={field.value === undefined ? '' : String(field.value)}
                     onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value.replace(/,/g, '')))}
                   />
@@ -349,7 +391,7 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
               <div>
                 <p>You are currently on team: <strong className="text-accent">{userProfile.teamName}</strong>.</p>
                 <Button type="button" variant="outline" onClick={handleLeaveTeamAndResetForm} disabled={loading} className="mt-2">
-                  <LogOut className="mr-2 h-4 w-4" /> Leave Current Team
+                  <LogOut className="mr-2 h-4 w-4" /> {loading && selectedTeamAction === 'none' ? 'Processing...' : 'Leave Current Team'}
                 </Button>
                 <p className="text-xs text-muted-foreground mt-1">To join or create a new team, you must first leave your current team.</p>
               </div>
@@ -360,8 +402,19 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
                   control={control}
                   render={({ field }) => (
                     <RadioGroup
-                      onValueChange={field.onChange}
-                      value={field.value} 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        if (value === 'create') {
+                            setValue('joinTeamId', undefined);
+                        } else if (value === 'join') {
+                            setValue('newTeamName', undefined);
+                        } else {
+                            setValue('newTeamName', undefined);
+                            setValue('joinTeamId', undefined);
+                        }
+                        trigger(['teamAction', 'newTeamName', 'joinTeamId']);
+                      }}
+                      value={field.value}
                       className="space-y-2"
                     >
                       <div className="flex items-center space-x-2">
@@ -386,7 +439,7 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
                     <Controller
                         name="newTeamName"
                         control={control}
-                        render={({ field }) => <Input id="newTeamName" placeholder="e.g., The Monarch Trackers" {...field} />}
+                        render={({ field }) => <Input id="newTeamName" placeholder="e.g., The Monarch Trackers" {...field} onChange={(e) => { field.onChange(e); trigger('newTeamName'); }} />}
                     />
                     {errors.newTeamName && <p className="text-sm text-destructive">{errors.newTeamName.message}</p>}
                   </div>
@@ -404,6 +457,7 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
                                     placeholder="Enter Team ID"
                                     {...field}
                                     value={field.value || ''} 
+                                    onChange={(e) => { field.onChange(e); trigger('joinTeamId');}}
                                 />
                             )}
                         />
@@ -419,7 +473,11 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
           <Button type="button" variant="outline" onClick={() => router.push(cancelLink)} className="w-full sm:w-auto">
             Cancel
           </Button>
-          <Button type="submit" className="w-full sm:w-auto" disabled={loading}>
+          <Button 
+            type="submit" 
+            className="w-full sm:w-auto" 
+            disabled={loading || !isDirty || !isValid}
+          >
             {loading ? (isUpdate ? 'Updating...' : 'Saving...') : (<><CheckCircle className="mr-2 h-5 w-5" /> {isUpdate ? 'Update Profile' : 'Save Profile & Start Challenge'}</>)}
           </Button>
         </CardFooter>
@@ -427,3 +485,4 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
     </Card>
   );
 }
+    
