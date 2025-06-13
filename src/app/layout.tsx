@@ -5,7 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/AuthContext';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
-import StreakDisplayModal from '@/components/dashboard/StreakDisplayModal'; // Import the modal
+import StreakDisplayModal from '@/components/dashboard/StreakDisplayModal';
+import DailyGoalMetModal from '@/components/modals/DailyGoalMetModal'; // Import the new modal
 
 export const metadata: Metadata = {
   title: 'Butterfly Steps',
@@ -33,7 +34,8 @@ export default function RootLayout({
           </main>
           <Footer />
           <Toaster />
-          <StreakDisplayModal /> {/* Render the modal globally */}
+          <StreakDisplayModal />
+          <DailyGoalMetModal /> {/* Render the new daily goal modal globally */}
         </AuthProvider>
       </body>
     </html>

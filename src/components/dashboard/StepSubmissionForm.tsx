@@ -12,8 +12,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { submitSteps } from '@/lib/firebaseService';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Footprints } from 'lucide-react'; // Removed Award as it's part of badge.icon
+import { PlusCircle, Footprints } from 'lucide-react';
 import type { BadgeData } from '@/lib/badges';
+import type { StepSubmissionResult } from '@/types';
 import { useRouter } from 'next/navigation';
 import { ToastAction } from "@/components/ui/toast";
 
@@ -31,7 +32,7 @@ interface StepSubmissionFormProps {
 }
 
 export default function StepSubmissionForm({ onStepSubmit }: StepSubmissionFormProps) {
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, setShowDailyGoalMetModal } = useAuth();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -46,13 +47,13 @@ export default function StepSubmissionForm({ onStepSubmit }: StepSubmissionFormP
     }
     setLoading(true);
     try {
-      const newlyAwardedBadges: BadgeData[] = await submitSteps(user.uid, data.steps);
+      const result: StepSubmissionResult = await submitSteps(user.uid, data.steps);
       toast({ title: 'Steps Submitted!', description: `${data.steps.toLocaleString()} steps added to your total.` });
-      
-      if (newlyAwardedBadges && newlyAwardedBadges.length > 0) {
-        newlyAwardedBadges.forEach(badge => {
-          toast({ 
-            title: 'Badge Unlocked!', 
+
+      if (result.newlyAwardedBadges && result.newlyAwardedBadges.length > 0) {
+        result.newlyAwardedBadges.forEach(badge => {
+          toast({
+            title: 'Badge Unlocked!',
             description: (
               <div className="flex items-center">
                 <badge.icon className="mr-2 h-5 w-5 text-primary" />
@@ -71,8 +72,12 @@ export default function StepSubmissionForm({ onStepSubmit }: StepSubmissionFormP
         });
       }
 
-      reset(); 
-      onStepSubmit?.(); 
+      if (result.dailyGoalAchieved) {
+        setShowDailyGoalMetModal(true);
+      }
+
+      reset();
+      onStepSubmit?.();
     } catch (error) {
       console.error('Step submission error:', error);
       toast({ title: 'Submission Failed', description: (error as Error).message || 'Could not submit steps. Please try again.', variant: 'destructive' });
@@ -107,10 +112,10 @@ export default function StepSubmissionForm({ onStepSubmit }: StepSubmissionFormP
             <Label htmlFor="steps">Number of Steps</Label>
             <div className="relative">
                 <Footprints className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input 
-                  id="steps" 
-                  type="number" 
-                  placeholder="e.g., 5000" 
+                <Input
+                  id="steps"
+                  type="number"
+                  placeholder="e.g., 5000"
                   {...register('steps')}
                   className="pl-10"
                 />

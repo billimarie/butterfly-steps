@@ -3,6 +3,8 @@ import type { User as FirebaseUser } from 'firebase/auth';
 import type { BadgeId } from '@/lib/badges';
 import type { Timestamp } from 'firebase/firestore';
 
+export const CHALLENGE_DURATION_DAYS = 133; // June 21 to Oct 31
+
 export type ActivityStatus = 'Sedentary' | 'Moderately Active' | 'Very Active';
 
 export interface UserProfile {
@@ -28,7 +30,7 @@ export interface Team {
   creatorUid: string;
   memberUids: string[];
   totalSteps: number;
-  createdAt: any; 
+  createdAt: any;
 }
 
 export interface CommunityStats {
@@ -39,6 +41,7 @@ export interface CommunityStats {
 export interface DailyStep {
   date: string; // YYYY-MM-DD
   steps: number;
+  dailyGoalMetOnThisDate?: boolean;
 }
 
 export interface AppUser extends FirebaseUser {
@@ -52,6 +55,11 @@ export interface StreakUpdateResults {
   streakProcessedForToday: boolean;
 }
 
+export interface StepSubmissionResult {
+  newlyAwardedBadges: BadgeData[];
+  dailyGoalAchieved: boolean;
+}
+
 export interface AuthContextType {
   user: FirebaseUser | null;
   userProfile: UserProfile | null;
@@ -62,4 +70,6 @@ export interface AuthContextType {
   setUserProfileState: (profile: UserProfile | null) => void;
   showStreakModal: boolean;
   setShowStreakModal: (show: boolean) => void;
+  showDailyGoalMetModal: boolean;
+  setShowDailyGoalMetModal: (show: boolean) => void;
 }
