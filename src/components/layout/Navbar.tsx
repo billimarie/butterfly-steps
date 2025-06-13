@@ -24,7 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, X, User, LogOut, LayoutDashboard, Gift, Users, ShoppingCart, Plus } from 'lucide-react';
+import { Menu, X, User, LogOut, LayoutDashboard, Users, ShoppingCart, Plus } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Navbar() {
@@ -117,13 +117,10 @@ export default function Navbar() {
           ) : (
             // Desktop View
             loading ? (
-              <div className="h-8 w-32 bg-muted rounded animate-pulse"></div> // Placeholder for buttons and avatar
+              <div className="h-8 w-32 bg-muted rounded animate-pulse"></div> 
             ) : user ? (
               <>
                 <LogStepsButton />
-                <Button variant="ghost" asChild>
-                  <Link href="/feed">Feed</Link>
-                </Button>
                 <Button variant="ghost" asChild>
                   <Link href="/shop">Shop</Link>
                 </Button>
@@ -145,10 +142,10 @@ export default function Navbar() {
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link href="/"><LayoutDashboard className="mr-2 h-4 w-4" />Your Dashboard</Link>
+                      <Link href="/"><LayoutDashboard className="mr-2 h-4 w-4" />Dashboard</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                    {userProfile?.teamId && userProfile?.teamName ? ( // Check userProfile existence
+                    {userProfile?.teamId && userProfile?.teamName ? (
                       <Link href={`/teams/${userProfile.teamId}`} onClick={() => setMobileMenuOpen(false)} className="block">
                         <Users className="mr-3 h-5 w-5" />{userProfile.teamName}
                       </Link>
@@ -182,7 +179,6 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile Menu Content - slides down */}
         {isMobile && mobileMenuOpen && (
           <div className="absolute top-full left-0 w-full bg-background shadow-lg border-t border-border z-40">
             <div className="container mx-auto px-4 py-3 flex flex-col gap-1">
@@ -191,9 +187,9 @@ export default function Navbar() {
               ) : user ? (
                 <>
                   <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block">
-                    <Button variant="ghost" className="w-full justify-start text-base py-3"><LayoutDashboard className="mr-3 h-5 w-5" />Your Dashboard</Button>
+                    <Button variant="ghost" className="w-full justify-start text-base py-3"><LayoutDashboard className="mr-3 h-5 w-5" />Dashboard</Button>
                   </Link>
-                  {userProfile?.teamId && userProfile?.teamName ? ( // Check userProfile existence
+                  {userProfile?.teamId && userProfile?.teamName ? (
                   <Link href={`/teams/${userProfile.teamId}`} onClick={() => setMobileMenuOpen(false)} className="block">
                     <Button variant="ghost" className="w-full justify-start text-base py-3"><Users className="mr-3 h-5 w-5" />{userProfile.teamName}</Button>
                   </Link>
@@ -202,9 +198,6 @@ export default function Navbar() {
                       <Button variant="ghost" className="w-full justify-start text-base py-3"><Users className="mr-3 h-5 w-5" />Team Hub</Button>
                     </Link>
                   )}
-                  <Link href="/feed" onClick={() => setMobileMenuOpen(false)} className="block">
-                    <Button variant="ghost" className="w-full justify-start text-base py-3"><LayoutDashboard className="mr-3 h-5 w-5" />Feed</Button>
-                  </Link>
                    <Link href="/shop" onClick={() => setMobileMenuOpen(false)} className="block">
                     <Button variant="ghost" className="w-full justify-start text-base py-3"><ShoppingCart className="mr-3 h-5 w-5" />Shop</Button>
                   </Link>

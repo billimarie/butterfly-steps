@@ -5,130 +5,22 @@ import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 import { useRouter, usePathname } from 'next/navigation';
-import CountdownTimer from '@/components/dashboard/CountdownTimer';
-import UserProgressCard from '@/components/dashboard/UserProgressCard';
-import CommunityProgressCard from '@/components/dashboard/CommunityProgressCard';
-import StepSubmissionForm from '@/components/dashboard/StepSubmissionForm';
-import ButterflyAnimation from '@/components/dashboard/ButterflyAnimation';
-import InteractiveMap from '@/components/dashboard/InteractiveMap';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { getCommunityStats, getUserDailySteps } from '@/lib/firebaseService';
-import type { CommunityStats, UserProfile, DailyStep } from '@/types';
+import { getCommunityStats } from '@/lib/firebaseService';
+import type { CommunityStats, UserProfile } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import Image from 'next/image';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, Footprints, Users, Gift } from 'lucide-react';
 import Logo from '@/components/ui/Logo';
-import DailyStepChart from '@/components/profile/DailyStepChart';
+import { ArrowRight, Footprints, Users, Gift } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import UserDashboardTabContent from '@/components/dashboard/UserDashboardTabContent';
+import CommunityFeedTabContent from '@/components/feed/CommunityFeedTabContent';
+import CountdownTimer from '@/components/dashboard/CountdownTimer';
+import InteractiveMap from '@/components/dashboard/InteractiveMap';
+import ButterflyAnimation from '@/components/dashboard/ButterflyAnimation';
+import CommunityProgressCard from '@/components/dashboard/CommunityProgressCard';
 
-
-function Dashboard({ userProfile, initialCommunityStats }: { userProfile: UserProfile, initialCommunityStats: CommunityStats | null }) {
-  const [communityStats, setCommunityStats] = useState<CommunityStats | null>(initialCommunityStats);
-  const { fetchUserProfile: refreshAuthUserProfile } = useAuth(); // Renamed to avoid conflict
-  const [dailyStepsData, setDailyStepsData] = useState<DailyStep[]>([]);
-  const [isLoadingChart, setIsLoadingChart] = useState(true);
-
-  const refreshDashboardData = useCallback(async () => {
-    const stats = await getCommunityStats();
-    setCommunityStats(stats);
-    if (userProfile?.uid) {
-      await refreshAuthUserProfile(userProfile.uid, false); 
-    }
-  }, [userProfile?.uid, refreshAuthUserProfile]);
-
-  const fetchChartData = useCallback(async () => {
-    if (userProfile?.uid) {
-      setIsLoadingChart(true);
-      try {
-        const data = await getUserDailySteps(userProfile.uid, 30); // Get last 30 days
-        setDailyStepsData(data);
-      } catch (error) {
-        console.error("Failed to fetch daily steps data for chart:", error);
-      } finally {
-        setIsLoadingChart(false);
-      }
-    } else {
-      setDailyStepsData([]);
-      setIsLoadingChart(false);
-    }
-  }, [userProfile?.uid]);
-
-  useEffect(() => {
-    fetchChartData();
-  }, [fetchChartData]);
-
-  useEffect(() => {
-    if (!initialCommunityStats) {
-        refreshDashboardData();
-    } else {
-        setCommunityStats(initialCommunityStats);
-    }
-  }, [initialCommunityStats, refreshDashboardData]);
-
-  return (
-    <div className="space-y-8">
-      
-      <CountdownTimer />
-      
-        
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-
-        <div className="space-y-6">
-          <StepSubmissionForm onStepSubmit={refreshDashboardData} />
-          <UserProgressCard userProfile={userProfile} />
-        </div>
-
-        <div className="">
-          {userProfile && (
-            <DailyStepChart 
-              dailyStepsData={dailyStepsData} 
-              isLoading={isLoadingChart} 
-              userProfile={userProfile} 
-            />
-          )}
-        </div>
-
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="space-y-2">
-          {userProfile.profileComplete && (userProfile.stepGoal || userProfile.currentSteps > 0) && (
-            <ButterflyAnimation 
-              type="user" 
-              userCurrentSteps={userProfile.currentSteps} 
-              userStepGoal={userProfile.stepGoal} 
-            />
-          )}
-
-           {communityStats && <InteractiveMap totalCommunitySteps={communityStats.totalSteps} className="mt-6" />}
-        </div>
-        <div className="">
-          <CommunityProgressCard communityStats={communityStats} />
-        </div>
-      </div>
-
-      
-      
-      <Card className="shadow-lg">
-        <CardHeader>
-            <CardTitle className="font-headline text-2xl">Support the Monarchs</CardTitle>
-            <CardDescription>Every Step Count</CardDescription>
-        </CardHeader>
-        <CardContent>
-            <p className="mb-4">
-                Our nonprofit ecofarm plants Butterfly Habitats in the Mojave Desert. You can help us plant native milkweed and turn desertified land into a thriving ecosystem!
-            </p>
-            <Button asChild size="lg">
-                <a href="https://foreverystaratree.org/donate.html" target="_blank" rel="noopener noreferrer">
-                    <Gift className="mr-2 h-5 w-5"/> Donate to For Every Star, A Tree
-                </a>
-            </Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
 
 function LandingPage() {
   const [communityStats, setCommunityStats] = useState<CommunityStats | null>(null);
@@ -167,7 +59,7 @@ function LandingPage() {
                 <Link href="/signup">Join Us <ArrowRight className="ml-2 h-5 w-5"/></Link>
               </Button>
               <Button size="lg" variant="ghost" asChild>
-                <Link href="/feed">See Our Migration Walk <img src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1749691114/Cartoons/catti-the-caterpillar_b9skmk.png" className="w-12 ml-2" alt="Catti the Caterpillar" /></Link>
+                <Link href="/#community-landing">See Our Migration Walk <img src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1749691114/Cartoons/catti-the-caterpillar_b9skmk.png" className="w-12 ml-2" alt="Catti the Caterpillar" /></Link>
               </Button>
             </div>
         </div>
@@ -219,7 +111,7 @@ function LandingPage() {
         </Card>
       </div>
 
-      <div className="p-8 space-y-8 container mx-auto px-4">
+      <div id="community-landing" className="p-8 space-y-8 container mx-auto px-4">
         <CommunityProgressCard communityStats={communityStats} />
       </div>
 
@@ -314,19 +206,19 @@ export default function HomePage() {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!authLoading && user && (!userProfile || !userProfile.profileComplete) && pathname !== '/profile' && !pathname.startsWith('/profile/')) { // Adjusted condition for dynamic profile routes
-      router.push(`/profile/${user.uid}?setup=true`); // Redirect to specific profile page
+    if (!authLoading && user && (!userProfile || !userProfile.profileComplete) && pathname !== '/profile' && !pathname.startsWith('/profile/')) {
+      router.push(`/profile/${user.uid}?setup=true`);
     }
   }, [user, userProfile, authLoading, router, pathname]);
 
-  const fetchInitialCommunityData = useCallback(async () => {
+  const fetchDashboardCommunityData = useCallback(async () => {
     if (user && userProfile?.profileComplete) {
       setCommunityStatsLoading(true);
       try {
         const stats = await getCommunityStats();
         setInitialCommunityStats(stats);
       } catch (error) {
-        console.error("Failed to fetch initial community stats:", error);
+        console.error("Failed to fetch initial community stats for dashboard tab:", error);
         setInitialCommunityStats(null);
       } finally {
         setCommunityStatsLoading(false);
@@ -337,8 +229,8 @@ export default function HomePage() {
   }, [user, userProfile?.profileComplete]);
 
   useEffect(() => {
-    fetchInitialCommunityData();
-  }, [fetchInitialCommunityData]);
+    fetchDashboardCommunityData();
+  }, [fetchDashboardCommunityData]);
 
   if (authLoading) {
     return (
@@ -361,27 +253,39 @@ export default function HomePage() {
         </div>
       );
     } else {
-      if (communityStatsLoading && !initialCommunityStats) { 
-        return (
-          <div className="space-y-8">
-            <CountdownTimer />
-            <Skeleton className="h-56 w-full rounded-lg" />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                    <Skeleton className="h-56 w-full rounded-lg" /> 
-                    <Skeleton className="h-24 w-full rounded-lg" /> 
-                    <Skeleton className="h-64 w-full rounded-lg mt-6" /> 
+      // Logged-in, profile complete view with TABS
+      return (
+        <Tabs defaultValue="dashboard" className="w-full space-y-4">
+          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="community">Community</TabsTrigger>
+          </TabsList>
+          <TabsContent value="dashboard">
+            {communityStatsLoading && !initialCommunityStats ? (
+              <div className="space-y-8 mt-4">
+                <Skeleton className="h-24 w-full rounded-lg" />
+                <Skeleton className="h-56 w-full rounded-lg" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-6">
+                    <Skeleton className="h-56 w-full rounded-lg" />
+                    <Skeleton className="h-24 w-full rounded-lg" />
+                    <Skeleton className="h-64 w-full rounded-lg mt-6" />
+                  </div>
+                  <div className="space-y-6">
+                    <Skeleton className="h-48 w-full rounded-lg" />
+                    <Skeleton className="h-80 w-full rounded-lg" />
+                  </div>
                 </div>
-                <div className="space-y-6">
-                    <Skeleton className="h-48 w-full rounded-lg" /> 
-                    <Skeleton className="h-80 w-full rounded-lg" /> {/* Placeholder for DailyStepChart */}
-                </div>
-            </div>
-          </div>
-        );
-      }
-      return <Dashboard userProfile={userProfile} initialCommunityStats={initialCommunityStats} />;
+              </div>
+            ) : (
+              <UserDashboardTabContent userProfile={userProfile} initialCommunityStats={initialCommunityStats} />
+            )}
+          </TabsContent>
+          <TabsContent value="community">
+            <CommunityFeedTabContent />
+          </TabsContent>
+        </Tabs>
+      );
     }
   } else {
      return <LandingPage />;
