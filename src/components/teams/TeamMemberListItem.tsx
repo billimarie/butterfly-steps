@@ -3,9 +3,11 @@
 
 import type { UserProfile } from '@/types';
 import Link from 'next/link';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // Added AvatarImage
 import { Card, CardHeader } from '@/components/ui/card';
-import { Footprints, Crown as CreatorCrownIcon, Medal } from 'lucide-react';
+import { Footprints, Crown as CreatorCrownIcon, Medal, Shell } from 'lucide-react'; // Added Shell
+
+const CHRYSALIS_AVATAR_IDENTIFIER = 'lucide:shell';
 
 const getInitials = (name: string | null | undefined) => {
     if (!name) return 'U';
@@ -17,20 +19,31 @@ const getInitials = (name: string | null | undefined) => {
 
 interface TeamMemberListItemProps {
   member: UserProfile;
-  isCreator: boolean; // Retained in case it's needed for other subtle UI in the future, but not for the crown here.
+  isCreator: boolean;
   index: number; // Rank within the team
 }
 
 export default function TeamMemberListItem({ member, isCreator, index }: TeamMemberListItemProps) {
   let rankIcon = null;
   if (index === 0) {
-    // Use CreatorCrownIcon for 1st place, styled gold
     rankIcon = <CreatorCrownIcon className="h-5 w-5 text-yellow-400" title="1st Place" />;
   } else if (index === 1) {
     rankIcon = <Medal className="h-5 w-5 text-slate-400" title="2nd Place" />;
   } else if (index === 2) {
     rankIcon = <Medal className="h-5 w-5 text-orange-400" title="3rd Place" />;
   }
+
+  const renderAvatarContent = () => {
+    if (member.photoURL === CHRYSALIS_AVATAR_IDENTIFIER) {
+      return <Shell className="h-full w-full p-1.5 text-primary" data-ai-hint="chrysalis shell gold" />;
+    }
+    return (
+      <>
+        <AvatarImage src={member.photoURL || undefined} alt={member.displayName || 'User'} />
+        <AvatarFallback>{getInitials(member.displayName)}</AvatarFallback>
+      </>
+    );
+  };
 
   return (
     <Link
@@ -42,12 +55,11 @@ export default function TeamMemberListItem({ member, isCreator, index }: TeamMem
         <CardHeader className="flex flex-row items-center justify-between space-x-4 py-3 px-4">
           <div className="flex items-center space-x-3 min-w-0">
             <Avatar className="h-10 w-10 border flex-shrink-0">
-              <AvatarFallback>{getInitials(member.displayName)}</AvatarFallback>
+              {renderAvatarContent()}
             </Avatar>
             <div className="min-w-0">
               <p className="text-sm font-medium leading-none truncate flex items-center">
                 {member.displayName || 'Anonymous User'}
-                {/* Creator indicator next to name removed as per new requirement for crown */}
               </p>
             </div>
           </div>

@@ -38,14 +38,12 @@ function getTodayDateStringUTC(): string {
 }
 
 // Helper to get today's date in YYYY-MM-DD format (Local to the client)
-function getTodaysDateClientLocal(): string {
+export function getTodaysDateClientLocal(): string {
   const now = new Date(); // Current moment in client's local timezone
-  console.log('[getTodaysDateClientLocal] Raw `new Date()`:', now.toString(), 'Timestamp:', now.getTime());
   const year = now.getFullYear();
   const month = (now.getMonth() + 1).toString().padStart(2, '0'); // JS months are 0-indexed
   const day = now.getDate().toString().padStart(2, '0');
   const localDateString = `${year}-${month}-${day}`;
-  console.log('[getTodaysDateClientLocal] Calculated localDateString:', localDateString);
   return localDateString;
 }
 
@@ -60,6 +58,7 @@ function mapDocToUserProfile(docSnap: DocumentSnapshot): UserProfile {
     uid: docSnap.id,
     email: data.email || null,
     displayName: data.displayName || null,
+    photoURL: data.photoURL || null,
     activityStatus: data.activityStatus || null,
     stepGoal: data.stepGoal || null,
     currentSteps: typeof data.currentSteps === 'number' ? data.currentSteps : 0,
@@ -69,8 +68,10 @@ function mapDocToUserProfile(docSnap: DocumentSnapshot): UserProfile {
     teamId: data.teamId || null,
     teamName: data.teamName || null,
     currentStreak: typeof data.currentStreak === 'number' ? data.currentStreak : 0,
-    lastStreakLoginDate: data.lastStreakLoginDate || null, // Should be YYYY-MM-DD
+    lastStreakLoginDate: data.lastStreakLoginDate || null,
     lastLoginTimestamp: data.lastLoginTimestamp instanceof Timestamp ? data.lastLoginTimestamp : null,
+    chrysalisCoinDates: Array.isArray(data.chrysalisCoinDates) ? data.chrysalisCoinDates : [],
+    dashboardLayout: data.dashboardLayout || { dashboardOrder: [], communityOrder: [] },
   };
 }
 
@@ -89,6 +90,7 @@ export async function createUserProfile(firebaseUser: FirebaseUser, additionalDa
     uid: firebaseUser.uid,
     email: firebaseUser.email,
     displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Anonymous User',
+    photoURL: firebaseUser.photoURL || null,
     activityStatus: null,
     stepGoal: null,
     currentSteps: 0,
@@ -100,6 +102,8 @@ export async function createUserProfile(firebaseUser: FirebaseUser, additionalDa
     currentStreak: 0,
     lastStreakLoginDate: null,
     lastLoginTimestamp: null,
+    chrysalisCoinDates: [],
+    dashboardLayout: { dashboardOrder: [], communityOrder: [] },
   };
   const profileData = { ...baseProfileData, ...additionalData };
   await setDoc(userProfileRef, profileData);
@@ -109,8 +113,7 @@ export async function createUserProfile(firebaseUser: FirebaseUser, additionalDa
 export async function updateUserProfile(uid: string, data: Partial<UserProfile>): Promise<void> {
   const userRef = doc(db, USERS_COLLECTION, uid);
   const updatePayload = { ...data, uid: uid };
-  // Ensure inviteLink is not undefined
-  if (updatePayload.inviteLink === undefined) {
+  if (updatePayload.inviteLink === undefined && data.inviteLink !== null) {
     updatePayload.inviteLink = `${process.env.NEXT_PUBLIC_APP_URL || ''}/profile/${uid}`;
   }
   await setDoc(userRef, updatePayload, { merge: true });
@@ -119,7 +122,7 @@ export async function updateUserProfile(uid: string, data: Partial<UserProfile>)
 export async function updateUserStreakOnLogin(uid: string): Promise<StreakUpdateResults> {
   const userRef = doc(db, USERS_COLLECTION, uid);
   const newLastLoginTimestamp = Timestamp.fromDate(new Date());
-  const todayDateStringUTC = getTodayDateStringUTC(); // Streaks remain UTC based
+  const todayDateStringUTC = getTodayDateStringUTC();
 
   try {
     const result = await runTransaction(db, async (transaction) => {
@@ -137,43 +140,41 @@ export async function updateUserStreakOnLogin(uid: string): Promise<StreakUpdate
 
       const userProfile = mapDocToUserProfile(userSnap);
       let currentStreak = userProfile.currentStreak;
-      let lastStreakLoginDateStr = userProfile.lastStreakLoginDate; // This is a UTC date string
+      let lastStreakLoginDateStr = userProfile.lastStreakLoginDate;
       let streakProcessedForToday = false;
       let newStreakCount = currentStreak;
       let newLastStreakLoginDate = lastStreakLoginDateStr;
 
-      if (!lastStreakLoginDateStr) { // First login or streak reset
+      if (!lastStreakLoginDateStr) {
         newStreakCount = 1;
         newLastStreakLoginDate = todayDateStringUTC;
         streakProcessedForToday = true;
-      } else if (lastStreakLoginDateStr !== todayDateStringUTC) { // Logged in on a new UTC day
+      } else if (lastStreakLoginDateStr !== todayDateStringUTC) {
         streakProcessedForToday = true;
-        const lastLoginDate = new Date(lastStreakLoginDateStr + 'T00:00:00Z'); // Treat as start of UTC day
-        const todayStart = new Date(todayDateStringUTC + 'T00:00:00Z'); // Treat as start of UTC day
+        const lastLoginDate = new Date(lastStreakLoginDateStr + 'T00:00:00Z');
+        const todayStart = new Date(todayDateStringUTC + 'T00:00:00Z');
 
         const yesterdayStart = new Date(todayStart);
         yesterdayStart.setUTCDate(todayStart.getUTCDate() - 1);
 
-        if (lastLoginDate.getTime() === yesterdayStart.getTime()) { // Check if last login was "yesterday" UTC
+        if (lastLoginDate.getTime() === yesterdayStart.getTime()) {
           newStreakCount = currentStreak + 1;
         } else {
-          newStreakCount = 1; // Streak broken, reset
+          newStreakCount = 1;
         }
         newLastStreakLoginDate = todayDateStringUTC;
       } else {
-         // Already logged in today (UTC), no change to streak count or last streak date from this login
          streakProcessedForToday = false;
       }
 
-      // Safety: if streak processed and result is 0, make it 1 (first day of new streak)
       if (streakProcessedForToday && newStreakCount === 0) {
         newStreakCount = 1;
       }
 
       transaction.update(userRef, {
         currentStreak: newStreakCount,
-        lastStreakLoginDate: newLastStreakLoginDate, // Store UTC date for streak
-        lastLoginTimestamp: newLastLoginTimestamp, // Always update to current login time
+        lastStreakLoginDate: newLastStreakLoginDate,
+        lastLoginTimestamp: newLastLoginTimestamp,
       });
 
       return {
@@ -206,7 +207,7 @@ export async function checkAndAwardBadges(
   const newBadgeIdsToSaveSet = new Set<BadgeId>(currentUserBadgeIds);
 
   for (const badge of ALL_BADGES) {
-    if (badge.id === 'team-player' || badge.id === 'social-butterfly') continue; // Event-based badges handled elsewhere
+    if (badge.id === 'team-player' || badge.id === 'social-butterfly') continue;
 
     if (currentTotalSteps >= badge.milestone && !currentUserBadgeIds.includes(badge.id)) {
       if (!newBadgeIdsToSaveSet.has(badge.id)) {
@@ -236,7 +237,7 @@ export async function awardSpecificBadgeIfUnearned(userId: string, badgeIdToAwar
       const currentBadges = userProfile.badgesEarned || [];
 
       if (currentBadges.includes(badgeIdToAward)) {
-        return null; // Already has the badge
+        return null;
       }
 
       const badgeDefinition = getBadgeDataById(badgeIdToAward);
@@ -247,7 +248,7 @@ export async function awardSpecificBadgeIfUnearned(userId: string, badgeIdToAwar
 
       const newBadgesArray = [...currentBadges, badgeIdToAward];
       transaction.update(userRef, { badgesEarned: newBadgesArray });
-      return badgeDefinition; // Return the full BadgeData object
+      return badgeDefinition;
     });
     return awardedBadgeData;
   } catch (error) {
@@ -263,7 +264,6 @@ export async function submitSteps(uid: string, stepsToAdd: number): Promise<Step
   }
 
   const clientLocalDateString = getTodaysDateClientLocal();
-  console.log('[firebaseService.submitSteps] Logging steps for date:', clientLocalDateString, 'Steps:', stepsToAdd);
 
   const userDocRef = doc(db, USERS_COLLECTION, uid);
   const communityStatsRef = doc(db, COMMUNITY_COLLECTION, COMMUNITY_STATS_DOC);
@@ -293,17 +293,14 @@ export async function submitSteps(uid: string, stepsToAdd: number): Promise<Step
       teamDocSnap = await transaction.get(teamDocRef);
     }
 
-    // Update user's total steps
     transaction.update(userDocRef, { currentSteps: increment(stepsToAdd) });
 
-    // Update community's overall total steps
     if (!communityStatsDoc.exists()) {
       transaction.set(communityStatsRef, { totalSteps: stepsToAdd, totalParticipants: 1 });
     } else {
       transaction.update(communityStatsRef, { totalSteps: increment(stepsToAdd) });
     }
     
-    // Update user's daily steps for client's local date
     const newUserDailyStepsValue = (userDailyStepDataBeforeUpdate?.steps || 0) + stepsToAdd;
     const userDailyStepUpdatePayload: DailyStep = {
         date: clientLocalDateString, 
@@ -316,12 +313,11 @@ export async function submitSteps(uid: string, stepsToAdd: number): Promise<Step
             userDailyStepUpdatePayload.dailyGoalMetOnThisDate = true;
             dailyGoalAchieved = true;
         } else if (userDailyStepDataBeforeUpdate?.dailyGoalMetOnThisDate) {
-            userDailyStepUpdatePayload.dailyGoalMetOnThisDate = true; // Preserve if already met
+            userDailyStepUpdatePayload.dailyGoalMetOnThisDate = true;
         }
     }
     transaction.set(userDailyStepDocRef, userDailyStepUpdatePayload, { merge: true });
 
-    // Update community's daily steps for client's local date
     transaction.set(communityDailyStepDocRef, { date: clientLocalDateString, steps: increment(stepsToAdd) }, { merge: true });
 
 
@@ -341,7 +337,6 @@ export async function submitSteps(uid: string, stepsToAdd: number): Promise<Step
 }
 
 export async function getUserDailySteps(uid: string, limitDays: number = 30): Promise<DailyStep[]> {
-  console.log(`[firebaseService] getUserDailySteps called for UID: ${uid}, limit: ${limitDays}`);
   const dailyStepsRef = collection(db, USERS_COLLECTION, uid, DAILY_STEPS_SUBCOLLECTION);
   const q = query(dailyStepsRef, orderBy('date', 'desc'), firestoreLimit(limitDays));
   const querySnapshot = await getDocs(q);
@@ -355,12 +350,25 @@ export async function getUserDailySteps(uid: string, limitDays: number = 30): Pr
       dailyGoalMetOnThisDate: data.dailyGoalMetOnThisDate || false,
     });
   });
-  console.log(`[firebaseService] getUserDailySteps for UID ${uid} returning:`, JSON.stringify(dailySteps.slice().reverse(), null, 2));
   return dailySteps.reverse();
 }
 
+export async function getDailyStepForDate(uid: string, dateString: string): Promise<DailyStep | null> {
+  const dailyStepDocRef = doc(db, USERS_COLLECTION, uid, DAILY_STEPS_SUBCOLLECTION, dateString);
+  const docSnap = await getDoc(dailyStepDocRef);
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    return {
+      date: data.date,
+      steps: data.steps,
+      dailyGoalMetOnThisDate: data.dailyGoalMetOnThisDate || false,
+    };
+  }
+  return null;
+}
+
+
 export async function getCommunityDailySteps(limitDays: number = 30): Promise<DailyStep[]> {
-  console.log(`[firebaseService] getCommunityDailySteps called, limit: ${limitDays}`);
   const dailyStepsRef = collection(db, COMMUNITY_COLLECTION, COMMUNITY_STATS_DOC, DAILY_STEPS_SUBCOLLECTION);
   const q = query(dailyStepsRef, orderBy('date', 'desc'), firestoreLimit(limitDays));
   const querySnapshot = await getDocs(q);
@@ -368,13 +376,11 @@ export async function getCommunityDailySteps(limitDays: number = 30): Promise<Da
   const dailySteps: DailyStep[] = [];
   querySnapshot.forEach((docSnap) => {
     const data = docSnap.data();
-    // For community, dailyGoalMetOnThisDate is not applicable
     dailySteps.push({
       date: data.date,
       steps: data.steps,
     });
   });
-   console.log(`[firebaseService] getCommunityDailySteps returning:`, JSON.stringify(dailySteps.slice().reverse(), null, 2));
   return dailySteps.reverse(); 
 }
 
@@ -537,7 +543,7 @@ export async function getTeamMembersProfiles(memberUids: string[]): Promise<User
   if (!memberUids || memberUids.length === 0) return [];
 
   const profiles: UserProfile[] = [];
-  const CHUNK_SIZE = 30; // Firestore 'in' query limit
+  const CHUNK_SIZE = 30;
   for (let i = 0; i < memberUids.length; i += CHUNK_SIZE) {
       const chunk = memberUids.slice(i, i + CHUNK_SIZE);
       if (chunk.length > 0) {
@@ -560,3 +566,5 @@ export async function getTopUsers(count: number): Promise<UserProfile[]> {
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => mapDocToUserProfile(docSnap));
 }
+
+    

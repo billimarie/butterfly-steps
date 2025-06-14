@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
-import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIconLucide, Users as TeamIcon, LogOut, PlusCircle, CalendarDays, EggIcon, ShellIcon, SparklesIcon } from 'lucide-react';
+import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIconLucide, Users as TeamIcon, LogOut, PlusCircle, CalendarDays, EggIcon, ShellIcon, SparklesIcon, Layers, Replace } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ALL_BADGES, type BadgeData } from '@/lib/badges';
@@ -17,6 +17,7 @@ import { useState, useEffect, useCallback } from 'react';
 import StepSubmissionForm from '@/components/dashboard/StepSubmissionForm';
 import { Separator } from '@/components/ui/separator';
 import type { UserProfile } from '@/types';
+import { CHALLENGE_DURATION_DAYS } from '@/types'; 
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import BadgeDetailModal from '@/components/profile/BadgeDetailModal';
@@ -68,7 +69,7 @@ interface ProfileDisplayProps {
 }
 
 export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDisplayProps) {
-  const { user: authUser, fetchUserProfile: fetchAuthUserProfile } = useAuth();
+  const { user: authUser, fetchUserProfile: fetchAuthUserProfile, setShowStreakModal, setStreakModalContext } = useAuth();
   const { toast } = useToast();
   const [leavingTeam, setLeavingTeam] = useState(false);
 
@@ -76,6 +77,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   const [selectedExistingBadge, setSelectedExistingBadge] = useState<BadgeData | null>(null);
 
   const progressPercentage = profileData.stepGoal ? (profileData.currentSteps / profileData.stepGoal) * 100 : 0;
+  const collectedCoinsCount = profileData.chrysalisCoinDates?.length || 0;
 
   const handleShare = () => {
     if (profileData.inviteLink) {
@@ -103,19 +105,20 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     }
   };
 
-  const handleStepSubmit = async () => {
-    if (authUser && isOwnProfile) {
-      await fetchAuthUserProfile(authUser.uid);
-      // Removed fetchChartData call
-    }
-  };
-
   const handleExistingBadgeClick = (badge: BadgeData) => {
-    if (isOwnProfile) { // Only allow modal opening for own profile
+    if (isOwnProfile) { 
         setSelectedExistingBadge(badge);
         setIsExistingBadgeModalOpen(true);
     }
   };
+
+  const handleChrysalisAvatarClick = () => {
+    if (isOwnProfile) {
+      setStreakModalContext('profile_avatar_select');
+      setShowStreakModal(true);
+    }
+  };
+
 
   const earnedBadgeIds = profileData.badgesEarned || [];
   const earnedBadgesDetails: BadgeData[] = earnedBadgeIds
@@ -170,8 +173,35 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                 )}
               </div>
           </div>
-
           
+          <Separator className="my-6" />
+
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold flex items-center"><Layers className="mr-2 h-5 w-5 text-primary" /> Chrysalis Coins</h3>
+            <p className="text-sm text-muted-foreground">Log your steps once a day, and collect them all</p>
+            <div className="flex items-center space-x-2">
+              <ShellIcon className="h-8 w-8 text-primary" data-ai-hint="chrysalis shell gold"/>
+              <p className="text-xl">
+                Collected: <span className="font-bold text-accent">{collectedCoinsCount}</span> / {CHALLENGE_DURATION_DAYS}
+              </p>
+            </div>
+            {collectedCoinsCount === 0 && isOwnProfile && (
+                <p className="text-sm text-muted-foreground">Log in and log your steps daily to collect coins!</p>
+            )}
+            {collectedCoinsCount > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2 items-center">
+                {Array.from({ length: Math.min(collectedCoinsCount, 5) }).map((_, i) => (
+                  <ShellIcon key={`coin-display-${i}`} className="h-5 w-5 text-yellow-500" data-ai-hint="chrysalis shell gold"/>
+                ))}
+                {collectedCoinsCount > 5 && <span className="text-sm text-muted-foreground self-end">...and more!</span>}
+              </div>
+            )}
+            {isOwnProfile && (
+                 <Button variant="outline" size="sm" onClick={handleChrysalisAvatarClick} className="mt-2">
+                    <Replace className="mr-2 h-4 w-4" /> Change Chrysalis Avatar
+                </Button>
+            )}
+          </div>
 
           <Separator className="my-6" />
           
@@ -311,3 +341,5 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     </>
   );
 }
+
+    

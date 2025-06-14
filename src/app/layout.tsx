@@ -5,9 +5,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/AuthContext';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
-import StreakDisplayModal from '@/components/dashboard/StreakDisplayModal';
+import ChrysalisInteractionModal from '@/components/profile/ChrysalisInteractionModal'; // Updated import
 import DailyGoalMetModal from '@/components/modals/DailyGoalMetModal';
-import BadgeDetailModalRenderer from '@/components/profile/BadgeDetailModalRenderer'; // Renamed for clarity
+import BadgeDetailModalRenderer from '@/components/profile/BadgeDetailModalRenderer';
 import FloatingLogStepsButton from '@/components/modals/FloatingLogStepsButton';
 
 export const metadata: Metadata = {
@@ -36,9 +36,9 @@ export default function RootLayout({
           </main>
           <Footer />
           <Toaster />
-          <StreakDisplayModal />
+          <ChrysalisInteractionModal /> {/* Updated component name */}
           <DailyGoalMetModal />
-          <BadgeDetailModalRenderer /> {/* Render the modal that shows newly earned badges */}
+          <BadgeDetailModalRenderer />
           <FloatingLogStepsButton />
         </AuthProvider>
       </body>

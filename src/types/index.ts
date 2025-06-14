@@ -11,6 +11,7 @@ export interface UserProfile {
   uid: string;
   email: string | null;
   displayName: string | null;
+  photoURL?: string | null;
   activityStatus: ActivityStatus | null;
   stepGoal: number | null;
   currentSteps: number;
@@ -22,6 +23,11 @@ export interface UserProfile {
   currentStreak: number;
   lastStreakLoginDate: string | null; // YYYY-MM-DD
   lastLoginTimestamp: Timestamp | null;
+  chrysalisCoinDates?: string[]; // Array of "YYYY-MM-DD" for collected coins
+  dashboardLayout?: {
+    dashboardOrder?: string[];
+    communityOrder?: string[];
+  };
 }
 
 export interface Team {
@@ -56,30 +62,36 @@ export interface StreakUpdateResults {
 }
 
 export interface StepSubmissionResult {
-  newlyAwardedBadges: BadgeData[]; // Now returns full BadgeData
+  newlyAwardedBadges: BadgeData[];
   dailyGoalAchieved: boolean;
 }
 
-// For team creation/joining results that might award a badge
 export interface TeamActionResult {
   teamId: string;
   teamName: string;
-  awardedTeamBadge?: BadgeData | null; // Full BadgeData if awarded
+  awardedTeamBadge?: BadgeData | null;
 }
 
+export type StreakModalViewContext = 'login' | 'profile_avatar_select';
 
 export interface AuthContextType {
   user: FirebaseUser | null;
   userProfile: UserProfile | null;
   loading: boolean;
-  error: Error | null; // Changed AuthError to generic Error for broader compatibility
+  error: Error | null;
   logout: () => Promise<void>;
   fetchUserProfile: (uid: string, initialLogin?: boolean) => Promise<void>;
   setUserProfileState: (profile: UserProfile | null) => void;
   showStreakModal: boolean;
   setShowStreakModal: (show: boolean) => void;
+  streakModalContext: StreakModalViewContext;
+  setStreakModalContext: (context: StreakModalViewContext) => void;
   showDailyGoalMetModal: boolean;
   setShowDailyGoalMetModal: (show: boolean) => void;
-  newlyEarnedBadgeToShow: BadgeData | null; // Badge to show in the new modal
-  setShowNewBadgeModal: (badge: BadgeData | null) => void; // To trigger the new badge modal
+  newlyEarnedBadgeToShow: BadgeData | null;
+  setShowNewBadgeModal: (badge: BadgeData | null) => void;
+  activateChrysalisAsAvatar: () => Promise<void>;
+  collectDailyChrysalisCoin: () => Promise<void>;
 }
+
+    
