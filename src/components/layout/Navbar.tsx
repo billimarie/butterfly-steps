@@ -24,7 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, X, User, LogOut, LayoutDashboard, ShoppingCart, Plus, Settings as SettingsIcon, BarChart3, Shell } from 'lucide-react';
+import { Menu, X, User, LogOut, LayoutDashboard, Gift, Plus, Settings as SettingsIcon, BarChart3, Shell } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
 
@@ -163,7 +163,7 @@ export default function Navbar() {
                       <Link href="/?tab=community"><BarChart3 className="mr-2 h-4 w-4" />Leaderboard</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/shop"><ShoppingCart className="mr-2 h-4 w-4" />Shop</Link>
+                      <Link href="/donate"><Gift className="mr-2 h-4 w-4" />Donate</Link>
                     </DropdownMenuItem>
                     {/* <DropdownMenuItem asChild>
                       <Link href="/settings"><SettingsIcon className="mr-2 h-4 w-4" />Settings</Link>
@@ -205,8 +205,8 @@ export default function Navbar() {
                   <Link href="/?tab=community" onClick={() => setMobileMenuOpen(false)} className="block">
                     <Button variant="ghost" className="w-full justify-start text-base py-3"><BarChart3 className="mr-3 h-5 w-5" />Leaderboard</Button>
                   </Link>
-                  <Link href="/shop" onClick={() => setMobileMenuOpen(false)} className="block">
-                    <Button variant="ghost" className="w-full justify-start text-base py-3"><ShoppingCart className="mr-3 h-5 w-5" />Shop</Button>
+                  <Link href="/donate" onClick={() => setMobileMenuOpen(false)} className="block">
+                    <Button variant="ghost" className="w-full justify-start text-base py-3"><Gift className="mr-3 h-5 w-5" />Donate</Button>
                   </Link>
                   {/* <Link href="/settings" onClick={() => setMobileMenuOpen(false)} className="block">
                     <Button variant="ghost" className="w-full justify-start text-base py-3"><SettingsIcon className="mr-3 h-5 w-5" />Settings</Button>

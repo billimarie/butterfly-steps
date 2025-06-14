@@ -1,6 +1,6 @@
 
 import type { User as FirebaseUser } from 'firebase/auth';
-import type { BadgeId, BadgeData } from '@/lib/badges'; // Import BadgeData
+import type { BadgeId, BadgeData } from '@/lib/badges'; // BadgeData already imported
 import type { Timestamp } from 'firebase/firestore';
 import type { ChrysalisVariantData } from '@/lib/chrysalisVariants'; // Import ChrysalisVariantData
 
@@ -64,6 +64,7 @@ export interface StreakUpdateResults {
   updatedLastStreakLoginDate: string | null;
   updatedLastLoginTimestamp: Timestamp;
   streakProcessedForToday: boolean;
+  // newlyAwardedBadges?: BadgeData[]; // This could be used to pass back any badges from streak processing if needed
 }
 
 export interface StepSubmissionResult {
@@ -104,7 +105,6 @@ export interface AuthContextType {
   setShowLogStepsModal: (show: boolean, origin?: LogStepsModalOrigin) => void;
   logStepsFlowOrigin: LogStepsModalOrigin;
   justCollectedCoin: ChrysalisVariantData | null; // Details of the coin just collected
-  activateThemeFromCollectedCoin: (coinToActivate: ChrysalisVariantData) => Promise<void>; // Activates theme of any specific coin
+  activateThemeFromCollectedCoin: (coinToActivate: ChrysalisVariantData, fromProfileActivation?: boolean) => Promise<void>; // Activates theme of any specific coin
   clearJustCollectedCoinDetails: () => void; // Clears the justCollectedCoin state
 }
-    
