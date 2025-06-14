@@ -12,12 +12,14 @@ import {
   updateUserStreakOnLogin,
   updateUserProfile as updateUserProfileInFirestore,
   getDailyStepForDate,
-  getTodaysDateClientLocal
+  getTodaysDateClientLocal,
+  checkAndAwardBadges as checkAndAwardStepBadges,
 } from '@/lib/firebaseService';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { arrayUnion, doc, updateDoc } from 'firebase/firestore';
 import { ALL_CHRYSALIS_VARIANTS, getChrysalisVariantByDay } from '@/lib/chrysalisVariants';
+import { ALL_BADGES } from '@/lib/badges';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -93,7 +95,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (initialLogin) {
         streakResult = await updateUserStreakOnLogin(uid);
-        finalProfile = await getUserProfile(uid);
+        finalProfile = await getUserProfile(uid); 
 
         if (finalProfile?.profileComplete) {
           if (streakResult.streakProcessedForToday) {
@@ -111,6 +113,58 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         finalProfile = await getUserProfile(uid);
       }
+
+
+      if (finalProfile) {
+        let currentEarnedBadges = finalProfile.badgesEarned ? [...finalProfile.badgesEarned] : [];
+        let newBadgesAwardedThisLogin: BadgeData[] = [];
+        let profileBadgesChanged = false;
+
+        // Determine the streak value to use for badge checking
+        // Use the direct result from updateUserStreakOnLogin if it's an initial login,
+        // otherwise use the streak from the fetched profile.
+        const streakValueForBadgeCheck = (initialLogin && streakResult) 
+                                          ? streakResult.updatedStreakCount 
+                                          : finalProfile.currentStreak;
+
+        // Award Streak Badges
+        const streakBadgesToConsider = ALL_BADGES.filter(badge => badge.type === 'streak');
+        for (const streakBadge of streakBadgesToConsider) {
+          if (streakValueForBadgeCheck >= streakBadge.milestone && !currentEarnedBadges.includes(streakBadge.id)) {
+            currentEarnedBadges.push(streakBadge.id);
+            newBadgesAwardedThisLogin.push(streakBadge);
+            profileBadgesChanged = true;
+          }
+        }
+
+        // Award Step Badges
+        // checkAndAwardStepBadges now only processes step-type badges
+        const newlyAwardedStepBadges = await checkAndAwardStepBadges(uid, finalProfile.currentSteps, currentEarnedBadges);
+        for (const stepBadge of newlyAwardedStepBadges) {
+            if (!currentEarnedBadges.includes(stepBadge.id)) {
+                currentEarnedBadges.push(stepBadge.id);
+                newBadgesAwardedThisLogin.push(stepBadge);
+                profileBadgesChanged = true;
+            }
+        }
+        
+        if (profileBadgesChanged) {
+          await updateUserProfileInFirestore(uid, { badgesEarned: currentEarnedBadges });
+          finalProfile.badgesEarned = currentEarnedBadges; 
+
+          if (newBadgesAwardedThisLogin.length > 0 && !newlyEarnedBadgeToShow) {
+            setNewlyEarnedBadgeToShow(newBadgesAwardedThisLogin[0]);
+            for (let i = 1; i < newBadgesAwardedThisLogin.length; i++) {
+              toast({
+                title: `${newBadgesAwardedThisLogin[i].type === 'streak' ? 'Streak' : 'Step'} Badge Unlocked!`,
+                description: `You've also earned the "${newBadgesAwardedThisLogin[i].name}" badge!`,
+                duration: 5000,
+              });
+            }
+          }
+        }
+      }
+
       setUserProfile(finalProfile);
       if (finalProfile?.activeChrysalisThemeId) {
         applyTheme(finalProfile.activeChrysalisThemeId);
@@ -129,7 +183,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
         setLoading(false);
     }
-  }, [toast, applyTheme]);
+  }, [toast, applyTheme, newlyEarnedBadgeToShow]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -183,7 +237,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [fetchUserProfile, user, applyTheme, userProfile?.activeChrysalisThemeId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchUserProfile, user, applyTheme]); // Removed userProfile?.activeChrysalisThemeId from deps as applyTheme handles it internally based on current userProfile state.
 
   const setUserProfileState = (profile: UserProfile | null) => {
     setUserProfile(profile);
@@ -212,8 +267,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setShowStreakModal(show);
     if (!show) {
       setStreakModalContext('login');
-      // If closing and a coin was just collected but not activated, clear it.
-      // This is also handled by clearJustCollectedCoinDetails, but good for direct closes too.
       if (justCollectedCoin) {
         setJustCollectedCoin(null);
       }
@@ -242,7 +295,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     
     await activateThemeFromCollectedCoin(goldenChrysalisVariant, true);
-    // No need to navigate here as this is usually called from profile or a specific non-collection context
   };
 
   const collectDailyChrysalisCoin = async () => {
@@ -255,10 +307,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     if (userProfile.chrysalisCoinDates?.includes(currentDate)) {
       toast({ title: 'Already Collected', description: "You've already collected your chrysalis coin for today." });
-      // Don't close modal, let the modal re-render to show "already collected"
       const dayNumber = getChallengeDayNumber(currentDate);
       const variant = getChrysalisVariantByDay(dayNumber);
-      if (variant) setJustCollectedCoin(variant); // Show details even if already collected for user to activate theme.
+      if (variant) setJustCollectedCoin(variant);
       return;
     }
 
@@ -286,10 +337,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const dayNumber = getChallengeDayNumber(currentDate);
       const variant = getChrysalisVariantByDay(dayNumber);
       if (variant) {
-        setJustCollectedCoin(variant); // Set state to show collected coin details in modal
+        setJustCollectedCoin(variant);
       } else {
         console.error(`Could not find Chrysalis variant for day ${dayNumber}`);
-        internalSetShowStreakModal(false); // Fallback: close modal if variant details can't be shown
+        internalSetShowStreakModal(false);
       }
 
     } catch (e) {
@@ -309,18 +360,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const updates: Partial<UserProfile> = {
         activeChrysalisThemeId: coinToActivate.id,
-        photoURL: CHRYSALIS_AVATAR_IDENTIFIER, // Always set chrysalis avatar when a theme is activated
+        photoURL: CHRYSALIS_AVATAR_IDENTIFIER,
       };
       
-      // Optimistic UI updates
       setUser(prevUser => prevUser ? { ...auth.currentUser!, photoURL: CHRYSALIS_AVATAR_IDENTIFIER } : null );
       setUserProfile(prevProfile => {
         if (!prevProfile) return null;
         return { ...prevProfile, photoURL: CHRYSALIS_AVATAR_IDENTIFIER, activeChrysalisThemeId: coinToActivate.id };
       });
 
-      // Firestore updates
-      await updateProfile(auth.currentUser!, { photoURL: CHRYSALIS_AVATAR_IDENTIFIER });
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, { photoURL: CHRYSALIS_AVATAR_IDENTIFIER });
+      }
       await updateUserProfileInFirestore(uid, updates);
       
       applyTheme(coinToActivate.id);
@@ -329,14 +380,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setJustCollectedCoin(null);
       internalSetShowStreakModal(false);
       
-      if (!fromProfileActivation) { // Only navigate if not triggered by the "activate chrysalis avatar" button on profile page
+      if (!fromProfileActivation) {
          router.push(`/profile/${uid}`);
       }
 
     } catch (e) {
       console.error('Failed to activate theme:', e);
       toast({ title: 'Theme Activation Failed', description: (e as Error).message, variant: 'destructive' });
-      await fetchUserProfile(uid, false); // Re-fetch to ensure consistency
+      await fetchUserProfile(uid, false);
       setJustCollectedCoin(null);
       internalSetShowStreakModal(false);
     }
@@ -344,8 +395,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const clearJustCollectedCoinDetails = () => {
     setJustCollectedCoin(null);
-    // The modal closing itself will be handled by its onOpenChange or explicit close button.
-    // If modal is still open, it will revert to its initial display logic.
   };
 
 
@@ -401,3 +450,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+

@@ -265,6 +265,12 @@ export async function updateUserStreakOnLogin(uid: string): Promise<StreakUpdate
 }
 
 
+/**
+ * Checks and awards step-based badges to a user.
+ * This function ONLY processes badges of type: 'step'.
+ * Streak badges are handled separately in AuthContext.
+ * Event badges (like 'team-player', 'social-butterfly') are awarded at the time of the event.
+ */
 export async function checkAndAwardBadges(
   uid: string,
   currentTotalSteps: number,
@@ -273,9 +279,9 @@ export async function checkAndAwardBadges(
   const newlyEarnedBadgesData: BadgeData[] = [];
   const newBadgeIdsToSaveSet = new Set<BadgeId>(currentUserBadgeIds);
 
-  for (const badge of ALL_BADGES) {
-    if (badge.id === 'team-player' || badge.id === 'social-butterfly') continue;
-
+  // Only process badges of type 'step'
+  for (const badge of ALL_BADGES.filter(b => b.type === 'step')) {
+    // 'first-step' has milestone 1 (step), others have step counts
     if (currentTotalSteps >= badge.milestone && !currentUserBadgeIds.includes(badge.id)) {
       if (!newBadgeIdsToSaveSet.has(badge.id)) {
          newlyEarnedBadgesData.push(badge);
@@ -285,7 +291,11 @@ export async function checkAndAwardBadges(
   }
 
   if (newlyEarnedBadgesData.length > 0) {
-    await updateUserProfile(uid, { badgesEarned: Array.from(newBadgeIdsToSaveSet) });
+    // The actual update to Firestore should happen in AuthContext after all badge processing
+    // to ensure a single write with all new badges (step and streak).
+    // For now, this function returns the badges that *would* be awarded.
+    // If AuthContext is changed to not update, then this line would be reinstated:
+    // await updateUserProfile(uid, { badgesEarned: Array.from(newBadgeIdsToSaveSet) });
   }
   return newlyEarnedBadgesData;
 }
@@ -341,6 +351,7 @@ export async function submitSteps(uid: string, stepsToAdd: number): Promise<Step
   let teamDocRef: DocumentReference | undefined;
   let userProfileDataBeforeUpdate: UserProfile | null = null;
   let dailyGoalAchieved = false;
+  let updatedCurrentTotalSteps = 0;
 
   await runTransaction(db, async (transaction) => {
     const userDocSnap = await transaction.get(userDocRef);
@@ -350,6 +361,7 @@ export async function submitSteps(uid: string, stepsToAdd: number): Promise<Step
       throw new Error("User profile does not exist for step submission.");
     }
     userProfileDataBeforeUpdate = mapDocToUserProfile(userDocSnap);
+    updatedCurrentTotalSteps = (userProfileDataBeforeUpdate.currentSteps || 0) + stepsToAdd;
 
     const userDailyStepSnap = await transaction.get(userDailyStepDocRef);
     const userDailyStepDataBeforeUpdate = userDailyStepSnap.data() as DailyStep | undefined;
@@ -393,14 +405,9 @@ export async function submitSteps(uid: string, stepsToAdd: number): Promise<Step
     }
   });
 
-  const updatedUserProfile = await getUserProfile(uid);
-  if (!updatedUserProfile || typeof updatedUserProfile.currentSteps !== 'number') {
-    console.error("Failed to get updated user profile or currentSteps after step submission.");
-    return { newlyAwardedBadges: [], dailyGoalAchieved: dailyGoalAchieved };
-  }
-
-  const newlyAwardedBadges = await checkAndAwardBadges(uid, updatedUserProfile.currentSteps, updatedUserProfile.badgesEarned || []);
-  return { newlyAwardedBadges, dailyGoalAchieved };
+  // Badge awarding logic is now primarily handled in AuthContext after profile refresh.
+  // This function returns dailyGoalAchieved, and AuthContext will call checkAndAwardBadges.
+  return { newlyAwardedBadges: [], dailyGoalAchieved: dailyGoalAchieved };
 }
 
 export async function getUserDailySteps(uid: string, limitDays: number = 30): Promise<DailyStep[]> {
@@ -633,3 +640,4 @@ export async function getTopUsers(count: number): Promise<UserProfile[]> {
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => mapDocToUserProfile(docSnap));
 }
+

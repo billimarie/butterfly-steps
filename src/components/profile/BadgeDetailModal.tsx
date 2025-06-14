@@ -18,6 +18,26 @@ export default function BadgeDetailModal({ isOpen, onOpenChange, badge }: BadgeD
 
   const BadgeIconComponent = badge.icon || Award;
 
+  let milestoneText = '';
+  if (badge.type === 'streak') {
+    milestoneText = `${badge.milestone} day streak`;
+  } else if (badge.type === 'step') {
+    if (badge.id === 'first-step') {
+      milestoneText = 'Logged your first step';
+    } else {
+      milestoneText = `${badge.milestone.toLocaleString()} steps`;
+    }
+  } else if (badge.type === 'event') {
+    if (badge.id === 'team-player') {
+      milestoneText = 'Joined or created a team';
+    } else if (badge.id === 'social-butterfly') {
+      milestoneText = 'Just fluttering on by';
+    } else {
+      milestoneText = `Completed event: ${badge.name}`; // Fallback for other event types
+    }
+  }
+
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md p-0 overflow-hidden shadow-2xl rounded-lg">
@@ -37,12 +57,7 @@ export default function BadgeDetailModal({ isOpen, onOpenChange, badge }: BadgeD
           <div className="p-3 bg-muted/30 rounded-md border">
             <p className="text-sm font-semibold text-foreground">Milestone Reached:</p>
             <p className="text-sm text-muted-foreground">
-            {
-              badge.id === 'team-player' ? 'Joined or created a team'
-              : badge.id === 'social-butterfly' ? 'Just fluttering on by'
-              : badge.milestone === 1 && badge.id === 'first-step' ? 'Logged your first step'
-              : `${badge.milestone.toLocaleString()} steps`
-            }
+              {milestoneText}
             </p>
           </div>
         </div>
@@ -59,3 +74,4 @@ export default function BadgeDetailModal({ isOpen, onOpenChange, badge }: BadgeD
     </Dialog>
   );
 }
+
