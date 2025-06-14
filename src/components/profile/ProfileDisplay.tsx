@@ -7,22 +7,24 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
-import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIconLucide, Users as TeamIcon, LogOut, PlusCircle, CalendarDays, EggIcon, Shell as ShellIconOriginal, SparklesIcon, Layers, Replace, Palette } from 'lucide-react';
+import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIconLucide, Users as TeamIcon, LogOut, PlusCircle, CalendarDays, EggIcon, Shell as ShellIconOriginal, SparklesIcon, Layers, Replace, Palette, Gift } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ALL_BADGES, type BadgeData } from '@/lib/badges';
 import type { BadgeId } from '@/lib/badges';
-import { leaveTeam, getTodaysDateClientLocal, getChallengeDayNumberFromDateString, getChallengeDateStringByDayNumber } from '@/lib/firebaseService';
+import { leaveTeam, getTodaysDateClientLocal, getChallengeDayNumberFromDateString, getChallengeDateStringByDayNumber, getUserDailySteps } from '@/lib/firebaseService';
 import { useState, useEffect, useCallback } from 'react';
 import StepSubmissionForm from '@/components/dashboard/StepSubmissionForm';
 import { Separator } from '@/components/ui/separator';
-import type { UserProfile, ChrysalisVariantData } from '@/types';
+import type { UserProfile, ChrysalisVariantData, DailyStep } from '@/types';
 import { CHALLENGE_DURATION_DAYS, CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import BadgeDetailModal from '@/components/profile/BadgeDetailModal';
 import { getChrysalisVariantByDay, getChrysalisVariantById } from '@/lib/chrysalisVariants';
-import CoinDetailActivationModal from './CoinDetailActivationModal'; 
+import CoinDetailActivationModal from './CoinDetailActivationModal';
+import DailyStepChart from '@/components/profile/DailyStepChart';
+
 
 const WormIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -82,9 +84,30 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   const [selectedCoinForModal, setSelectedCoinForModal] = useState<ChrysalisVariantData | null>(null);
   const [isViewingMissedCoin, setIsViewingMissedCoin] = useState(false);
 
+  const [dailyStepsData, setDailyStepsData] = useState<DailyStep[]>([]);
+  const [isLoadingChart, setIsLoadingChart] = useState(true);
 
   const progressPercentage = profileData.stepGoal ? (profileData.currentSteps / profileData.stepGoal) * 100 : 0;
   const collectedCoinsCount = profileData.chrysalisCoinDates?.length || 0;
+
+  useEffect(() => {
+    const fetchChartData = async () => {
+      if (profileData.uid) {
+        setIsLoadingChart(true);
+        try {
+          const data = await getUserDailySteps(profileData.uid, 30); 
+          setDailyStepsData(data);
+        } catch (error) {
+          console.error("Failed to fetch daily steps data for chart:", error);
+          setDailyStepsData([]);
+        } finally {
+          setIsLoadingChart(false);
+        }
+      }
+    };
+    fetchChartData();
+  }, [profileData.uid]);
+
 
   const handleShare = () => {
     if (profileData.inviteLink) {
@@ -99,7 +122,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   };
 
   const handleExistingBadgeClick = (badge: BadgeData) => {
-    if (isOwnProfile) { 
+    if (isOwnProfile) {
         setSelectedExistingBadge(badge);
         setIsExistingBadgeModalOpen(true);
     }
@@ -138,24 +161,28 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
         variantToShow = getChrysalisVariantById(profileData.activeChrysalisThemeId);
     }
     if (!variantToShow) {
-        variantToShow = getChrysalisVariantByDay(1); // Default to Golden if no theme set or not found
+        variantToShow = getChrysalisVariantByDay(1); // Default to Golden Chrysalis (Day 1)
     }
-    
+
     const IconComponent = variantToShow?.icon || ShellIconOriginal;
-    
-    const iconColorStyle = isOwnProfile
-      ? { color: `hsl(var(--primary))` } 
-      : variantToShow?.themePrimaryHSL 
-        ? { color: `hsl(${variantToShow.themePrimaryHSL})` }
-        : { color: 'hsl(var(--muted-foreground))' }; // Fallback color for viewed user if somehow no themePrimaryHSL
+
+    let iconColorStyle: React.CSSProperties = {};
+    if (isOwnProfile) {
+        iconColorStyle = { color: `hsl(var(--primary))` }; 
+    } else if (variantToShow?.themePrimaryHSL) {
+        iconColorStyle = { color: `hsl(${variantToShow.themePrimaryHSL})` };
+    } else {
+        iconColorStyle = { color: 'hsl(var(--muted-foreground))' }; 
+    }
+
 
     const iconClassName = cn(
       "h-32 w-32 md:h-36 md:w-36",
       isOwnProfile ? "animate-chrysalis-glow" : "opacity-90"
     );
-    
-    const buttonAriaLabel = isOwnProfile 
-      ? "Change Chrysalis Avatar or Theme" 
+
+    const buttonAriaLabel = isOwnProfile
+      ? "Change Chrysalis Avatar or Theme"
       : `${variantToShow?.name || 'Chrysalis'} Avatar`;
 
     return (
@@ -169,7 +196,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
           aria-label={buttonAriaLabel}
           disabled={!isOwnProfile}
         >
-          <IconComponent className={iconClassName} style={iconColorStyle} data-ai-hint={variantToShow?.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"} />
+          <IconComponent className={iconClassName} style={iconColorStyle} data-ai-hint={variantToShow?.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"}/>
         </button>
       </div>
     );
@@ -179,7 +206,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   return (
     <>
       <Card className="w-full max-w-2xl mx-auto shadow-xl">
-        <CardHeader className="text-center"> 
+        <CardHeader className="text-center">
           <MainChrysalisAvatar />
           <div className="flex justify-between items-start text-left">
             <div>
@@ -188,7 +215,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                 {profileData.displayName || 'User Profile'}
               </CardTitle>
               {isOwnProfile && profileData.email && (
-                <CardDescription className="flex items-center mt-1">
+                <CardDescription className="flex items-center mt-3">
                     <Mail className="mr-2 h-4 w-4 text-muted-foreground" /> {profileData.email}
                 </CardDescription>
               )}
@@ -210,25 +237,44 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
         </CardHeader>
 
         <CardContent className="space-y-6">
-
-          <div className="flex flex-col md:flex-row gap-6">
-              <div className="md:w-1/3 space-y-2">
-                <h3 className="text-lg font-semibold flex items-center"><Target className="mr-2 h-5 w-5 text-primary" />Step Goal</h3>
-                <p className="text-2xl font-bold text-primary">{profileData.stepGoal?.toLocaleString() || 'Not set'} steps</p>
+          <div className="rounded-lg border bg-card text-card-foreground shadow-sm space-y-3"> {/* Main container for step info + progress bar */}
+            <div className="flex flex-col space-y-1.5 p-6 pb-0">
+              <div className="font-semibold tracking-tight font-headline text-xl flex items-center"><Footprints className="mr-2 h-5 w-5 text-primary"/>Your Steps</div>
+              <div className="text-sm text-muted-foreground">How close you are to your goal.</div>
+            </div>
+            <div className="space-y-1.5 p-6 pt-4">
+              <div className="flex flex-row justify-end">
+                <div className="text-sm font-medium text-muted-foreground">
+                  <span className="font-bold mr-1">{profileData.currentSteps.toLocaleString()} steps</span> out of {profileData.stepGoal && profileData.stepGoal > 0 && ( 
+                    <span className="ml-1">{profileData.stepGoal.toLocaleString()} goal</span>
+                  )}
+                </div>              
               </div>
 
-              <div className="md:w-2/3 flex-grow space-y-2">
-                <h3 className="text-lg font-semibold flex items-center"><Footprints className="mr-2 h-5 w-5 text-primary" />Current Steps</h3>
-                <p className="text-2xl font-bold text-accent">{profileData.currentSteps.toLocaleString()} steps</p>
-                {profileData.stepGoal && profileData.stepGoal > 0 && (
-                  <>
-                    <Progress value={progressPercentage} className="w-full h-3 mt-2" />
-                    <p className="text-sm text-muted-foreground text-right">{Math.min(100, Math.round(progressPercentage))}% of goal</p>
-                  </>
-                )}
-              </div>
+              {/* Progress Bar and Percentage (if goal exists) */}
+              {profileData.stepGoal && profileData.stepGoal > 0 && (
+                <div className="mt-0"> {/* Small margin top to separate from numbers */}
+                  <Progress value={progressPercentage} className="w-full h-3" />
+                  <p className="text-sm text-muted-foreground text-left mt-1">
+                    {Math.min(100, Math.round(progressPercentage))}%
+                  </p>
+                </div>
+              )}
+              {!profileData.stepGoal && (
+                <p className="text-sm text-muted-foreground">Step goal not set. {isOwnProfile && <Link href={`/profile/${profileData.uid}?edit=true`} className="underline">Set one now!</Link>}</p>
+              )}
+            </div>
           </div>
-          
+
+          <Separator className="my-6" />
+
+          <DailyStepChart
+            dailyStepsData={dailyStepsData}
+            isLoading={isLoadingChart}
+            userProfile={profileData}
+            chartType="user"
+          />
+
           <Separator className="my-6" />
 
           <div className="space-y-3">
@@ -247,37 +293,37 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                   const challengeDateForDay = getChallengeDateStringByDayNumber(dayNum, challengeYear);
                   const isCollected = profileData.chrysalisCoinDates?.includes(challengeDateForDay) ?? false;
                   const CoinIcon = variant.icon || ShellIconOriginal;
-                  const isMissedAndPast = !isCollected && variant.dayNumber < currentChallengeDay;
+                  const isMissedAndPastCoin = !isCollected && variant.dayNumber < currentChallengeDay;
 
                   return (
                     <button
                       key={variant.id}
-                      onClick={() => isOwnProfile && handleCoinGalleryItemClick(variant, isMissedAndPast)}
+                      onClick={() => isOwnProfile && handleCoinGalleryItemClick(variant, isMissedAndPastCoin)}
                       className={cn(
-                        "p-3 rounded-lg flex flex-col items-center w-28 min-h-[8.5rem] text-center shadow-sm transition-all justify-between", 
+                        "p-3 rounded-lg flex flex-col items-center w-28 min-h-[8.5rem] text-center shadow-sm transition-all justify-between",
                         "border hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary",
                         isCollected ? "bg-card border-primary/30" : "bg-muted/40 border-muted-foreground/20",
                         isOwnProfile ? "cursor-pointer hover:opacity-100" : (isCollected ? "cursor-default" : "cursor-not-allowed opacity-50"),
-                        !isCollected && !isMissedAndPast && "opacity-50 cursor-not-allowed", // Future, uncollected
-                        isMissedAndPast && isOwnProfile && "hover:border-accent cursor-pointer opacity-75 hover:opacity-100", // Missed, own profile
-                        isMissedAndPast && !isOwnProfile && "opacity-50 cursor-not-allowed" // Missed, other's profile
+                        !isCollected && !isMissedAndPastCoin && "opacity-50 cursor-not-allowed",
+                        isMissedAndPastCoin && isOwnProfile && "hover:border-accent cursor-pointer opacity-75 hover:opacity-100",
+                        isMissedAndPastCoin && !isOwnProfile && "opacity-50 cursor-not-allowed"
                       )}
                       aria-label={`View ${variant.name}`}
-                      disabled={!isOwnProfile && !isCollected && !isMissedAndPast} 
+                      disabled={!isOwnProfile && !isCollected && !isMissedAndPastCoin}
                     >
                       <CoinIcon className={cn(
-                        "h-12 w-12 mb-1.5 flex-shrink-0", 
+                        "h-12 w-12 mb-1.5 flex-shrink-0",
                         isCollected ? "text-primary" : "text-muted-foreground"
-                      )} />
+                      )} data-ai-hint={variant.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"} />
                       <div className="flex-grow flex flex-col justify-end w-full">
                         <span className={cn(
-                          "text-xs font-medium block truncate w-full leading-tight", 
+                          "text-xs font-medium block truncate w-full leading-tight",
                           isCollected ? "text-foreground" : "text-muted-foreground"
                         )}>
                           {variant.name}
                         </span>
-                        {isMissedAndPast && <span className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">(Missed)</span>}
-                        {!isCollected && !isMissedAndPast && variant.dayNumber <= currentChallengeDay && <span className="text-xs text-muted-foreground/80 mt-0.5">(Not Collected)</span>}
+                        {isMissedAndPastCoin && <span className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">(Missed)</span>}
+                        {!isCollected && !isMissedAndPastCoin && variant.dayNumber <= currentChallengeDay && <span className="text-xs text-muted-foreground/80 mt-0.5">(Not Collected)</span>}
                       </div>
                     </button>
                   );
@@ -286,7 +332,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
             ) : (
                <p className="text-muted-foreground text-center py-4">The challenge hasn't started yet. Coins will appear here once it begins!</p>
             )}
-            {isOwnProfile && profileData.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER && collectedCoinsCount > 0 && ( 
+            {isOwnProfile && profileData.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER && collectedCoinsCount > 0 && (
                  <Button variant="outline" size="sm" onClick={handleChrysalisAvatarClick} className="mt-3">
                     <Replace className="mr-2 h-4 w-4" /> Set Golden Chrysalis Avatar
                 </Button>
@@ -295,14 +341,14 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
 
 
           <Separator className="my-6" />
-          
+
           {showStreakMilestonesSection && (
             <div className="space-y-3">
               <h3 className="text-lg font-semibold flex items-center"><CalendarDays className="mr-2 h-5 w-5 text-primary" /> Streak Milestones</h3>
               {profileData.currentStreak > 0 ? (
                 <p className="text-sm text-muted-foreground">Current login streak: <strong className="text-accent">{profileData.currentStreak} day{profileData.currentStreak === 1 ? '' : 's'}</strong></p>
               ) : (
-                isOwnProfile && <p className="text-sm text-muted-foreground">This user hasn't started a login streak yet.</p> 
+                isOwnProfile && <p className="text-sm text-muted-foreground">This user hasn't started a login streak yet.</p>
               )}
               <div className="flex flex-wrap gap-3 justify-center">
                 {STREAK_ACHIEVEMENTS.map((achievement) => {
@@ -335,7 +381,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
           )}
 
           <Separator className="my-6" />
-          
+
           <div className="space-y-3">
             <h3 className="text-lg font-semibold flex items-center">
               <AwardIconLucide className="mr-2 h-5 w-5 text-primary" /> Badges Earned ({earnedBadgesDetails.length})
@@ -349,14 +395,14 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                   const nonInteractiveBadgeClasses = "cursor-default";
 
                   return (
-                    <div 
+                    <div
                       key={badge.id}
                       onClick={isOwnProfile ? () => handleExistingBadgeClick(badge) : undefined}
                       className={cn(
                         commonBadgeClasses,
                         isOwnProfile ? interactiveBadgeClasses : nonInteractiveBadgeClasses
                       )}
-                      role={isOwnProfile ? "button" : "img"} 
+                      role={isOwnProfile ? "button" : "img"}
                       tabIndex={isOwnProfile ? 0 : -1}
                       aria-label={isOwnProfile ? `View details for ${badge.name} badge` : badge.name}
                       onKeyDown={isOwnProfile ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleExistingBadgeClick(badge); } : undefined}
@@ -371,7 +417,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
               <p className="text-muted-foreground text-center">{isOwnProfile ? "Start logging steps" : "This user has not earned any badges"} to earn badges!</p>
             )}
           </div>
-          
+
           {isOwnProfile && profileData.inviteLink && (
             <div className="space-y-2">
               <h3 className="text-lg font-semibold flex items-center"><Share2 className="mr-2 h-5 w-5 text-primary" />Share Profile</h3>
@@ -387,7 +433,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
 
         </CardContent>
       </Card>
-      
+
       {isOwnProfile && (
         <BadgeDetailModal
             isOpen={isExistingBadgeModalOpen}
