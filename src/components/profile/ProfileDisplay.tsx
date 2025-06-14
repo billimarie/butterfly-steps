@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
-import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIconLucide, Users as TeamIcon, LogOut, PlusCircle, CalendarDays, EggIcon, Shell as ShellIconOriginal, SparklesIcon, Layers, Replace, Palette } from 'lucide-react';
+import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIconLucide, Users as TeamIcon, LogOut, PlusCircle, CalendarDays, EggIcon, Shell as ShellIconOriginal, SparklesIcon, Layers, Replace, Palette, Gift } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ALL_BADGES, type BadgeData } from '@/lib/badges';
@@ -95,7 +95,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
       if (profileData.uid) {
         setIsLoadingChart(true);
         try {
-          const data = await getUserDailySteps(profileData.uid, 30); // Get last 30 days of data
+          const data = await getUserDailySteps(profileData.uid, 30); 
           setDailyStepsData(data);
         } catch (error) {
           console.error("Failed to fetch daily steps data for chart:", error);
@@ -135,9 +135,9 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     }
   };
 
-  const handleCoinGalleryItemClick = (variant: ChrysalisVariantData, isMissed: boolean) => {
+  const handleCoinGalleryItemClick = (variant: ChrysalisVariantData, isMissedAndPastCoin: boolean) => {
     setSelectedCoinForModal(variant);
-    setIsViewingMissedCoin(isMissed);
+    setIsViewingMissedCoin(isMissedAndPastCoin);
     setIsCoinDetailModalOpen(true);
   };
 
@@ -161,18 +161,18 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
         variantToShow = getChrysalisVariantById(profileData.activeChrysalisThemeId);
     }
     if (!variantToShow) {
-        variantToShow = getChrysalisVariantByDay(1);
+        variantToShow = getChrysalisVariantByDay(1); // Default to Golden Chrysalis (Day 1)
     }
 
     const IconComponent = variantToShow?.icon || ShellIconOriginal;
 
     let iconColorStyle: React.CSSProperties = {};
     if (isOwnProfile) {
-        iconColorStyle = { color: `hsl(var(--primary))` }; // Uses the theme variable directly
+        iconColorStyle = { color: `hsl(var(--primary))` }; 
     } else if (variantToShow?.themePrimaryHSL) {
         iconColorStyle = { color: `hsl(${variantToShow.themePrimaryHSL})` };
     } else {
-        iconColorStyle = { color: 'hsl(var(--muted-foreground))' }; // Fallback
+        iconColorStyle = { color: 'hsl(var(--muted-foreground))' }; 
     }
 
 
@@ -196,7 +196,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
           aria-label={buttonAriaLabel}
           disabled={!isOwnProfile}
         >
-          <IconComponent className={iconClassName} style={iconColorStyle} data-ai-hint={variantToShow?.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"} />
+          <IconComponent className={iconClassName} style={iconColorStyle} data-ai-hint={variantToShow?.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"}/>
         </button>
       </div>
     );
@@ -215,7 +215,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                 {profileData.displayName || 'User Profile'}
               </CardTitle>
               {isOwnProfile && profileData.email && (
-                <CardDescription className="flex items-center mt-1">
+                <CardDescription className="flex items-center mt-3">
                     <Mail className="mr-2 h-4 w-4 text-muted-foreground" /> {profileData.email}
                 </CardDescription>
               )}
@@ -237,23 +237,33 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
         </CardHeader>
 
         <CardContent className="space-y-6">
-
-          <div className="flex flex-col md:flex-row gap-6">
-              <div className="md:w-1/3 space-y-2">
-                <h3 className="text-lg font-semibold flex items-center"><Target className="mr-2 h-5 w-5 text-primary" />Step Goal</h3>
-                <p className="text-2xl font-bold text-primary">{profileData.stepGoal?.toLocaleString() || 'Not set'} steps</p>
+          <div className="rounded-lg border bg-card text-card-foreground shadow-sm space-y-3"> {/* Main container for step info + progress bar */}
+            <div className="flex flex-col space-y-1.5 p-6 pb-0">
+              <div className="font-semibold tracking-tight font-headline text-xl flex items-center"><Footprints className="mr-2 h-5 w-5 text-primary"/>Your Steps</div>
+              <div className="text-sm text-muted-foreground">How close you are to your goal.</div>
+            </div>
+            <div className="space-y-1.5 p-6 pt-4">
+              <div className="flex flex-row justify-end">
+                <div className="text-sm font-medium text-muted-foreground">
+                  <span className="font-bold mr-1">{profileData.currentSteps.toLocaleString()} steps</span> out of {profileData.stepGoal && profileData.stepGoal > 0 && ( 
+                    <span className="ml-1">{profileData.stepGoal.toLocaleString()} goal</span>
+                  )}
+                </div>              
               </div>
 
-              <div className="md:w-2/3 flex-grow space-y-2">
-                <h3 className="text-lg font-semibold flex items-center"><Footprints className="mr-2 h-5 w-5 text-primary" />Current Steps</h3>
-                <p className="text-2xl font-bold text-accent">{profileData.currentSteps.toLocaleString()} steps</p>
-                {profileData.stepGoal && profileData.stepGoal > 0 && (
-                  <>
-                    <Progress value={progressPercentage} className="w-full h-3 mt-2" />
-                    <p className="text-sm text-muted-foreground text-right">{Math.min(100, Math.round(progressPercentage))}% of goal</p>
-                  </>
-                )}
-              </div>
+              {/* Progress Bar and Percentage (if goal exists) */}
+              {profileData.stepGoal && profileData.stepGoal > 0 && (
+                <div className="mt-0"> {/* Small margin top to separate from numbers */}
+                  <Progress value={progressPercentage} className="w-full h-3" />
+                  <p className="text-sm text-muted-foreground text-left mt-1">
+                    {Math.min(100, Math.round(progressPercentage))}%
+                  </p>
+                </div>
+              )}
+              {!profileData.stepGoal && (
+                <p className="text-sm text-muted-foreground">Step goal not set. {isOwnProfile && <Link href={`/profile/${profileData.uid}?edit=true`} className="underline">Set one now!</Link>}</p>
+              )}
+            </div>
           </div>
 
           <Separator className="my-6" />
@@ -283,23 +293,23 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                   const challengeDateForDay = getChallengeDateStringByDayNumber(dayNum, challengeYear);
                   const isCollected = profileData.chrysalisCoinDates?.includes(challengeDateForDay) ?? false;
                   const CoinIcon = variant.icon || ShellIconOriginal;
-                  const isMissedAndPast = !isCollected && variant.dayNumber < currentChallengeDay;
+                  const isMissedAndPastCoin = !isCollected && variant.dayNumber < currentChallengeDay;
 
                   return (
                     <button
                       key={variant.id}
-                      onClick={() => isOwnProfile && handleCoinGalleryItemClick(variant, isMissedAndPast)}
+                      onClick={() => isOwnProfile && handleCoinGalleryItemClick(variant, isMissedAndPastCoin)}
                       className={cn(
                         "p-3 rounded-lg flex flex-col items-center w-28 min-h-[8.5rem] text-center shadow-sm transition-all justify-between",
                         "border hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary",
                         isCollected ? "bg-card border-primary/30" : "bg-muted/40 border-muted-foreground/20",
                         isOwnProfile ? "cursor-pointer hover:opacity-100" : (isCollected ? "cursor-default" : "cursor-not-allowed opacity-50"),
-                        !isCollected && !isMissedAndPast && "opacity-50 cursor-not-allowed",
-                        isMissedAndPast && isOwnProfile && "hover:border-accent cursor-pointer opacity-75 hover:opacity-100",
-                        isMissedAndPast && !isOwnProfile && "opacity-50 cursor-not-allowed"
+                        !isCollected && !isMissedAndPastCoin && "opacity-50 cursor-not-allowed",
+                        isMissedAndPastCoin && isOwnProfile && "hover:border-accent cursor-pointer opacity-75 hover:opacity-100",
+                        isMissedAndPastCoin && !isOwnProfile && "opacity-50 cursor-not-allowed"
                       )}
                       aria-label={`View ${variant.name}`}
-                      disabled={!isOwnProfile && !isCollected && !isMissedAndPast}
+                      disabled={!isOwnProfile && !isCollected && !isMissedAndPastCoin}
                     >
                       <CoinIcon className={cn(
                         "h-12 w-12 mb-1.5 flex-shrink-0",
@@ -312,8 +322,8 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                         )}>
                           {variant.name}
                         </span>
-                        {isMissedAndPast && <span className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">(Missed)</span>}
-                        {!isCollected && !isMissedAndPast && variant.dayNumber <= currentChallengeDay && <span className="text-xs text-muted-foreground/80 mt-0.5">(Not Collected)</span>}
+                        {isMissedAndPastCoin && <span className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">(Missed)</span>}
+                        {!isCollected && !isMissedAndPastCoin && variant.dayNumber <= currentChallengeDay && <span className="text-xs text-muted-foreground/80 mt-0.5">(Not Collected)</span>}
                       </div>
                     </button>
                   );
