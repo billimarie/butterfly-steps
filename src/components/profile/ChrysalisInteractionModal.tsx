@@ -9,9 +9,9 @@ import { ShellIcon, RefreshCw, Gift, CheckCircle, XCircle, User as UserIcon, Foo
 import { cn } from '@/lib/utils';
 import { getDailyStepForDate, getTodaysDateClientLocal } from '@/lib/firebaseService';
 import type { DailyStep } from '@/types';
+import { CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
 import { useRouter } from 'next/navigation';
 
-const CHRYSALIS_AVATAR_IDENTIFIER = 'lucide:shell';
 
 export default function ChrysalisInteractionModal() {
   const {
@@ -162,11 +162,11 @@ export default function ChrysalisInteractionModal() {
       );
     } else if (!stepsLoggedToday) {
       statusText = "Log your steps for today to unlock your Chrysalis Coin!";
-      IconComponentForStatus = Footprints; // Changed from XCircle to Footprints
+      IconComponentForStatus = Footprints; 
       iconColorForStatus = "text-destructive";
       finalButton = (
         <Button className="w-full sm:w-auto" size="lg" disabled={true}>
-            <XCircle className="mr-2 h-5 w-5" /> {/* Or Footprints for consistency */}
+            <XCircle className="mr-2 h-5 w-5" /> 
             Log Steps to Unlock
         </Button>
       );

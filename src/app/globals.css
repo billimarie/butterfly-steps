@@ -147,6 +147,40 @@
     50% { transform: translateX(0) rotate(0deg) scale(1); }
     75% { transform: translateX(2px) rotate(3deg) scale(1.05); }
   }
+
+  .animate-catti-bubble-float {
+    animation: catti-bubble-float 3s ease-in-out infinite;
+  }
+
+  @keyframes catti-bubble-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .group-hover\\:animate-catti-bubble-pulse .catti-bubble-interactive:hover,
+  .catti-bubble-interactive:focus-visible { /* Added focus-visible for accessibility */
+    animation: catti-bubble-pulse 0.8s ease-in-out infinite;
+  }
+
+  @keyframes catti-bubble-pulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4); }
+    50% { transform: scale(1.05); box-shadow: 0 0 10px 5px hsl(var(--primary) / 0.2); }
+  }
+  
+  .animate-chrysalis-glow {
+    animation: chrysalis-glow 2.5s infinite ease-in-out;
+  }
+
+  @keyframes chrysalis-glow {
+    0%, 100% {
+      transform: scale(1);
+      filter: drop-shadow(0 0 5px hsl(var(--primary) / 0.5)) drop-shadow(0 0 10px hsl(var(--primary) / 0.3));
+    }
+    50% {
+      transform: scale(1.05);
+      filter: drop-shadow(0 0 10px hsl(var(--primary) / 0.7)) drop-shadow(0 0 20px hsl(var(--primary) / 0.5));
+    }
+  }
 }
 
 /* Mariposa Animation by Monet Fort : https://codepen.io/mfort/pen/yLqRXoN */
@@ -296,3 +330,4 @@
     transform: translateY(-40vh);
   }
 }
+

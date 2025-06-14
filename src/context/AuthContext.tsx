@@ -6,6 +6,7 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 import { auth, db } from '@/lib/firebase'; // Import db
 import { onAuthStateChanged, signOut as firebaseSignOut, updateProfile } from 'firebase/auth';
 import type { UserProfile, AuthContextType, StreakUpdateResults, BadgeData, StreakModalViewContext } from '@/types';
+import { CHRYSALIS_AVATAR_IDENTIFIER } from '@/types'; // Import constant
 import { 
   getUserProfile, 
   updateUserStreakOnLogin, 
@@ -18,8 +19,6 @@ import { useToast } from '@/hooks/use-toast';
 import { arrayUnion, doc, updateDoc } from 'firebase/firestore'; 
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const CHRYSALIS_AVATAR_IDENTIFIER = 'lucide:shell';
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -154,19 +153,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     const uid = auth.currentUser.uid;
     try {
+      // Optimistically update local Firebase Auth user state first for Navbar
+      if (auth.currentUser) {
+        setUser(prevUser => prevUser ? { ...auth.currentUser!, photoURL: CHRYSALIS_AVATAR_IDENTIFIER } : { ...auth.currentUser!, photoURL: CHRYSALIS_AVATAR_IDENTIFIER });
+      }
+      // Optimistically update local profile state for photoURL as well
+      setUserProfile(prevProfile => {
+        if (!prevProfile) return null;
+        return { ...prevProfile, photoURL: CHRYSALIS_AVATAR_IDENTIFIER };
+      });
+      
       await updateProfile(auth.currentUser, { photoURL: CHRYSALIS_AVATAR_IDENTIFIER });
       await updateUserProfileInFirestore(uid, { photoURL: CHRYSALIS_AVATAR_IDENTIFIER });
       
-      if (auth.currentUser) {
-         setUser(prevUser => prevUser ? { ...auth.currentUser! } : auth.currentUser);
-      }
-      await fetchUserProfile(uid, false); 
-
       toast({ title: 'Chrysalis Activated!', description: 'Your profile icon has been updated.' });
       internalSetShowStreakModal(false);
+
+      // Fetch from server to ensure consistency
+      await fetchUserProfile(uid, false); 
+
     } catch (e) {
       console.error('Failed to update profile picture:', e);
       toast({ title: 'Update Failed', description: (e as Error).message, variant: 'destructive' });
+      await fetchUserProfile(uid, false); // Re-fetch to get actual server state on error
     }
   };
 
@@ -178,30 +187,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const uid = user.uid;
     const currentDate = getTodaysDateClientLocal();
 
+    if (userProfile.chrysalisCoinDates?.includes(currentDate)) {
+      toast({ title: 'Already Collected', description: "You've already collected your chrysalis coin for today." });
+      internalSetShowStreakModal(false);
+      return;
+    }
+
+    const dailyStepLog = await getDailyStepForDate(uid, currentDate);
+    if (!dailyStepLog || dailyStepLog.steps === 0) {
+      toast({ title: 'Log Steps First', description: "You need to log your steps for today before collecting a coin.", variant: "default" });
+      return;
+    }
+
     try {
-      if (userProfile.chrysalisCoinDates?.includes(currentDate)) {
-        toast({ title: 'Already Collected', description: "You've already collected your chrysalis coin for today." });
-        return;
-      }
-
-      const dailyStepLog = await getDailyStepForDate(uid, currentDate);
-      if (!dailyStepLog || dailyStepLog.steps === 0) {
-        toast({ title: 'Log Steps First', description: "You need to log your steps for today before collecting a coin.", variant: "default" });
-        return;
-      }
-
       const userDocRef = doc(db, "users", uid);
       await updateDoc(userDocRef, {
         chrysalisCoinDates: arrayUnion(currentDate)
       });
 
-      await fetchUserProfile(uid, false); 
+      // Optimistic local state update
+      setUserProfile(prevProfile => {
+        if (!prevProfile) return null;
+        const existingDates = prevProfile.chrysalisCoinDates || [];
+        const newCoinDates = existingDates.includes(currentDate) ? existingDates : [...existingDates, currentDate];
+        return { ...prevProfile, chrysalisCoinDates: newCoinDates };
+      });
+
       toast({ title: 'Chrysalis Coin Collected!', description: "Way to go! Your coin has been added to your profile." });
       internalSetShowStreakModal(false);
+
+      // Fetch from server to ensure consistency
+      await fetchUserProfile(uid, false); 
 
     } catch (e) {
       console.error('Failed to collect chrysalis coin:', e);
       toast({ title: 'Collection Failed', description: (e as Error).message, variant: 'destructive' });
+      await fetchUserProfile(uid, false); // Re-fetch to get actual server state on error
     }
   };
 

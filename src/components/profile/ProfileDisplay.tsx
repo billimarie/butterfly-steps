@@ -17,7 +17,7 @@ import { useState, useEffect, useCallback } from 'react';
 import StepSubmissionForm from '@/components/dashboard/StepSubmissionForm';
 import { Separator } from '@/components/ui/separator';
 import type { UserProfile } from '@/types';
-import { CHALLENGE_DURATION_DAYS } from '@/types'; 
+import { CHALLENGE_DURATION_DAYS, CHRYSALIS_AVATAR_IDENTIFIER } from '@/types'; 
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import BadgeDetailModal from '@/components/profile/BadgeDetailModal';
@@ -131,8 +131,23 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   return (
     <>
       <Card className="w-full max-w-2xl mx-auto shadow-xl">
-        <CardHeader className="mb-6">
-          <div className="flex justify-between items-start">
+        <CardHeader className="text-center"> {/* Centered CardHeader for avatar */}
+          {profileData.photoURL === CHRYSALIS_AVATAR_IDENTIFIER && (
+            <div className="flex justify-center mb-6"> {/* Increased bottom margin */}
+              <button
+                onClick={handleChrysalisAvatarClick}
+                className={cn(
+                  "p-2 rounded-full focus:outline-none focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-card",
+                  isOwnProfile ? "cursor-pointer" : "cursor-default" 
+                )}
+                aria-label={isOwnProfile ? "Change Chrysalis Avatar" : "Golden Chrysalis Avatar"}
+                disabled={!isOwnProfile}
+              >
+                <ShellIcon className="h-32 w-32 md:h-36 md:w-36 text-primary animate-chrysalis-glow" data-ai-hint="chrysalis shell gold" />
+              </button>
+            </div>
+          )}
+          <div className="flex justify-between items-start text-left"> {/* Original header content alignment */}
             <div>
               <CardTitle className="font-headline text-3xl flex items-center">
                 <User className="mr-3 h-8 w-8 text-primary" />
@@ -178,7 +193,6 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
 
           <div className="space-y-3">
             <h3 className="text-lg font-semibold flex items-center"><Layers className="mr-2 h-5 w-5 text-primary" /> Chrysalis Coins</h3>
-            <p className="text-sm text-muted-foreground">Log your steps once a day, and collect them all</p>
             <div className="flex items-center space-x-2">
               <ShellIcon className="h-8 w-8 text-primary" data-ai-hint="chrysalis shell gold"/>
               <p className="text-xl">
@@ -190,15 +204,15 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
             )}
             {collectedCoinsCount > 0 && (
               <div className="flex flex-wrap gap-1 mt-2 items-center">
-                {Array.from({ length: Math.min(collectedCoinsCount, 5) }).map((_, i) => (
+                {Array.from({ length: Math.min(collectedCoinsCount, 7) }).map((_, i) => ( // Show up to 7, for example
                   <ShellIcon key={`coin-display-${i}`} className="h-5 w-5 text-yellow-500" data-ai-hint="chrysalis shell gold"/>
                 ))}
-                {collectedCoinsCount > 5 && <span className="text-sm text-muted-foreground self-end">...and more!</span>}
+                {collectedCoinsCount > 7 && <span className="text-sm text-muted-foreground self-end">...and more!</span>}
               </div>
             )}
-            {isOwnProfile && (
+            {isOwnProfile && profileData.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER && collectedCoinsCount > 0 && ( // Show only if avatar is not chrysalis but coins collected
                  <Button variant="outline" size="sm" onClick={handleChrysalisAvatarClick} className="mt-2">
-                    <Replace className="mr-2 h-4 w-4" /> Change Chrysalis Avatar
+                    <Replace className="mr-2 h-4 w-4" /> Set Chrysalis Avatar
                 </Button>
             )}
           </div>

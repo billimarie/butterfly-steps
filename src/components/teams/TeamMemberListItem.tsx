@@ -3,11 +3,11 @@
 
 import type { UserProfile } from '@/types';
 import Link from 'next/link';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // Added AvatarImage
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; 
 import { Card, CardHeader } from '@/components/ui/card';
-import { Footprints, Crown as CreatorCrownIcon, Medal, Shell } from 'lucide-react'; // Added Shell
+import { Footprints, Crown as CreatorCrownIcon, Medal, Shell } from 'lucide-react'; 
+import { CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
 
-const CHRYSALIS_AVATAR_IDENTIFIER = 'lucide:shell';
 
 const getInitials = (name: string | null | undefined) => {
     if (!name) return 'U';
