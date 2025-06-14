@@ -80,6 +80,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
 
   const [isCoinDetailModalOpen, setIsCoinDetailModalOpen] = useState(false);
   const [selectedCoinForModal, setSelectedCoinForModal] = useState<ChrysalisVariantData | null>(null);
+  const [isViewingMissedCoin, setIsViewingMissedCoin] = useState(false);
 
 
   const progressPercentage = profileData.stepGoal ? (profileData.currentSteps / profileData.stepGoal) * 100 : 0;
@@ -111,8 +112,9 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     }
   };
 
-  const handleCoinGalleryItemClick = (variant: ChrysalisVariantData) => {
+  const handleCoinGalleryItemClick = (variant: ChrysalisVariantData, isMissedAndPastCoin: boolean) => {
     setSelectedCoinForModal(variant);
+    setIsViewingMissedCoin(isMissedAndPastCoin);
     setIsCoinDetailModalOpen(true);
   };
 
@@ -132,26 +134,24 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     if (profileData.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER) return null;
 
     let variantToShow: ChrysalisVariantData | undefined;
-    if (isOwnProfile) {
-      variantToShow = profileData.activeChrysalisThemeId
-        ? getChrysalisVariantById(profileData.activeChrysalisThemeId)
-        : getChrysalisVariantByDay(1); // Default to Golden if own profile has no theme set
-    } else {
-      variantToShow = profileData.activeChrysalisThemeId
-        ? getChrysalisVariantById(profileData.activeChrysalisThemeId)
-        : getChrysalisVariantByDay(1); // Default to Golden for others if no theme set
+     if (profileData.activeChrysalisThemeId) {
+        variantToShow = getChrysalisVariantById(profileData.activeChrysalisThemeId);
+    }
+    if (!variantToShow) {
+        variantToShow = getChrysalisVariantByDay(1); // Default to Golden if no theme set or not found
     }
     
     const IconComponent = variantToShow?.icon || ShellIconOriginal;
-    const iconColor = isOwnProfile 
-      ? { color: `hsl(var(--primary))` } // Uses viewer's theme for own profile interactive avatar
-      : variantToShow && variantToShow.themePrimaryHSL 
-        ? { color: `hsl(${variantToShow.themePrimaryHSL})` } // Uses viewed user's theme for their static avatar
-        : { color: `hsl(var(--primary))` }; // Fallback for viewed user if their theme is somehow missing
+    
+    const iconColorStyle = isOwnProfile
+      ? { color: `hsl(var(--primary))` } 
+      : variantToShow?.themePrimaryHSL 
+        ? { color: `hsl(${variantToShow.themePrimaryHSL})` }
+        : { color: 'hsl(var(--muted-foreground))' }; // Fallback color for viewed user if somehow no themePrimaryHSL
 
     const iconClassName = cn(
       "h-32 w-32 md:h-36 md:w-36",
-      isOwnProfile ? "text-primary animate-chrysalis-glow" : "opacity-90"
+      isOwnProfile ? "animate-chrysalis-glow" : "opacity-90"
     );
     
     const buttonAriaLabel = isOwnProfile 
@@ -169,7 +169,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
           aria-label={buttonAriaLabel}
           disabled={!isOwnProfile}
         >
-          <IconComponent className={iconClassName} style={iconColor} data-ai-hint={variantToShow?.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"} />
+          <IconComponent className={iconClassName} style={iconColorStyle} data-ai-hint={variantToShow?.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"} />
         </button>
       </div>
     );
@@ -247,22 +247,26 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                   const challengeDateForDay = getChallengeDateStringByDayNumber(dayNum, challengeYear);
                   const isCollected = profileData.chrysalisCoinDates?.includes(challengeDateForDay) ?? false;
                   const CoinIcon = variant.icon || ShellIconOriginal;
+                  const isMissedAndPast = !isCollected && variant.dayNumber < currentChallengeDay;
 
                   return (
                     <button
                       key={variant.id}
-                      onClick={() => (isOwnProfile || isCollected) && handleCoinGalleryItemClick(variant)}
+                      onClick={() => isOwnProfile && handleCoinGalleryItemClick(variant, isMissedAndPast)}
                       className={cn(
-                        "p-3 rounded-lg flex flex-col items-center w-28 min-h-[7.5rem] text-center shadow-sm transition-all justify-between", 
+                        "p-3 rounded-lg flex flex-col items-center w-28 min-h-[8.5rem] text-center shadow-sm transition-all justify-between", 
                         "border hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary",
-                        isCollected ? "bg-card border-primary/30" : "bg-muted/40 border-muted-foreground/20 opacity-60",
-                        (isOwnProfile || isCollected) ? "cursor-pointer hover:opacity-100" : "cursor-not-allowed"
+                        isCollected ? "bg-card border-primary/30" : "bg-muted/40 border-muted-foreground/20",
+                        isOwnProfile ? "cursor-pointer hover:opacity-100" : (isCollected ? "cursor-default" : "cursor-not-allowed opacity-50"),
+                        !isCollected && !isMissedAndPast && "opacity-50 cursor-not-allowed", // Future, uncollected
+                        isMissedAndPast && isOwnProfile && "hover:border-accent cursor-pointer opacity-75 hover:opacity-100", // Missed, own profile
+                        isMissedAndPast && !isOwnProfile && "opacity-50 cursor-not-allowed" // Missed, other's profile
                       )}
                       aria-label={`View ${variant.name}`}
-                      disabled={!isOwnProfile && !isCollected} 
+                      disabled={!isOwnProfile && !isCollected && !isMissedAndPast} 
                     >
                       <CoinIcon className={cn(
-                        "h-10 w-10 mb-1.5 flex-shrink-0", 
+                        "h-12 w-12 mb-1.5 flex-shrink-0", 
                         isCollected ? "text-primary" : "text-muted-foreground"
                       )} />
                       <div className="flex-grow flex flex-col justify-end w-full">
@@ -272,7 +276,8 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                         )}>
                           {variant.name}
                         </span>
-                        {!isCollected && <span className="text-xs text-muted-foreground/80 mt-0.5">(Missed)</span>}
+                        {isMissedAndPast && <span className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">(Missed)</span>}
+                        {!isCollected && !isMissedAndPast && variant.dayNumber <= currentChallengeDay && <span className="text-xs text-muted-foreground/80 mt-0.5">(Not Collected)</span>}
                       </div>
                     </button>
                   );
@@ -395,6 +400,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
           isOpen={isCoinDetailModalOpen}
           onOpenChange={setIsCoinDetailModalOpen}
           coinVariant={selectedCoinForModal}
+          isMissedAndPast={isViewingMissedCoin}
         />
       )}
     </>

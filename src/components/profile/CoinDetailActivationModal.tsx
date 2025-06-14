@@ -6,18 +6,21 @@ import { Button } from '@/components/ui/button';
 import type { ChrysalisVariantData } from '@/lib/chrysalisVariants';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
-import { Palette, RefreshCw, Shell, CheckCircle } from 'lucide-react';
+import { Palette, RefreshCw, Shell, CheckCircle, Gift, ExternalLink } from 'lucide-react';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation'; // Import useRouter
 
 interface CoinDetailActivationModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   coinVariant: ChrysalisVariantData | null;
+  isMissedAndPast: boolean;
 }
 
-export default function CoinDetailActivationModal({ isOpen, onOpenChange, coinVariant }: CoinDetailActivationModalProps) {
+export default function CoinDetailActivationModal({ isOpen, onOpenChange, coinVariant, isMissedAndPast }: CoinDetailActivationModalProps) {
   const { activateThemeFromCollectedCoin, userProfile } = useAuth();
   const [isActivating, setIsActivating] = useState(false);
+  const router = useRouter(); // Initialize useRouter
 
   if (!coinVariant) return null;
 
@@ -29,6 +32,11 @@ export default function CoinDetailActivationModal({ isOpen, onOpenChange, coinVa
     setIsActivating(true);
     await activateThemeFromCollectedCoin(coinVariant);
     setIsActivating(false);
+    onOpenChange(false);
+  };
+
+  const handleNavigateToDonatePage = () => {
+    router.push('/donate'); // Navigate to the internal /donate page
     onOpenChange(false);
   };
 
@@ -44,15 +52,55 @@ export default function CoinDetailActivationModal({ isOpen, onOpenChange, coinVa
     color: `hsl(${coinVariant.themePrimaryForegroundHSL})`,
   };
 
-  const dynamicActivateButtonStyle: React.CSSProperties = {
+  const dynamicActionButtonStyle: React.CSSProperties = {
     backgroundColor: `hsl(${coinVariant.themePrimaryHSL})`,
     color: `hsl(${coinVariant.themePrimaryForegroundHSL})`,
-    borderColor: `hsl(${coinVariant.themePrimaryHSL})` // For consistency if it has a border
+    borderColor: `hsl(${coinVariant.themePrimaryHSL})`
   };
-  const dynamicActivateButtonHoverStyle: React.CSSProperties = {
-     // Slightly darken or adjust the primary HSL for hover, ensuring L (lightness) is reduced
+  const dynamicActionButtonHoverStyle: React.CSSProperties = {
     backgroundColor: `hsl(${coinVariant.themePrimaryHSL.split(' ')[0]} ${coinVariant.themePrimaryHSL.split(' ')[1]} ${Math.max(0, parseFloat(coinVariant.themePrimaryHSL.split(' ')[2]) - 10)}%)`,
   };
+
+  let ActionButton: React.ReactNode;
+  if (isMissedAndPast) {
+    ActionButton = (
+      <Button 
+        onClick={handleNavigateToDonatePage} 
+        disabled={isActivating}
+        className="order-1 sm:order-2 w-full sm:w-auto transition-colors duration-150 ease-in-out"
+        style={dynamicActionButtonStyle}
+        onMouseEnter={e => Object.assign(e.currentTarget.style, dynamicActionButtonHoverStyle)}
+        onMouseLeave={e => Object.assign(e.currentTarget.style, dynamicActionButtonStyle)}
+      >
+        <Gift className="mr-2 h-4 w-4" /> Donate Your Missed Day
+      </Button>
+    );
+  } else if (isCurrentlyActive) {
+    ActionButton = (
+      <div className="flex items-center text-sm font-semibold order-1 sm:order-2" style={{color: `hsl(${coinVariant.themePrimaryHSL})`}}>
+        <CheckCircle className="mr-2 h-5 w-5" />
+        Theme is Active
+      </div>
+    );
+  } else {
+    ActionButton = (
+      <Button 
+        onClick={handleActivate} 
+        disabled={isActivating} 
+        className="order-1 sm:order-2 w-full sm:w-auto transition-colors duration-150 ease-in-out"
+        style={isActivating ? {} : dynamicActionButtonStyle}
+        onMouseEnter={e => {
+          if(!isActivating) Object.assign(e.currentTarget.style, dynamicActionButtonHoverStyle);
+        }}
+        onMouseLeave={e => {
+           if(!isActivating) Object.assign(e.currentTarget.style, dynamicActionButtonStyle);
+        }}
+      >
+        {isActivating ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Palette className="mr-2 h-4 w-4" />}
+        Activate Theme
+      </Button>
+    );
+  }
 
 
   return (
@@ -78,31 +126,9 @@ export default function CoinDetailActivationModal({ isOpen, onOpenChange, coinVa
         </div>
         <DialogFooter className="px-6 py-4 bg-muted/20 border-t rounded-b-lg flex flex-col sm:flex-row items-center justify-center gap-4">
           <Button onClick={() => onOpenChange(false)} variant="outline" className="order-2 sm:order-1 w-full sm:w-auto">Close</Button>
-          {isCurrentlyActive ? (
-            <div className="flex items-center text-sm font-semibold order-1 sm:order-2" style={{color: `hsl(${coinVariant.themePrimaryHSL})`}}>
-              <CheckCircle className="mr-2 h-5 w-5" />
-              Theme is Active
-            </div>
-          ) : (
-            <Button 
-              onClick={handleActivate} 
-              disabled={isActivating} 
-              className="order-1 sm:order-2 w-full sm:w-auto transition-colors duration-150 ease-in-out"
-              style={isActivating ? {} : dynamicActivateButtonStyle}
-              onMouseEnter={e => {
-                if(!isActivating) Object.assign(e.currentTarget.style, dynamicActivateButtonHoverStyle);
-              }}
-              onMouseLeave={e => {
-                 if(!isActivating) Object.assign(e.currentTarget.style, dynamicActivateButtonStyle);
-              }}
-            >
-              {isActivating ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Palette className="mr-2 h-4 w-4" />}
-              Activate Theme
-            </Button>
-          )}
+          {ActionButton}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
