@@ -20,7 +20,7 @@ export const ALL_CHRYSALIS_VARIANTS: ChrysalisVariantData[] = [
   {
     id: 'coin_day_1', // June 21
     dayNumber: 1,
-    name: 'Solstice Sun Shell',
+    name: 'Golden Chrysalis',
     description: 'Collected on the first day, basking in the summer solstice light. A bright start!',
     themePrimaryHSL: '39 100% 50%', // Saturated Orange (App Default Primary)
     themePrimaryForegroundHSL: '0 0% 100%', // White (App Default Primary Foreground)

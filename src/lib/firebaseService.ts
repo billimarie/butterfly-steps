@@ -82,7 +82,7 @@ export function getTodaysDateClientLocal(): string {
   // 3. Uncomment the line below and update the string to "YYYY-MM-DD" for that date.
   //    Example: For Day 1 (June 21st, 2024), use "2024-06-21".
   //             For Day 5 (June 25th, 2024), use "2024-06-25".
-  return "2024-06-30"; // Test specific date
+  return "2024-06-29"; // Test specific date
 
   // ORIGINAL IMPLEMENTATION (Revert to this after testing):
   /* const now = new Date(); // Current moment in client's local timezone

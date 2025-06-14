@@ -29,18 +29,41 @@ export default function CoinDetailActivationModal({ isOpen, onOpenChange, coinVa
     setIsActivating(true);
     await activateThemeFromCollectedCoin(coinVariant);
     setIsActivating(false);
-    onOpenChange(false); // The AuthContext function will also close the main modal
+    onOpenChange(false);
   };
+
+  const dynamicHeaderStyle: React.CSSProperties = {
+    background: `linear-gradient(to bottom right, hsl(${coinVariant.themePrimaryHSL}), hsl(${coinVariant.themeAccentHSL}))`,
+  };
+
+  const dynamicIconStyle: React.CSSProperties = {
+    color: `hsl(${coinVariant.themePrimaryHSL})`,
+  };
+  
+  const dynamicTitleStyle: React.CSSProperties = {
+    color: `hsl(${coinVariant.themePrimaryForegroundHSL})`,
+  };
+
+  const dynamicActivateButtonStyle: React.CSSProperties = {
+    backgroundColor: `hsl(${coinVariant.themePrimaryHSL})`,
+    color: `hsl(${coinVariant.themePrimaryForegroundHSL})`,
+    borderColor: `hsl(${coinVariant.themePrimaryHSL})` // For consistency if it has a border
+  };
+  const dynamicActivateButtonHoverStyle: React.CSSProperties = {
+     // Slightly darken or adjust the primary HSL for hover, ensuring L (lightness) is reduced
+    backgroundColor: `hsl(${coinVariant.themePrimaryHSL.split(' ')[0]} ${coinVariant.themePrimaryHSL.split(' ')[1]} ${Math.max(0, parseFloat(coinVariant.themePrimaryHSL.split(' ')[2]) - 10)}%)`,
+  };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md p-0 overflow-hidden shadow-2xl rounded-lg">
-        <DialogHeader className={cn(
-            "p-6 pb-4 text-center items-center justify-center rounded-t-lg",
-            "bg-gradient-to-br from-secondary/80 via-secondary/70 to-accent/60"
-        )}>
-          <CoinIcon className={cn("!h-20 !w-20 mb-3", "text-primary")} data-ai-hint={coinVariant.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"}/>
-          <DialogTitle className="font-headline text-3xl text-secondary-foreground">
+        <DialogHeader 
+            className="p-6 pb-4 text-center items-center justify-center rounded-t-lg"
+            style={dynamicHeaderStyle}
+        >
+          <CoinIcon className={cn("!h-20 !w-20 mb-3")} style={dynamicTitleStyle} data-ai-hint={coinVariant.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"}/>
+          <DialogTitle className="font-headline text-3xl" style={dynamicTitleStyle}>
             {coinVariant.name}
           </DialogTitle>
         </DialogHeader>
@@ -48,17 +71,31 @@ export default function CoinDetailActivationModal({ isOpen, onOpenChange, coinVa
           <DialogDescription className="text-muted-foreground text-base">
             {coinVariant.description}
           </DialogDescription>
-          <p className="text-xs text-muted-foreground">Challenge Day: {coinVariant.dayNumber}</p>
+          <div className="p-3 bg-muted/30 rounded-md border">
+            <p className="text-sm font-semibold text-foreground">Challenge Day:</p>
+            <p className="text-sm text-muted-foreground">{coinVariant.dayNumber}</p>
+          </div>
         </div>
         <DialogFooter className="px-6 py-4 bg-muted/20 border-t rounded-b-lg flex flex-col sm:flex-row items-center justify-center gap-4">
           <Button onClick={() => onOpenChange(false)} variant="outline" className="order-2 sm:order-1 w-full sm:w-auto">Close</Button>
           {isCurrentlyActive ? (
-            <div className="flex items-center text-sm text-green-600 font-semibold order-1 sm:order-2">
+            <div className="flex items-center text-sm font-semibold order-1 sm:order-2" style={{color: `hsl(${coinVariant.themePrimaryHSL})`}}>
               <CheckCircle className="mr-2 h-5 w-5" />
               Theme is Active
             </div>
           ) : (
-            <Button onClick={handleActivate} disabled={isActivating} className="order-1 sm:order-2 w-full sm:w-auto">
+            <Button 
+              onClick={handleActivate} 
+              disabled={isActivating} 
+              className="order-1 sm:order-2 w-full sm:w-auto transition-colors duration-150 ease-in-out"
+              style={isActivating ? {} : dynamicActivateButtonStyle}
+              onMouseEnter={e => {
+                if(!isActivating) Object.assign(e.currentTarget.style, dynamicActivateButtonHoverStyle);
+              }}
+              onMouseLeave={e => {
+                 if(!isActivating) Object.assign(e.currentTarget.style, dynamicActivateButtonStyle);
+              }}
+            >
               {isActivating ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Palette className="mr-2 h-4 w-4" />}
               Activate Theme
             </Button>
@@ -68,3 +105,4 @@ export default function CoinDetailActivationModal({ isOpen, onOpenChange, coinVa
     </Dialog>
   );
 }
+

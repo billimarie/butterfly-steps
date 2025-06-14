@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardHeader } from '@/components/ui/card';
 import { Footprints, Crown as CreatorCrownIcon, Medal, Shell } from 'lucide-react'; 
 import { CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
+import { getChrysalisVariantById, getChrysalisVariantByDay } from '@/lib/chrysalisVariants';
 
 
 const getInitials = (name: string | null | undefined) => {
@@ -35,7 +36,12 @@ export default function TeamMemberListItem({ member, isCreator, index }: TeamMem
 
   const renderAvatarContent = () => {
     if (member.photoURL === CHRYSALIS_AVATAR_IDENTIFIER) {
-      return <Shell className="h-full w-full p-1.5 text-primary" data-ai-hint="chrysalis shell gold" />;
+      const activeVariant = member.activeChrysalisThemeId 
+        ? getChrysalisVariantById(member.activeChrysalisThemeId) 
+        : getChrysalisVariantByDay(1); // Default to Golden Chrysalis (Day 1)
+      const IconComponent = activeVariant?.icon || Shell;
+      const iconStyle = activeVariant?.themePrimaryHSL ? { color: `hsl(${activeVariant.themePrimaryHSL})` } : {};
+      return <IconComponent className="h-full w-full p-1.5" style={iconStyle} data-ai-hint={activeVariant?.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"} />;
     }
     return (
       <>

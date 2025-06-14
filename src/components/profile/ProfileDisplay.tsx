@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
-import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIconLucide, Users as TeamIcon, LogOut, PlusCircle, CalendarDays, EggIcon, ShellIcon as ShellIconLucideOriginal, SparklesIcon, Layers, Replace, Palette } from 'lucide-react';
+import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIconLucide, Users as TeamIcon, LogOut, PlusCircle, CalendarDays, EggIcon, Shell as ShellIconOriginal, SparklesIcon, Layers, Replace, Palette } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ALL_BADGES, type BadgeData } from '@/lib/badges';
@@ -21,8 +21,8 @@ import { CHALLENGE_DURATION_DAYS, CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import BadgeDetailModal from '@/components/profile/BadgeDetailModal';
-import { getChrysalisVariantByDay } from '@/lib/chrysalisVariants';
-import CoinDetailActivationModal from './CoinDetailActivationModal'; // New Import
+import { getChrysalisVariantByDay, getChrysalisVariantById } from '@/lib/chrysalisVariants';
+import CoinDetailActivationModal from './CoinDetailActivationModal'; 
 
 const WormIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -61,7 +61,7 @@ interface StreakAchievement {
 const STREAK_ACHIEVEMENTS: StreakAchievement[] = [
   { id: 'egg', name: 'Persistent Egg', requiredStreak: 30, icon: EggIcon, description: 'Logged in for 30 consecutive days! Hatching potential!' },
   { id: 'caterpillar', name: 'Curious Caterpillar', requiredStreak: 60, icon: WormIcon, description: '60 day streak! Munching through the days!' },
-  { id: 'chrysalis', name: 'Committed Chrysalis', requiredStreak: 90, icon: ShellIconLucideOriginal, description: '90 days of consistency! Transformation is near.' },
+  { id: 'chrysalis', name: 'Committed Chrysalis', requiredStreak: 90, icon: ShellIconOriginal, description: '90 days of consistency! Transformation is near.' },
   { id: 'butterfly', name: 'Monarch Dedication', requiredStreak: 133, icon: SparklesIcon, description: 'Logged in every day of the challenge until Halloween! True Monarch Spirit!' },
 ];
 
@@ -128,26 +128,59 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   const currentChallengeDay = getChallengeDayNumberFromDateString(getTodaysDateClientLocal());
   const challengeYear = new Date(profileData.lastLoginTimestamp ? profileData.lastLoginTimestamp.toDate() : Date.now()).getFullYear();
 
+  const MainChrysalisAvatar = () => {
+    if (profileData.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER) return null;
+
+    let variantToShow: ChrysalisVariantData | undefined;
+    if (isOwnProfile) {
+      variantToShow = profileData.activeChrysalisThemeId
+        ? getChrysalisVariantById(profileData.activeChrysalisThemeId)
+        : getChrysalisVariantByDay(1); // Default to Golden if own profile has no theme set
+    } else {
+      variantToShow = profileData.activeChrysalisThemeId
+        ? getChrysalisVariantById(profileData.activeChrysalisThemeId)
+        : getChrysalisVariantByDay(1); // Default to Golden for others if no theme set
+    }
+    
+    const IconComponent = variantToShow?.icon || ShellIconOriginal;
+    const iconColor = isOwnProfile 
+      ? { color: `hsl(var(--primary))` } // Uses viewer's theme for own profile interactive avatar
+      : variantToShow && variantToShow.themePrimaryHSL 
+        ? { color: `hsl(${variantToShow.themePrimaryHSL})` } // Uses viewed user's theme for their static avatar
+        : { color: `hsl(var(--primary))` }; // Fallback for viewed user if their theme is somehow missing
+
+    const iconClassName = cn(
+      "h-32 w-32 md:h-36 md:w-36",
+      isOwnProfile ? "text-primary animate-chrysalis-glow" : "opacity-90"
+    );
+    
+    const buttonAriaLabel = isOwnProfile 
+      ? "Change Chrysalis Avatar or Theme" 
+      : `${variantToShow?.name || 'Chrysalis'} Avatar`;
+
+    return (
+      <div className="flex justify-center mb-6">
+        <button
+          onClick={handleChrysalisAvatarClick}
+          className={cn(
+            "p-2 rounded-full focus:outline-none",
+            isOwnProfile ? "cursor-pointer focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-card" : "cursor-default"
+          )}
+          aria-label={buttonAriaLabel}
+          disabled={!isOwnProfile}
+        >
+          <IconComponent className={iconClassName} style={iconColor} data-ai-hint={variantToShow?.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"} />
+        </button>
+      </div>
+    );
+  };
+
 
   return (
     <>
       <Card className="w-full max-w-2xl mx-auto shadow-xl">
         <CardHeader className="text-center"> 
-          {profileData.photoURL === CHRYSALIS_AVATAR_IDENTIFIER && (
-            <div className="flex justify-center mb-6"> 
-              <button
-                onClick={handleChrysalisAvatarClick}
-                className={cn(
-                  "p-2 rounded-full focus:outline-none focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-card",
-                  isOwnProfile ? "cursor-pointer" : "cursor-default" 
-                )}
-                aria-label={isOwnProfile ? "Change Chrysalis Avatar or Theme" : "Chrysalis Avatar"}
-                disabled={!isOwnProfile}
-              >
-                <ShellIconLucideOriginal className="h-32 w-32 md:h-36 md:w-36 text-primary animate-chrysalis-glow" data-ai-hint="chrysalis shell gold" />
-              </button>
-            </div>
-          )}
+          <MainChrysalisAvatar />
           <div className="flex justify-between items-start text-left">
             <div>
               <CardTitle className="font-headline text-3xl flex items-center">
@@ -203,7 +236,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
               <Layers className="mr-2 h-5 w-5 text-primary" /> Chrysalis Coins Gallery
             </h3>
             <p className="text-sm text-muted-foreground">
-              Collected: <span className="font-bold text-accent">{collectedCoinsCount}</span> / {currentChallengeDay > 0 ? currentChallengeDay : CHALLENGE_DURATION_DAYS} days so far. Click a coin to view details or activate its theme.
+              Collected: <span className="font-bold text-accent">{collectedCoinsCount}</span> / {currentChallengeDay > 0 ? currentChallengeDay : CHALLENGE_DURATION_DAYS} days so far. {isOwnProfile ? "Click a coin to view details or activate its theme." : ""}
             </p>
             {currentChallengeDay > 0 ? (
               <div className="flex flex-wrap gap-x-3 gap-y-4 justify-center pt-2">
@@ -213,27 +246,28 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
 
                   const challengeDateForDay = getChallengeDateStringByDayNumber(dayNum, challengeYear);
                   const isCollected = profileData.chrysalisCoinDates?.includes(challengeDateForDay) ?? false;
-                  const CoinIcon = variant.icon || ShellIconLucideOriginal;
+                  const CoinIcon = variant.icon || ShellIconOriginal;
 
                   return (
                     <button
                       key={variant.id}
-                      onClick={() => handleCoinGalleryItemClick(variant)}
+                      onClick={() => (isOwnProfile || isCollected) && handleCoinGalleryItemClick(variant)}
                       className={cn(
-                        "p-3 rounded-lg flex flex-col items-center w-28 min-h-[7.5rem] text-center shadow-sm transition-all justify-between", // Ensure items have consistent height
+                        "p-3 rounded-lg flex flex-col items-center w-28 min-h-[7.5rem] text-center shadow-sm transition-all justify-between", 
                         "border hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary",
-                        isCollected ? "bg-card border-primary/30" : "bg-muted/40 border-muted-foreground/20 opacity-60 hover:opacity-100"
+                        isCollected ? "bg-card border-primary/30" : "bg-muted/40 border-muted-foreground/20 opacity-60",
+                        (isOwnProfile || isCollected) ? "cursor-pointer hover:opacity-100" : "cursor-not-allowed"
                       )}
                       aria-label={`View ${variant.name}`}
-                      disabled={!isOwnProfile && !isCollected} // Only allow clicking collected for others, any for self
+                      disabled={!isOwnProfile && !isCollected} 
                     >
                       <CoinIcon className={cn(
-                        "h-10 w-10 mb-1.5 flex-shrink-0", // Adjusted size and margin
+                        "h-10 w-10 mb-1.5 flex-shrink-0", 
                         isCollected ? "text-primary" : "text-muted-foreground"
                       )} />
                       <div className="flex-grow flex flex-col justify-end w-full">
                         <span className={cn(
-                          "text-xs font-medium block truncate w-full leading-tight", // Ensure text doesn't overflow and aligns well
+                          "text-xs font-medium block truncate w-full leading-tight", 
                           isCollected ? "text-foreground" : "text-muted-foreground"
                         )}>
                           {variant.name}
@@ -366,6 +400,3 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     </>
   );
 }
-    
-
-    

@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogOverlay, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ShellIcon as DefaultShellIcon, RefreshCw, Gift, CheckCircle, Footprints, User as UserIcon, Palette, Check } from 'lucide-react';
+import { ShellIcon as DefaultShellIcon, RefreshCw, Gift, CheckCircle, Footprints, Palette, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getDailyStepForDate, getTodaysDateClientLocal } from '@/lib/firebaseService';
 import type { DailyStep } from '@/types';
@@ -22,18 +22,18 @@ export default function ChrysalisInteractionModal() {
     setShowStreakModal,
     streakModalContext,
     setStreakModalContext,
-    activateChrysalisAsAvatar, // Used for default Golden Chrysalis activation
+    activateChrysalisAsAvatar, 
     collectDailyChrysalisCoin,
     setShowLogStepsModal,
-    justCollectedCoin,        // New state from context
-    activateThemeFromCollectedCoin, // New function from context
-    clearJustCollectedCoinDetails, // New function from context
+    justCollectedCoin,        
+    activateThemeFromCollectedCoin, 
+    clearJustCollectedCoinDetails, 
   } = useAuth();
 
   const router = useRouter();
-  const [isActivatingAvatar, setIsActivatingAvatar] = useState(false); // For default Golden Chrysalis
+  const [isActivatingAvatar, setIsActivatingAvatar] = useState(false); 
   const [isCollectingCoin, setIsCollectingCoin] = useState(false);
-  const [isActivatingTheme, setIsActivatingTheme] = useState(false); // For activating theme of justCollectedCoin
+  const [isActivatingTheme, setIsActivatingTheme] = useState(false); 
   const [stepsLoggedToday, setStepsLoggedToday] = useState<boolean | null>(null);
   const [coinAlreadyCollectedThisSession, setCoinAlreadyCollectedThisSession] = useState<boolean | null>(null);
 
@@ -46,10 +46,8 @@ export default function ChrysalisInteractionModal() {
       return;
     }
 
-    // If a coin was just collected, we don't need to re-check these statuses immediately.
     if (justCollectedCoin) return;
 
-    // Only check if context is 'login' and no coin was just collected.
     if (streakModalContext === 'login') {
       const alreadyCollectedInProfile = userProfile.chrysalisCoinDates?.includes(currentDate) || false;
       setCoinAlreadyCollectedThisSession(alreadyCollectedInProfile);
@@ -65,7 +63,7 @@ export default function ChrysalisInteractionModal() {
             setStepsLoggedToday(false);
           });
       } else {
-        setStepsLoggedToday(true); // If already collected, assume steps were logged
+        setStepsLoggedToday(true); 
       }
     } else {
       setStepsLoggedToday(null);
@@ -79,14 +77,14 @@ export default function ChrysalisInteractionModal() {
   }
 
   const handleDialogClose = (isOpen: boolean) => {
-    if (isActivatingAvatar || isCollectingCoin || isActivatingTheme) return; // Prevent close during async ops
+    if (isActivatingAvatar || isCollectingCoin || isActivatingTheme) return; 
 
     if (!isOpen) {
       if (justCollectedCoin) {
-        clearJustCollectedCoinDetails(); // Clear if user closes while viewing collected coin
+        clearJustCollectedCoinDetails(); 
       }
       setShowStreakModal(false);
-      setStreakModalContext('login'); // Reset context
+      setStreakModalContext('login'); 
     } else {
       setShowStreakModal(true);
     }
@@ -94,14 +92,13 @@ export default function ChrysalisInteractionModal() {
 
   const handleActivateDefaultChrysalis = async () => {
     setIsActivatingAvatar(true);
-    await activateChrysalisAsAvatar(); // Activates the default Golden Chrysalis
+    await activateChrysalisAsAvatar(); 
     setIsActivatingAvatar(false);
-    // activateChrysalisAsAvatar handles closing the modal
   };
 
   const handleCollectCoinAttempt = async () => {
     setIsCollectingCoin(true);
-    await collectDailyChrysalisCoin(); // This now sets justCollectedCoin, doesn't close modal
+    await collectDailyChrysalisCoin(); 
     setIsCollectingCoin(false);
   };
 
@@ -110,11 +107,9 @@ export default function ChrysalisInteractionModal() {
     setIsActivatingTheme(true);
     await activateThemeFromCollectedCoin(justCollectedCoin);
     setIsActivatingTheme(false);
-    // activateThemeFromCollectedCoin handles closing the modal and navigation
   };
 
   const handleLogStepsToUnlock = () => {
-    // No need to call clearJustCollectedCoinDetails() here as it should be null
     setShowStreakModal(false);
     setShowLogStepsModal(true, 'chrysalis');
   };
@@ -123,7 +118,6 @@ export default function ChrysalisInteractionModal() {
   const isLoadingCoinStatus = streakModalContext === 'login' && !justCollectedCoin && (stepsLoggedToday === null || coinAlreadyCollectedThisSession === null);
 
 
-  // View for displaying the details of a coin that was JUST collected
   if (justCollectedCoin) {
     const CollectedCoinIcon = justCollectedCoin.icon || DefaultShellIcon;
     return (
@@ -132,7 +126,7 @@ export default function ChrysalisInteractionModal() {
         <DialogContent className="sm:max-w-md p-0 overflow-hidden shadow-2xl rounded-lg">
           <DialogHeader className={cn(
             "p-6 pb-4 text-center items-center justify-center rounded-t-lg",
-            "bg-gradient-to-br from-secondary/80 via-secondary/70 to-accent/60" // Different gradient
+            "bg-gradient-to-br from-secondary/80 via-secondary/70 to-accent/60" 
           )}>
             <DialogTitle className="font-headline text-3xl text-secondary-foreground flex items-center justify-center">
               Coin Collected!
@@ -162,11 +156,10 @@ export default function ChrysalisInteractionModal() {
     );
   }
 
-  // Default/Initial views of the modal
   const renderActivateAvatarContent = () => {
     const isProfileAvatarView = streakModalContext === 'profile_avatar_select';
     let titleText = "Chrysalis Unlocked";
-    let displayedVariantData = getChrysalisVariantByDay(1); // Default to Golden Chrysalis
+    let displayedVariantData = getChrysalisVariantByDay(1); 
 
     if (isProfileAvatarView) {
       titleText = "Your Chrysalis Avatar";
@@ -203,10 +196,12 @@ export default function ChrysalisInteractionModal() {
       </div>
       
       {isProfileAvatarView ? (
-        // Footer for when modal is opened from profile avatar click
         <DialogFooter className="px-6 py-4 bg-muted/30 border-t rounded-b-lg flex justify-center items-center">
           {isDefaultGoldenThemeActive ? (
-            <p className="text-sm text-muted-foreground">The Golden Chrysalis theme is active.</p>
+             <div className="flex items-center text-sm font-semibold text-primary">
+                <Check className="mr-2 h-5 w-5" />
+                Golden Chrysalis Theme is Active
+            </div>
           ) : (
             <Button onClick={handleActivateDefaultChrysalis} className="w-full sm:w-auto" size="lg" disabled={isActivatingAvatar}>
               {isActivatingAvatar ? ( <><RefreshCw className="mr-2 h-5 w-5 animate-spin" /> Activating...</> ) : ( 'Activate Golden Chrysalis' )}
@@ -214,7 +209,6 @@ export default function ChrysalisInteractionModal() {
           )}
         </DialogFooter>
       ) : (
-        // Footer for initial login flow (before any coin collection for the day)
         (streakModalContext === 'login' && !isChrysalisAvatarCurrentlyActive) && (
           <DialogFooter className="px-6 py-4 bg-muted/30 border-t rounded-b-lg flex justify-center items-center">
             <Button onClick={handleActivateDefaultChrysalis} className="w-full sm:w-auto" size="lg" disabled={isActivatingAvatar}>
@@ -223,8 +217,7 @@ export default function ChrysalisInteractionModal() {
           </DialogFooter>
         )
       )}
-       {/* If avatar is already active during login context, show message or alternative */}
-      {streakModalContext === 'login' && isChrysalisAvatarCurrentlyActive && !isLoadingCoinStatus && !coinAlreadyCollectedThisSession && (
+      {streakModalContext === 'login' && isChrysalisAvatarCurrentlyActive && !isLoadingCoinStatus && !coinAlreadyCollectedThisSession && !justCollectedCoin && (
          <DialogFooter className="px-6 py-4 bg-muted/30 border-t rounded-b-lg flex justify-center items-center">
            <p className="text-sm text-muted-foreground">Golden Chrysalis avatar is active. Ready to collect today's coin?</p>
          </DialogFooter>
@@ -259,9 +252,9 @@ export default function ChrysalisInteractionModal() {
                 if (user?.uid) {
                    const variantForToday = getChrysalisVariantByDay(getChallengeDayNumber(currentDate));
                    if (variantForToday) {
-                     activateThemeFromCollectedCoin(variantForToday); // Allow re-activating today's theme
+                     activateThemeFromCollectedCoin(variantForToday); 
                    } else {
-                     setShowStreakModal(false); // Close if variant can't be found
+                     setShowStreakModal(false); 
                    }
                 } else {
                   setShowStreakModal(false);
@@ -284,7 +277,7 @@ export default function ChrysalisInteractionModal() {
             Log Steps to Unlock
         </Button>
       );
-    } else { // Can attempt coin collection
+    } else { 
       statusText = "Well done on logging your steps! Collect your Chrysalis Coin.";
       IconComponentForStatus = Gift;
       iconColorForStatus = "text-primary animate-pulse";
@@ -336,12 +329,12 @@ export default function ChrysalisInteractionModal() {
   function getChallengeDayNumber(dateString: string): number {
     const [year, month, day] = dateString.split('-').map(Number);
     const currentDate = new Date(Date.UTC(year, month - 1, day));
-    const challengeStartDate = new Date(Date.UTC(currentDate.getUTCFullYear(), 5, 21)); // June 21st
+    const challengeStartDate = new Date(Date.UTC(currentDate.getUTCFullYear(), 5, 21)); 
     if (currentDate < challengeStartDate) return 0;
     const diffTime = currentDate.getTime() - challengeStartDate.getTime();
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     const dayNumber = diffDays + 1;
-    return Math.max(1, Math.min(dayNumber, 133)); // Clamp between 1 and 133
+    return Math.max(1, Math.min(dayNumber, 133)); 
   }
 
 
@@ -349,10 +342,11 @@ export default function ChrysalisInteractionModal() {
     <Dialog open={showStreakModal} onOpenChange={handleDialogClose}>
       <DialogOverlay className="bg-black/60 backdrop-blur-sm" />
       <DialogContent className="sm:max-w-md p-0 overflow-hidden shadow-2xl rounded-lg">
-        {/* Logic to decide which view of the modal to show */}
-        {streakModalContext === 'profile_avatar_select' || (streakModalContext === 'login' && !isChrysalisAvatarCurrentlyActive && !justCollectedCoin && !coinAlreadyCollectedThisSession && !isLoadingCoinStatus)
-            ? renderActivateAvatarContent()
-            : renderCollectCoinContent()
+        {justCollectedCoin
+            ? renderActivateAvatarContent() // This will actually render the "Collected Coin View"
+            : streakModalContext === 'profile_avatar_select' || (streakModalContext === 'login' && !isChrysalisAvatarCurrentlyActive && !isLoadingCoinStatus)
+                ? renderActivateAvatarContent()
+                : renderCollectCoinContent()
         }
       </DialogContent>
     </Dialog>
