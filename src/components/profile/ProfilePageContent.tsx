@@ -32,12 +32,12 @@ function ProfilePageSkeleton() {
 }
 
 interface ProfilePageContentProps {
-  viewedUserId: string; 
+  viewedUserId: string;
 }
 
 export default function ProfilePageContent({ viewedUserId }: ProfilePageContentProps) {
-  const { user: authUser, userProfile: authUserProfile, loading: authLoading, fetchUserProfile, setShowNewBadgeModal } = useAuth();
-  useAuthRedirect({ requireAuth: true }); 
+  const { user: authUser, userProfile: authUserProfile, loading: authLoading, fetchUserProfile, setShowNewBadgeModal, recordSectionVisit } = useAuth();
+  useAuthRedirect({ requireAuth: true });
 
   const searchParams = useSearchParams();
   const editMode = searchParams.get('edit') === 'true';
@@ -49,7 +49,7 @@ export default function ProfilePageContent({ viewedUserId }: ProfilePageContentP
 
 
   useEffect(() => {
-    if (authLoading) return; 
+    if (authLoading) return;
 
     if (!authUser) {
       setIsLoadingTargetProfile(false);
@@ -62,7 +62,10 @@ export default function ProfilePageContent({ viewedUserId }: ProfilePageContentP
 
     if (ownProfile) {
       setProfileToDisplay(authUserProfile);
-      setIsLoadingTargetProfile(false); 
+      setIsLoadingTargetProfile(false);
+      if (authUserProfile?.profileComplete) {
+        recordSectionVisit('profile');
+      }
     } else {
       setIsLoadingTargetProfile(true);
       getUserProfile(viewedUserId)
@@ -81,7 +84,7 @@ export default function ProfilePageContent({ viewedUserId }: ProfilePageContentP
           setIsLoadingTargetProfile(false);
         });
     }
-  }, [viewedUserId, authUser, authUserProfile, authLoading]);
+  }, [viewedUserId, authUser, authUserProfile, authLoading, recordSectionVisit]);
 
   useEffect(() => {
     // Award 'social-butterfly' badge if viewing another profile for the first time
@@ -126,7 +129,7 @@ export default function ProfilePageContent({ viewedUserId }: ProfilePageContentP
   }
 
   if (!profileToDisplay) {
-    if (!isOwnProfileView) { 
+    if (!isOwnProfileView) {
         return (
             <Card className="w-full max-w-lg mx-auto">
                 <CardHeader><CardTitle>Profile Not Found</CardTitle></CardHeader>

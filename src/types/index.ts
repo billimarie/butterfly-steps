@@ -10,6 +10,9 @@ export const CHRYSALIS_AVATAR_IDENTIFIER = 'lucide:shell';
 
 export type ActivityStatus = 'Sedentary' | 'Moderately Active' | 'Very Active';
 
+export type ExplorerSectionKey = 'profile' | 'dashboard' | 'community' | 'donate';
+
+
 export interface UserProfile {
   uid: string;
   email: string | null;
@@ -33,6 +36,7 @@ export interface UserProfile {
     dashboardOrder?: string[];
     communityOrder?: string[];
   };
+  visitedSections?: ExplorerSectionKey[];
 }
 
 export interface Team {
@@ -64,7 +68,6 @@ export interface StreakUpdateResults {
   updatedLastStreakLoginDate: string | null;
   updatedLastLoginTimestamp: Timestamp;
   streakProcessedForToday: boolean;
-  // newlyAwardedBadges?: BadgeData[]; // This could be used to pass back any badges from streak processing if needed
 }
 
 export interface StepSubmissionResult {
@@ -87,7 +90,12 @@ export interface AuthContextType {
   loading: boolean;
   error: Error | null;
   logout: () => Promise<void>;
-  fetchUserProfile: (uid: string, initialLogin?: boolean) => Promise<void>;
+  fetchUserProfile: (
+    uid: string,
+    isInitialAuthEvent?: boolean,
+    isPostSignup?: boolean,
+    isFirstStepSubmissionViaWelcomeFlow?: boolean
+  ) => Promise<void>;
   setUserProfileState: (profile: UserProfile | null) => void;
   showStreakModal: boolean;
   setShowStreakModal: (show: boolean) => void;
@@ -97,14 +105,17 @@ export interface AuthContextType {
   setShowDailyGoalMetModal: (show: boolean) => void;
   newlyEarnedBadgeToShow: BadgeData | null;
   setShowNewBadgeModal: (badge: BadgeData | null) => void;
-  activateChrysalisAsAvatar: () => Promise<void>; // For default Golden Chrysalis avatar/theme activation
+  activateChrysalisAsAvatar: () => Promise<void>;
   collectDailyChrysalisCoin: () => Promise<void>;
   applyTheme: (themeId: string | null) => void;
   activeChrysalisThemeId: string | null | undefined;
   showLogStepsModal: boolean;
   setShowLogStepsModal: (show: boolean, origin?: LogStepsModalOrigin) => void;
   logStepsFlowOrigin: LogStepsModalOrigin;
-  justCollectedCoin: ChrysalisVariantData | null; // Details of the coin just collected
-  activateThemeFromCollectedCoin: (coinToActivate: ChrysalisVariantData, fromProfileActivation?: boolean) => Promise<void>; // Activates theme of any specific coin
-  clearJustCollectedCoinDetails: () => void; // Clears the justCollectedCoin state
+  justCollectedCoin: ChrysalisVariantData | null;
+  activateThemeFromCollectedCoin: (coinToActivate: ChrysalisVariantData, fromProfileActivation?: boolean) => Promise<void>;
+  clearJustCollectedCoinDetails: () => void;
+  showWelcomeMigrationModal: boolean;
+  setShowWelcomeMigrationModal: (show: boolean) => void;
+  recordSectionVisit: (sectionKey: ExplorerSectionKey) => Promise<void>;
 }

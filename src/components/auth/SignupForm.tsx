@@ -29,7 +29,6 @@ const activityGoalsMap: Record<ActivityStatus, { label: string; goals: string[] 
   'Very Active': { label: 'Regular vigorous exercise / active job', goals: ['100,000 steps', '300,000 steps', '500,000 steps', 'Custom'] },
 };
 
-// A curated list of common IANA timezones (consistent with ProfileSetupForm)
 const commonTimezones = [
   { value: "America/New_York", label: "America/New_York (Eastern Time)" },
   { value: "America/Chicago", label: "America/Chicago (Central Time)" },
@@ -67,11 +66,8 @@ const signupSchema = z.object({
 
 type SignupFormInputs = z.infer<typeof signupSchema>;
 
-interface SignupFormProps {
-    invitedTeamId?: string | null; // Keep prop for potential future use, but form won't use it now
-}
 
-export default function SignupForm({ invitedTeamId }: SignupFormProps) {
+export default function SignupForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -116,7 +112,6 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
     if (currentStep === 1) {
       fieldsToValidate = ['displayName', 'email', 'password'];
     } 
-    // No Step 2 validation here, submission happens on Step 2
     
     const isValid = fieldsToValidate.length > 0 ? await trigger(fieldsToValidate) : true;
     if (isValid) {
@@ -157,9 +152,9 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
         currentSteps: 0,
         profileComplete: true,
         inviteLink: `${process.env.NEXT_PUBLIC_APP_URL || ''}/profile/${firebaseUser.uid}`,
-        badgesEarned: [], // No team badge awarded at signup now
-        teamId: null,     // Team info is null at signup
-        teamName: null,   // Team info is null at signup
+        badgesEarned: [], 
+        teamId: null,    
+        teamName: null,  
         currentStreak: 0,
         lastStreakLoginDate: null,
         lastLoginTimestamp: null,
@@ -172,9 +167,12 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
       await setDoc(doc(db, "users", firebaseUser.uid), fullProfileData);
       await incrementParticipantCount();
       
-      toast({ title: 'Account Created & Profile Setup!', description: "Welcome to the Butterfly Steps challenge!" });
+      // "Account Created & Profile Setup!" toast removed as per user request
       
-      await fetchUserProfile(firebaseUser.uid, true); 
+      // Call fetchUserProfile with isInitialAuthEvent = true and isPostSignup = true
+      await fetchUserProfile(firebaseUser.uid, true, true); 
+      
+      // No direct router.push('/') here; AuthContext handles redirection based on profile completeness
       
     } catch (error) {
       const authError = error as AuthError;
@@ -369,7 +367,7 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
             )}
         </div>
         <div>
-            {currentStep < 2 ? ( // Only 2 steps now
+            {currentStep < 2 ? ( 
             <Button type="button" onClick={handleNextStep} disabled={loading} className="w-full sm:w-auto">
                 Continue
             </Button>
@@ -392,4 +390,3 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
     </form>
   );
 }
-

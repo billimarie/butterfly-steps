@@ -5,10 +5,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/AuthContext';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
-import ChrysalisInteractionModal from '@/components/modals/ChrysalisInteractionModal'; // Updated import
+import ChrysalisInteractionModal from '@/components/modals/ChrysalisInteractionModal';
 import DailyGoalMetModal from '@/components/modals/DailyGoalMetModal';
 import BadgeDetailModalRenderer from '@/components/profile/BadgeDetailModalRenderer';
 import FloatingLogStepsButton from '@/components/modals/FloatingLogStepsButton';
+import WelcomeMigrationModal from '@/components/modals/WelcomeMigrationModal'; // Import the new modal
 
 export const metadata: Metadata = {
   title: 'Butterfly Steps',
@@ -36,7 +37,8 @@ export default function RootLayout({
           </main>
           <Footer />
           <Toaster />
-          <ChrysalisInteractionModal /> {/* Updated component name */}
+          <WelcomeMigrationModal /> {/* Add the new modal here */}
+          <ChrysalisInteractionModal /> 
           <DailyGoalMetModal />
           <BadgeDetailModalRenderer />
           <FloatingLogStepsButton />

@@ -12,11 +12,11 @@ export default function FloatingLogStepsButton() {
     user, 
     userProfile, 
     fetchUserProfile,
-    showLogStepsModal,      // Get from context
-    setShowLogStepsModal,   // Get from context
-    logStepsFlowOrigin,     // Get from context
-    setShowStreakModal,     // Get from context
-    setStreakModalContext   // Get from context
+    showLogStepsModal,      
+    setShowLogStepsModal,   
+    logStepsFlowOrigin,     
+    // setShowStreakModal,    // No longer directly controlled here
+    // setStreakModalContext  // No longer directly controlled here
   } = useAuth();
 
   if (!user || !userProfile?.profileComplete) {
@@ -25,19 +25,17 @@ export default function FloatingLogStepsButton() {
 
   const handleFormSubmitSuccess = async () => {
     if (user?.uid) {
-      await fetchUserProfile(user.uid); // Refresh user profile data
+      const wasFromChrysalisWelcomeFlow = logStepsFlowOrigin === 'chrysalis';
+      // Call fetchUserProfile, indicating if this submission was part of the initial welcome flow
+      await fetchUserProfile(user.uid, false, false, wasFromChrysalisWelcomeFlow); 
     }
     
-    const origin = logStepsFlowOrigin; // Capture before closing modal might reset it
-    setShowLogStepsModal(false, 'direct'); // Close the log steps modal
-
-    if (origin === 'chrysalis') {
-      setStreakModalContext('login'); // Ensure correct context for chrysalis modal
-      setShowStreakModal(true);   // Re-open Chrysalis modal
-    }
+    // setShowLogStepsModal will be called with 'direct' to ensure flowOrigin is reset
+    setShowLogStepsModal(false, 'direct'); 
+    // The explicit re-opening of the streak modal if origin was 'chrysalis' is REMOVED.
+    // fetchUserProfile now handles the logic of when to show (or not show) the streak modal.
   };
 
-  // When user manually clicks the X or outside the dialog
   const handleOpenChange = (isOpen: boolean) => {
     setShowLogStepsModal(isOpen, 'direct');
   };
@@ -50,7 +48,7 @@ export default function FloatingLogStepsButton() {
           size="icon"
           className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-xl z-50 animate-pulse hover:animate-none"
           aria-label="Log Steps"
-          onClick={() => setShowLogStepsModal(true, 'direct')} // Explicitly open with 'direct' origin
+          onClick={() => setShowLogStepsModal(true, 'direct')} 
         >
           <Plus className="h-7 w-7" />
         </Button>
@@ -63,12 +61,10 @@ export default function FloatingLogStepsButton() {
             <button className="hidden" />
           </DialogClose>
         </DialogHeader>
-        <div className="px-6 py-2"> {/* Reduced vertical padding for content */}
+        <div className="px-6 py-2"> 
           <StepSubmissionForm onStepSubmit={handleFormSubmitSuccess} isModalVersion={true}/>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
-
-    

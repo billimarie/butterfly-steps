@@ -21,7 +21,7 @@ import {
   type DocumentReference,
   writeBatch
 } from 'firebase/firestore';
-import type { UserProfile, CommunityStats, Team, DailyStep, StreakUpdateResults, StepSubmissionResult } from '@/types';
+import type { UserProfile, CommunityStats, Team, DailyStep, StreakUpdateResults, StepSubmissionResult, ExplorerSectionKey } from '@/types';
 import { CHALLENGE_DURATION_DAYS } from '@/types'; // Import the constant
 import type { User as FirebaseUser } from 'firebase/auth';
 import { ALL_BADGES, type BadgeData, type BadgeId, getBadgeDataById } from '@/lib/badges';
@@ -116,6 +116,7 @@ function mapDocToUserProfile(docSnap: DocumentSnapshot): UserProfile {
     timezone: data.timezone || null,
     activeChrysalisThemeId: data.activeChrysalisThemeId || null,
     dashboardLayout: data.dashboardLayout || { dashboardOrder: [], communityOrder: [] },
+    visitedSections: Array.isArray(data.visitedSections) ? data.visitedSections : [],
   };
 }
 
@@ -157,6 +158,7 @@ export async function createUserProfile(firebaseUser: FirebaseUser, additionalDa
     timezone: additionalData.timezone !== undefined ? additionalData.timezone : browserTimezone,
     activeChrysalisThemeId: null,
     dashboardLayout: { dashboardOrder: [], communityOrder: [] },
+    visitedSections: [],
   };
 
   const profileData = { ...baseProfileData, ...additionalData };
@@ -180,6 +182,9 @@ export async function updateUserProfile(uid: string, data: Partial<UserProfile>)
 
   if (data.hasOwnProperty('activeChrysalisThemeId')) {
     updatePayload.activeChrysalisThemeId = data.activeChrysalisThemeId;
+  }
+  if (data.hasOwnProperty('visitedSections')) {
+    updatePayload.visitedSections = data.visitedSections;
   }
   await setDoc(userRef, updatePayload, { merge: true });
 }
@@ -314,7 +319,7 @@ export async function awardSpecificBadgeIfUnearned(userId: string, badgeIdToAwar
       const currentBadges = userProfile.badgesEarned || [];
 
       if (currentBadges.includes(badgeIdToAward)) {
-        return null;
+        return null; // Already has it
       }
 
       const badgeDefinition = getBadgeDataById(badgeIdToAward);
@@ -640,4 +645,3 @@ export async function getTopUsers(count: number): Promise<UserProfile[]> {
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => mapDocToUserProfile(docSnap));
 }
-

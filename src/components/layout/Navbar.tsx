@@ -108,7 +108,7 @@ export default function Navbar() {
               ) : user ? (
                 <Button
                   variant="ghost"
-                  className="relative h-9 w-9 rounded-full p-0"
+                  className="relative h-9 w-9 rounded-full p-0 hover:bg-transparent"
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                   aria-label="Toggle Mobile Menu"
                 >
@@ -121,7 +121,7 @@ export default function Navbar() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 text-muted-foreground hover:text-primary"
+                    className="h-9 w-9 text-muted-foreground hover:bg-transparent hover:text-muted-foreground"
                     onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                     aria-label="Toggle Mobile Menu"
                   >
