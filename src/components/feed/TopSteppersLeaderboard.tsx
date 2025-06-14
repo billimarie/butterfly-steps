@@ -5,11 +5,12 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Medal, Footprints, Users as TeamIcon, Shell } from 'lucide-react'; 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; 
+import { Medal, Footprints, Users as TeamIcon, Shell } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getTopUsers } from '@/lib/firebaseService';
 import type { UserProfile } from '@/types';
 import { CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
+import { getChrysalisVariantById, getChrysalisVariantByDay } from '@/lib/chrysalisVariants';
 
 
 const getInitials = (name: string | null | undefined) => {
@@ -34,7 +35,7 @@ export default function TopSteppersLeaderboard({ count }: TopSteppersLeaderboard
       const users = await getTopUsers(count);
       setTopUsers(users);
     } catch (error) {
-      console.error("Failed to fetch top users for leaderboard:", error);
+      console.error("Failed to fetch top users:", error);
       setTopUsers([]);
     } finally {
       setLoadingTopUsers(false);
@@ -47,7 +48,12 @@ export default function TopSteppersLeaderboard({ count }: TopSteppersLeaderboard
 
   const renderAvatarContent = (user: UserProfile) => {
     if (user.photoURL === CHRYSALIS_AVATAR_IDENTIFIER) {
-      return <Shell className="h-full w-full p-1.5 text-primary" data-ai-hint="chrysalis shell gold" />;
+      const activeVariant = user.activeChrysalisThemeId
+        ? getChrysalisVariantById(user.activeChrysalisThemeId)
+        : getChrysalisVariantByDay(1); // Default to Golden Chrysalis (Day 1)
+      const IconComponent = activeVariant?.icon || Shell;
+      const iconStyle = activeVariant?.themePrimaryHSL ? { color: `hsl(${activeVariant.themePrimaryHSL})` } : {};
+      return <IconComponent className="h-full w-full p-1.5" style={iconStyle} data-ai-hint={activeVariant?.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"} />;
     }
     return (
       <>
@@ -117,4 +123,3 @@ export default function TopSteppersLeaderboard({ count }: TopSteppersLeaderboard
     </div>
   );
 }
-

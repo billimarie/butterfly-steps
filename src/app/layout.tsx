@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/AuthContext';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
-import ChrysalisInteractionModal from '@/components/profile/ChrysalisInteractionModal'; // Updated import
+import ChrysalisInteractionModal from '@/components/modals/ChrysalisInteractionModal'; // Updated import
 import DailyGoalMetModal from '@/components/modals/DailyGoalMetModal';
 import BadgeDetailModalRenderer from '@/components/profile/BadgeDetailModalRenderer';
 import FloatingLogStepsButton from '@/components/modals/FloatingLogStepsButton';
