@@ -18,12 +18,10 @@ import { createTeam, joinTeam, incrementParticipantCount, getUserProfile } from 
 import type { ActivityStatus, UserProfile, TeamActionResult } from '@/types';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Mail, Lock, UserPlus, User as UserIcon, CheckCircle, Zap, TrendingUp, Target, Users, PlusCircle, LogIn } from 'lucide-react';
+import { Mail, Lock, UserPlus, User as UserIcon, CheckCircle, Zap, TrendingUp, Target, Users, PlusCircle, LogIn, Globe } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Separator } from '@/components/ui/separator';
-// ToastAction removed
 import type { BadgeData, BadgeId } from '@/lib/badges';
-// getBadgeDataById removed as not directly used here for modal data
 
 
 const activityGoalsMap: Record<ActivityStatus, { label: string; goals: string[] }> = {
@@ -31,6 +29,19 @@ const activityGoalsMap: Record<ActivityStatus, { label: string; goals: string[] 
   'Moderately Active': { label: 'Light exercise / walking a few times a week', goals: ['50,000 steps', '100,000 steps', '300,000 steps', 'Custom'] },
   'Very Active': { label: 'Regular vigorous exercise / active job', goals: ['100,000 steps', '300,000 steps', '500,000 steps', 'Custom'] },
 };
+
+// A curated list of common IANA timezones (consistent with ProfileSetupForm)
+const commonTimezones = [
+  { value: "America/New_York", label: "America/New_York (Eastern Time)" },
+  { value: "America/Chicago", label: "America/Chicago (Central Time)" },
+  { value: "America/Denver", label: "America/Denver (Mountain Time)" },
+  { value: "America/Los_Angeles", label: "America/Los_Angeles (Pacific Time)" },
+  { value: "Europe/London", label: "Europe/London" },
+  { value: "Europe/Paris", label: "Europe/Paris" },
+  { value: "Asia/Tokyo", label: "Asia/Tokyo" },
+  { value: "Australia/Sydney", label: "Australia/Sydney" },
+  { value: "UTC", label: "UTC" },
+];
 
 const signupSchema = z.object({
   displayName: z.string().min(2, { message: 'Display name must be at least 2 characters' }).max(50),
@@ -44,6 +55,7 @@ const signupSchema = z.object({
     (val) => (val === "" || val === undefined || val === null ? undefined : Number(String(val).replace(/,/g, ''))),
     z.number().positive('Custom goal must be a positive number.').optional()
   ),
+  timezone: z.string().optional().nullable(),
   teamAction: z.enum(['none', 'create', 'join']).default('none'),
   newTeamName: z.string().min(3, "Team name must be at least 3 characters").max(50).optional(),
   joinTeamId: z.string().min(5, "Team ID seems too short").optional(),
@@ -80,6 +92,15 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
   const [invitedTeamDetailsLoading, setInvitedTeamDetailsLoading] = useState(false);
   const [fetchedInvitedTeamName, setFetchedInvitedTeamName] = useState<string | null>(null);
   const [fetchedInvitedTeamCreatorDisplayName, setFetchedInvitedTeamCreatorDisplayName] = useState<string | null>(null);
+  const [browserTimezone, setBrowserTimezone] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      setBrowserTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    } catch (e) {
+      console.warn("Could not determine browser timezone for signup form.", e);
+    }
+  }, []);
   
   const { control, handleSubmit, watch, setValue, formState: { errors }, trigger } = useForm<SignupFormInputs>({
     resolver: zodResolver(signupSchema),
@@ -90,11 +111,19 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
       activityStatus: undefined,
       stepGoalOption: undefined,
       customStepGoal: undefined,
+      timezone: browserTimezone || null,
       teamAction: invitedTeamId ? 'join' : 'none',
       newTeamName: '',
       joinTeamId: invitedTeamId || '',
     },
   });
+
+  useEffect(() => {
+    // Set default timezone once browserTimezone is resolved
+    if (browserTimezone && !watch('timezone')) {
+        setValue('timezone', browserTimezone);
+    }
+  }, [browserTimezone, setValue, watch]);
 
   const selectedActivityStatus = watch('activityStatus');
   const selectedStepGoalOption = watch('stepGoalOption');
@@ -145,7 +174,7 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
     if (currentStep === 1) {
       fieldsToValidate = ['displayName', 'email', 'password'];
     } else if (currentStep === 2) {
-      fieldsToValidate = ['activityStatus', 'stepGoalOption'];
+      fieldsToValidate = ['activityStatus', 'stepGoalOption', 'timezone'];
       if (watch('stepGoalOption') === 'Custom') {
         fieldsToValidate.push('customStepGoal');
       }
@@ -186,6 +215,7 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
         displayName: data.displayName,
         activityStatus: data.activityStatus,
         stepGoal: finalStepGoal,
+        timezone: data.timezone || browserTimezone || null,
         currentSteps: 0,
         profileComplete: true,
         inviteLink: `${process.env.NEXT_PUBLIC_APP_URL || ''}/profile/${firebaseUser.uid}`,
@@ -366,6 +396,35 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
                   {errors.customStepGoal && <p className="text-sm text-destructive">{errors.customStepGoal.message}</p>}
                 </div>
               )}
+              <div className="space-y-2">
+                <Label htmlFor="timezone">Timezone <Globe className="inline h-5 w-5 text-primary" /></Label>
+                <Controller
+                    name="timezone"
+                    control={control}
+                    render={({ field }) => (
+                        <Select
+                            onValueChange={(value) => {
+                                field.onChange(value === "auto" ? browserTimezone : value);
+                            }}
+                            value={field.value || "auto"} // Default to 'auto' if field.value is null/undefined
+                        >
+                            <SelectTrigger id="timezone">
+                                <SelectValue placeholder="Select your timezone" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="auto">Auto-detect ({browserTimezone || "Unavailable"})</SelectItem>
+                                {commonTimezones.map(tz => (
+                                    <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
+                />
+                {errors.timezone && <p className="text-sm text-destructive">{errors.timezone.message}</p>}
+                <p className="text-xs text-muted-foreground">
+                    This helps us calculate your daily rewards. If unsure, "Auto-detect" will use your browser's setting.
+                </p>
+              </div>
             </div>
           </>
         );
@@ -487,7 +546,7 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="min-h-[350px]"> {/* Added min-height to reduce layout shift */}
+      <div className="min-h-[350px]"> 
         {renderStepContent()}
       </div>
 

@@ -71,6 +71,7 @@ function mapDocToUserProfile(docSnap: DocumentSnapshot): UserProfile {
     lastStreakLoginDate: data.lastStreakLoginDate || null,
     lastLoginTimestamp: data.lastLoginTimestamp instanceof Timestamp ? data.lastLoginTimestamp : null,
     chrysalisCoinDates: Array.isArray(data.chrysalisCoinDates) ? data.chrysalisCoinDates : [],
+    timezone: data.timezone || null, // Map timezone
     dashboardLayout: data.dashboardLayout || { dashboardOrder: [], communityOrder: [] },
   };
 }
@@ -86,6 +87,13 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 
 export async function createUserProfile(firebaseUser: FirebaseUser, additionalData: Partial<UserProfile> = {}): Promise<UserProfile> {
   const userProfileRef = doc(db, USERS_COLLECTION, firebaseUser.uid);
+  let browserTimezone: string | null = null;
+  try {
+    browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch (e) {
+    console.warn("Could not determine browser timezone for new user profile.", e);
+  }
+
   const baseProfileData: UserProfile = {
     uid: firebaseUser.uid,
     email: firebaseUser.email,
@@ -103,6 +111,7 @@ export async function createUserProfile(firebaseUser: FirebaseUser, additionalDa
     lastStreakLoginDate: null,
     lastLoginTimestamp: null,
     chrysalisCoinDates: [],
+    timezone: browserTimezone, // Initialize timezone
     dashboardLayout: { dashboardOrder: [], communityOrder: [] },
   };
   const profileData = { ...baseProfileData, ...additionalData };

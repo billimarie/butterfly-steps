@@ -26,6 +26,7 @@ export interface UserProfile {
   lastStreakLoginDate: string | null; // YYYY-MM-DD
   lastLoginTimestamp: Timestamp | null;
   chrysalisCoinDates?: string[]; // Array of "YYYY-MM-DD" for collected coins
+  timezone?: string | null; // Added timezone field
   dashboardLayout?: {
     dashboardOrder?: string[];
     communityOrder?: string[];

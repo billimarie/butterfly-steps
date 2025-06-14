@@ -16,7 +16,7 @@ import { createTeam, joinTeam, leaveTeam, getUserProfile } from '@/lib/firebaseS
 import type { ActivityStatus, UserProfile, TeamActionResult } from '@/types';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { CheckCircle, Zap, TrendingUp, Target, Edit3, Users, LogOut, PlusCircle } from 'lucide-react';
+import { CheckCircle, Zap, TrendingUp, Target, Edit3, Users, LogOut, PlusCircle, Globe } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import type { BadgeData, BadgeId } from '@/lib/badges';
 import { db } from '@/lib/firebase';
@@ -27,6 +27,20 @@ const activityGoalsMap: Record<ActivityStatus, { label: string; goals: string[] 
   'Moderately Active': { label: 'Light exercise / walking a few times a week', goals: ['50,000 steps', '100,000 steps', '300,000 steps', 'Custom'] },
   'Very Active': { label: 'Regular vigorous exercise / active job', goals: ['100,000 steps', '300,000 steps', '500,000 steps', 'Custom'] },
 };
+
+// A curated list of common IANA timezones
+const commonTimezones = [
+  { value: "America/New_York", label: "America/New_York (Eastern Time)" },
+  { value: "America/Chicago", label: "America/Chicago (Central Time)" },
+  { value: "America/Denver", label: "America/Denver (Mountain Time)" },
+  { value: "America/Los_Angeles", label: "America/Los_Angeles (Pacific Time)" },
+  { value: "Europe/London", label: "Europe/London" },
+  { value: "Europe/Paris", label: "Europe/Paris" },
+  { value: "Asia/Tokyo", label: "Asia/Tokyo" },
+  { value: "Australia/Sydney", label: "Australia/Sydney" },
+  { value: "UTC", label: "UTC" },
+];
+
 
 const profileUpdateSchema = z.object({
   displayName: z
@@ -42,6 +56,7 @@ const profileUpdateSchema = z.object({
     (val) => (val === "" || val === undefined || val === null ? undefined : Number(String(val).replace(/,/g, ''))),
     z.number().positive('Custom goal must be a positive number.').optional()
   ),
+  timezone: z.string().optional().nullable(),
   teamAction: z.enum(['none', 'create', 'join']).default('none'),
   newTeamName: z.string().min(3, "Team name must be at least 3 characters").max(50).optional(),
   joinTeamId: z.string().min(5, "Team ID seems too short").optional(),
@@ -74,6 +89,15 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const [browserTimezone, setBrowserTimezone] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      setBrowserTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    } catch (e) {
+      console.warn("Could not determine browser timezone.", e);
+    }
+  }, []);
 
   const { control, handleSubmit, watch, setValue, formState, trigger, reset } = useForm<ProfileUpdateFormInputs>({
     resolver: zodResolver(profileUpdateSchema),
@@ -83,6 +107,7 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       activityStatus: undefined,
       stepGoalOption: undefined,
       customStepGoal: undefined,
+      timezone: null,
       teamAction: 'none',
       newTeamName: undefined,
       joinTeamId: undefined,
@@ -119,6 +144,7 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
             activityStatus: determinedActivityStatus,
             stepGoalOption: goalOpt!,
             customStepGoal: customGoalVal,
+            timezone: userProfile.timezone || browserTimezone || null,
             teamAction: 'none', 
             newTeamName: undefined,
             joinTeamId: undefined,
@@ -135,6 +161,7 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
             activityStatus: defaultActivityStatus,
             stepGoalOption: defaultStepGoalOption,
             customStepGoal: undefined,
+            timezone: browserTimezone || null,
             teamAction: 'none',
             newTeamName: undefined,
             joinTeamId: undefined,
@@ -142,7 +169,7 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
         reset(resetValues);
         trigger();
     }
-  }, [user, userProfile, isUpdate, reset, trigger]);
+  }, [user, userProfile, isUpdate, reset, trigger, browserTimezone]);
 
 
   const onSubmit: SubmitHandler<ProfileUpdateFormInputs> = async (data) => {
@@ -151,9 +178,9 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       return;
     }
 
-    if (isUpdate && !userProfile && !isDirty) { // if it's an update, userProfile must exist. if !isDirty, don't submit.
+    if (isUpdate && !userProfile && !isDirty) { 
       toast({ title: 'No Changes', description: 'No changes were made to the profile.', variant: "default" });
-      router.push(`/profile/${user.uid}`); // Navigate back if no changes
+      router.push(`/profile/${user.uid}`); 
       return;
     }
     setLoading(true);
@@ -166,13 +193,11 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
         finalStepGoal = parseInt(data.stepGoalOption.replace(/,/g, '').replace(' steps', ''));
       }
       
-      // Construct the base for profile data. If userProfile exists, use it as a starting point.
-      // Otherwise, create a new profile structure with defaults.
       const existingProfileFieldsOrDefaults: UserProfile = userProfile 
         ? { ...userProfile } 
         : {
-            uid: user.uid, // This will be authoritative from 'user' object later
-            email: user.email, // This will be authoritative from 'user' object later
+            uid: user.uid, 
+            email: user.email, 
             displayName: user.email?.split('@')[0] || '',
             photoURL: user.photoURL || null,
             activityStatus: 'Moderately Active' as ActivityStatus,
@@ -187,25 +212,23 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
             lastStreakLoginDate: null,
             lastLoginTimestamp: null,
             chrysalisCoinDates: [] as string[],
+            timezone: browserTimezone || null,
             dashboardLayout: { dashboardOrder: [], communityOrder: [] },
       };
       
-      // Merge existing/default fields with form data and authoritative fields
       const profileUpdateData: UserProfile = {
-        ...existingProfileFieldsOrDefaults, // Spread existing or new profile defaults
-        // Overwrite with data from the form
+        ...existingProfileFieldsOrDefaults,
         displayName: data.displayName,
         activityStatus: data.activityStatus,
         stepGoal: finalStepGoal,
-        profileComplete: true, // Always true after this form submission
-        // Explicitly use authoritative uid and email from the authenticated user object
+        timezone: data.timezone || browserTimezone || null,
+        profileComplete: true, 
         uid: user.uid,
         email: user.email,
       };
       
       let awardedTeamBadgeFromAction: BadgeData | null | undefined = undefined;
       
-      // Check if user is already on a team FROM THE LOADED userProfile (not profileUpdateData yet)
       const canPerformTeamAction = !userProfile?.teamId; 
 
       if (canPerformTeamAction && data.teamAction !== 'none') {
@@ -230,7 +253,6 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
           }
       } else if (userProfile?.teamId && data.teamAction !== 'none' && (data.newTeamName || data.joinTeamId)) {
         toast({ title: 'Team Action Skipped', description: 'You are already on a team. Leave your current team to create or join another.', variant: 'default' });
-        // Reset team form fields visually as they were not processed
         setValue('teamAction', 'none');
         setValue('newTeamName', undefined);
         setValue('joinTeamId', undefined);
@@ -243,14 +265,13 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       await setDoc(doc(db, "users", user.uid), profileUpdateData, { merge: true });
       toast({ title: 'Profile Updated!', description: 'Your Butterfly Steps profile has been successfully saved.' });
       
-      const updatedFullProfile = await getUserProfile(user.uid); // Fetch the fully merged profile
+      const updatedFullProfile = await getUserProfile(user.uid); 
       if (updatedFullProfile) {
-        setUserProfileState(updatedFullProfile); // Update context with the truly latest data from DB
+        setUserProfileState(updatedFullProfile); 
         if (awardedTeamBadgeFromAction) {
              setShowNewBadgeModal(awardedTeamBadgeFromAction);
         }
       } else {
-        // Fallback to updating context with what we tried to save if fetch fails
         setUserProfileState(profileUpdateData); 
         toast({ title: 'Profile Saved', description: 'Profile was saved, but there was an issue refreshing the display. Please manually refresh if needed.', variant: 'default' });
       }
@@ -273,15 +294,13 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       await leaveTeam(user.uid, userProfile.teamId, userProfile.currentSteps);
       toast({ title: 'Left Team', description: `You have left ${userProfile.teamName}. You can now create or join a new team.` });
       
-      // Optimistically update local context
       const tempProfile = {...userProfile, teamId: null, teamName: null};
-      setUserProfileState(tempProfile); // Update context
+      setUserProfileState(tempProfile); 
 
-      // Reset form fields related to team actions
       setValue('teamAction', 'none');
       setValue('joinTeamId', undefined);
       setValue('newTeamName', undefined);
-      trigger(); // Re-validate the form state
+      trigger(); 
 
     } catch (error) {
       toast({ title: 'Error Leaving Team', description: (error as Error).message, variant: "destructive" });
@@ -400,6 +419,37 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
               {errors.customStepGoal && <p className="text-sm text-destructive">{errors.customStepGoal.message}</p>}
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="timezone">Timezone <Globe className="inline h-5 w-5 text-primary" /></Label>
+            <Controller
+                name="timezone"
+                control={control}
+                render={({ field }) => (
+                    <Select
+                        onValueChange={(value) => {
+                            field.onChange(value === "auto" ? browserTimezone : value); 
+                            trigger('timezone');
+                        }}
+                        value={field.value || "auto"}
+                    >
+                        <SelectTrigger id="timezone">
+                            <SelectValue placeholder="Select your timezone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="auto">Auto-detect ({browserTimezone || "Unavailable"})</SelectItem>
+                            {commonTimezones.map(tz => (
+                                <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                )}
+            />
+            {errors.timezone && <p className="text-sm text-destructive">{errors.timezone.message}</p>}
+             <p className="text-xs text-muted-foreground">
+                This helps us calculate your daily rewards. If unsure, "Auto-detect" will use your browser's setting.
+            </p>
+          </div>
         
           <Separator />
 
