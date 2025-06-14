@@ -31,7 +31,7 @@ function ProfilePageSkeleton() {
   );
 }
 
-export default async function UserProfilePage({ params }: { params: { userId: string } }) {
+export default function UserProfilePage({ params }: { params: { userId: string } }) {
   const userId = params.userId; // Explicit access
   return (
     <Suspense fallback={<ProfilePageSkeleton />}>
@@ -39,4 +39,3 @@ export default async function UserProfilePage({ params }: { params: { userId: st
     </Suspense>
   );
 }
-

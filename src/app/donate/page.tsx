@@ -1,13 +1,13 @@
 
-import type { Metadata } from 'next';
-import DonationTierCard from '@/components/donate/DonationTierCard';
-import { HeartHandshake } from 'lucide-react'; // Using a more relevant icon
+'use client'; // Mark as client component
 
-export const metadata: Metadata = {
-  title: 'Donate | Butterfly Steps',
-  description: 'Support Monarch butterfly conservation by sponsoring our habitat restoration efforts. Activate missed challenge days with your donation.',
-  keywords: ['donate', 'conservation', 'monarch butterfly', 'habitat restoration', 'sponsorship', 'nonprofit'],
-};
+import DonationTierCard from '@/components/donate/DonationTierCard';
+import { HeartHandshake } from 'lucide-react';
+import { useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
+
+// Metadata for this page should be handled in a parent layout or server component
+// as exporting it from a client component is not allowed.
 
 interface DonationTier {
   id: string;
@@ -17,7 +17,7 @@ interface DonationTier {
   imageUrl: string;
   dataAiHint: string;
   buttonText: string;
-  actionLink: string; // Placeholder for now, e.g., "#donate-tier-11"
+  actionLink: string;
 }
 
 const donationTiers: DonationTier[] = [
@@ -29,7 +29,7 @@ const donationTiers: DonationTier[] = [
     imageUrl: 'https://placehold.co/600x400.png',
     dataAiHint: 'milkweed plant donation',
     buttonText: 'Sponsor $11',
-    actionLink: '#donate-tier-11', 
+    actionLink: '#donate-tier-11',
   },
   {
     id: 'tier-50',
@@ -39,7 +39,7 @@ const donationTiers: DonationTier[] = [
     imageUrl: 'https://placehold.co/600x400.png',
     dataAiHint: 'butterfly garden donation',
     buttonText: 'Sponsor $50',
-    actionLink: '#donate-tier-50', 
+    actionLink: '#donate-tier-50',
   },
   {
     id: 'tier-100',
@@ -58,11 +58,19 @@ const donationTiers: DonationTier[] = [
     imageUrl: 'https://placehold.co/600x400.png',
     dataAiHint: 'employer match gift',
     buttonText: 'Learn About Matching',
-    actionLink: '#employer-match-info', 
+    actionLink: '#employer-match-info',
   },
 ];
 
 export default function DonatePage() {
+  const { userProfile, recordSectionVisit } = useAuth();
+
+  useEffect(() => {
+    if (userProfile?.profileComplete) {
+      recordSectionVisit('donate');
+    }
+  }, [userProfile, recordSectionVisit]);
+
   return (
     <div className="container mx-auto py-8 space-y-10">
       <div className="text-center">

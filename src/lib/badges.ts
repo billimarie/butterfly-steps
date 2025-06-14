@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Footprints, Award, Star, MapPin, Sparkles, Anchor, Sun, Mountain, Crown, Users, Eye, Egg, Shell as ShellIconLucide, Bug } from 'lucide-react';
+import { Footprints, Award, Star, MapPin, Sparkles, Anchor, Sun, Mountain, Crown, Users, Eye, Egg, Shell as ShellIconLucide, Bug, Compass } from 'lucide-react';
 import { WormIcon as WormIconComponent } from '@/components/icons/WormIcon'; // Updated import
 
 // Define WormIcon as a React Functional Component by re-exporting or using the imported component
@@ -18,6 +18,7 @@ export type BadgeId =
   | 'monarch-champion-mexico'
   | 'team-player'
   | 'social-butterfly'
+  | 'explorer-award' // New badge ID
   | 'streak-egg'          // 30 days
   | 'streak-caterpillar'  // 60 days
   | 'streak-chrysalis'    // 90 days
@@ -26,7 +27,7 @@ export type BadgeId =
 export interface BadgeData {
   id: BadgeId;
   name: string;
-  milestone: number;
+  milestone: number; // For step/streak, it's the count. For event, could be # of sub-events or just 1.
   description: string;
   icon: React.ElementType;
   type: 'step' | 'streak' | 'event';
@@ -47,6 +48,8 @@ export const ALL_BADGES: BadgeData[] = [
   // Event Badges
   { id: 'team-player', name: 'Team Player', milestone: 1, description: 'You\'ve joined or created a team!', icon: Users, type: 'event' },
   { id: 'social-butterfly', name: 'Social Butterfly', milestone: 1, description: 'You\'re exploring the community by viewing another user\'s profile!', icon: Eye, type: 'event' },
+  { id: 'explorer-award', name: 'Site Explorer', milestone: 4, description: 'You\'ve explored all the main areas of Butterfly Steps!', icon: Compass, type: 'event' },
+
 
   // Streak Badges
   { id: 'streak-egg', name: 'Persistent Egg', milestone: 30, description: 'Logged in for 30 consecutive days! Hatching potential!', icon: Egg, type: 'streak' },

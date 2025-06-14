@@ -10,6 +10,9 @@ export const CHRYSALIS_AVATAR_IDENTIFIER = 'lucide:shell';
 
 export type ActivityStatus = 'Sedentary' | 'Moderately Active' | 'Very Active';
 
+export type ExplorerSectionKey = 'profile' | 'dashboard' | 'community' | 'donate';
+
+
 export interface UserProfile {
   uid: string;
   email: string | null;
@@ -33,6 +36,7 @@ export interface UserProfile {
     dashboardOrder?: string[];
     communityOrder?: string[];
   };
+  visitedSections?: ExplorerSectionKey[];
 }
 
 export interface Team {
@@ -86,7 +90,12 @@ export interface AuthContextType {
   loading: boolean;
   error: Error | null;
   logout: () => Promise<void>;
-  fetchUserProfile: (uid: string, isInitialAuthEvent?: boolean, isPostSignup?: boolean) => Promise<void>;
+  fetchUserProfile: (
+    uid: string,
+    isInitialAuthEvent?: boolean,
+    isPostSignup?: boolean,
+    isFirstStepSubmissionViaWelcomeFlow?: boolean
+  ) => Promise<void>;
   setUserProfileState: (profile: UserProfile | null) => void;
   showStreakModal: boolean;
   setShowStreakModal: (show: boolean) => void;
@@ -108,5 +117,5 @@ export interface AuthContextType {
   clearJustCollectedCoinDetails: () => void;
   showWelcomeMigrationModal: boolean;
   setShowWelcomeMigrationModal: (show: boolean) => void;
+  recordSectionVisit: (sectionKey: ExplorerSectionKey) => Promise<void>;
 }
-

@@ -39,9 +39,15 @@ export default function LoginForm() {
     } catch (error) {
       const authError = error as AuthError;
       console.error('Login error:', authError);
+      let description = authError.message || 'An unexpected error occurred. Please try again.';
+      if (authError.code === 'auth/invalid-credential' || authError.code === 'auth/user-not-found' || authError.code === 'auth/wrong-password') {
+        description = 'Incorrect email or password. Please check your credentials and try again.';
+      } else if (authError.code === 'auth/too-many-requests') {
+        description = 'Access to this account has been temporarily disabled due to many failed login attempts. You can try again later or reset your password.';
+      }
       toast({
         title: 'Login Failed',
-        description: authError.message || 'An unexpected error occurred. Please try again.',
+        description: description,
         variant: 'destructive',
       });
     } finally {

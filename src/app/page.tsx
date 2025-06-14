@@ -25,11 +25,10 @@ import { auth } from '@/lib/firebase'; // Added auth import
 
 function LandingPage() {
   const [communityStats, setCommunityStats] = useState<CommunityStats | null>(null);
-  const [statsLoading, setStatsLoading] = useState(true); // Keep for internal loading state logic
+  const [statsLoading, setStatsLoading] = useState(true);
 
   const fetchLandingPageStats = useCallback(async () => {
     setStatsLoading(true);
-    // Only attempt to fetch if a user might be logged in or rules allow unauthenticated access
     if (auth.currentUser) {
         try {
             const stats = await getCommunityStats();
@@ -41,7 +40,6 @@ function LandingPage() {
             setStatsLoading(false);
         }
     } else {
-        // No user logged in, don't attempt to fetch. communityStats remains null.
         setCommunityStats(null);
         setStatsLoading(false);
     }
@@ -51,7 +49,7 @@ function LandingPage() {
     const unsubscribe = auth.onAuthStateChanged(user => {
       fetchLandingPageStats();
     });
-    fetchLandingPageStats(); // Initial fetch attempt
+    fetchLandingPageStats();
     return () => unsubscribe();
   }, [fetchLandingPageStats]);
 
@@ -96,8 +94,8 @@ function LandingPage() {
           </div>
         </div>
       </div>
-      
-      <div className="container mx-auto px-4 -mt-8 mb-12"> {/* Adjusted margin for countdown */}
+
+      <div className="container mx-auto px-4 -mt-8 mb-12">
         <CountdownTimer />
       </div>
 
@@ -126,23 +124,22 @@ function LandingPage() {
         </Card>
       </div>
 
-      {/* Community Progress Card and Migration Map: Only render if communityStats is available */}
-      {communityStats && (
-        <>
-          <div id="community-landing" className="p-8 space-y-8 container mx-auto px-4">
-            <CommunityProgressCard communityStats={communityStats} />
-          </div>
+    {communityStats && (
+      <>
+        <div id="community-landing" className="p-8 space-y-8 container mx-auto px-4">
+          <CommunityProgressCard communityStats={communityStats} />
+        </div>
 
-          <div className="p-8 space-y-8 container mx-auto px-4">
-            <h2 className="text-4xl font-headline text-primary text-center">Our Migration</h2>
-            <div className="space-y-6">
-              <InteractiveMap totalCommunitySteps={communityStats.totalSteps} className="mt-6" />
-              <ButterflyAnimation type="community" totalCommunitySteps={communityStats.totalSteps} />
-            </div>
+        <div className="p-8 space-y-8 container mx-auto px-4">
+          <h2 className="text-4xl font-headline text-primary text-center">Our Migration</h2>
+          <div className="space-y-6">
+            <InteractiveMap totalCommunitySteps={communityStats.totalSteps} className="mt-6" />
+            <ButterflyAnimation type="community" totalCommunitySteps={communityStats.totalSteps} />
           </div>
-        </>
-      )}
-      
+        </div>
+      </>
+    )}
+
       <div className="grid md:grid-cols-3 gap-8 text-left container mx-auto px-4 pb-12 mb-6">
         <Link href="/signup" className="block h-full transition-all duration-200 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-lg">
           <Card className="shadow-lg hover:shadow-xl transition-shadow h-full cursor-pointer">
@@ -170,7 +167,7 @@ function LandingPage() {
           <Card className="shadow-lg hover:shadow-xl transition-shadow h-full cursor-pointer">
               <CardHeader className="text-left">
                   <Gift className="h-12 w-12 text-primary mb-3"/>
-                  <CardTitle className="font-headline">Help Plant Habitats</CardTitle>
+                  <CardTitle className="font-headline">1 Step Raises $1</CardTitle>
               </CardHeader>
               <CardContent className="text-left">
                   <p>Your steps have a <strong>real</strong> impact. In 2024, we raised enough funds to plant a quarter-acre Butterfly Habitat! We're looking for corporate sponsors to turn your steps into dollars for our cause.</p>
@@ -180,7 +177,7 @@ function LandingPage() {
       </div>
 
       <div className="container mx-auto px-4 pb-12 mb-6">
-        <div className="rounded-xl p-8 md:p-12 text-center shadow-2xl text-white bg-slate-700">
+        <div className="rounded-xl p-8 md:p-12 text-center shadow-2xl text-white bg-slate-800">
           <Gift className="mx-auto h-16 w-16 mb-6 text-white" />
           <h2 className="text-4xl font-headline font-bold mb-4">
             Help Monarchs Take Flight
@@ -191,7 +188,7 @@ function LandingPage() {
           <Button
             asChild
             size="lg"
-            className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 py-3 px-8 transition-all duration-300 transform hover:scale-105"
+            className="bg-white text-orange-600 hover:bg-orange-50 px-4 py-2 py-3 px-8 transition-all duration-300 transform hover:scale-105"
           >
             <a href="https://foreverystaratree.org/donate.html" target="_blank" rel="noopener noreferrer">
               Make a Difference
@@ -212,7 +209,7 @@ function LandingPage() {
 
 
 function AuthenticatedHomepageContent() {
-  const { user, userProfile, loading: authLoading } = useAuth();
+  const { user, userProfile, loading: authLoading, recordSectionVisit } = useAuth();
   const [initialCommunityStats, setInitialCommunityStats] = useState<CommunityStats | null>(null);
   const [communityStatsLoading, setCommunityStatsLoading] = useState(true);
 
@@ -242,13 +239,40 @@ function AuthenticatedHomepageContent() {
         setCommunityStatsLoading(false);
       }
     } else {
-      setCommunityStatsLoading(false); 
+      setCommunityStatsLoading(false);
     }
   }, [user, userProfile?.profileComplete]);
 
   useEffect(() => {
     fetchDashboardCommunityData();
   }, [fetchDashboardCommunityData]);
+
+  useEffect(() => {
+    if (userProfile?.profileComplete) {
+      if (initialTab === 'dashboard') {
+        recordSectionVisit('dashboard');
+      } else if (initialTab === 'community') {
+        recordSectionVisit('community');
+      }
+    }
+  }, [initialTab, userProfile, recordSectionVisit]);
+
+  const handleTabChange = (tabValue: string) => {
+    if (userProfile?.profileComplete) {
+      if (tabValue === 'dashboard') {
+        recordSectionVisit('dashboard');
+      } else if (tabValue === 'community') {
+        recordSectionVisit('community');
+      }
+    }
+    // Update URL query param for tab persistence
+    const current = new URLSearchParams(Array.from(searchParams.entries()));
+    current.set('tab', tabValue);
+    const search = current.toString();
+    const query = search ? `?${search}` : "";
+    router.replace(`${pathname}${query}`, { scroll: false }); // Use replace to avoid pushing to history for tab changes
+  };
+
 
   if (authLoading) {
     return (
@@ -273,7 +297,7 @@ function AuthenticatedHomepageContent() {
     } else {
       // Logged-in, profile complete view with TABS
       return (
-        <Tabs key={initialTab} defaultValue={initialTab} className="w-full space-y-4">
+        <Tabs key={initialTab} defaultValue={initialTab} onValueChange={handleTabChange} className="w-full space-y-4">
           <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="community">Community</TabsTrigger>
@@ -325,4 +349,3 @@ export default function HomePage() {
     </Suspense>
   );
 }
-
