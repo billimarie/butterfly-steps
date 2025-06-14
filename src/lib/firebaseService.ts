@@ -32,19 +32,15 @@ const COMMUNITY_COLLECTION = 'community';
 const COMMUNITY_STATS_DOC = 'stats';
 const DAILY_STEPS_SUBCOLLECTION = 'dailySteps';
 
-// Helper to get today's date in YYYY-MM-DD format (UTC) - Kept for reference if needed elsewhere
-function getTodayDateStringUTC(): string {
-  return new Date().toISOString().split('T')[0];
-}
 
 // Helper function to get the challenge start date for a given year (UTC)
 export function getChallengeStartDate(year: number): Date {
-  return new Date(Date.UTC(year, 5, 21)); // June 21st, UTC
+  return new Date(Date.UTC(year, 5, 21)); // June 21st, UTC (Month is 0-indexed, so 5 is June)
 }
 
 // Helper function to get the date string for a specific challenge day number
 export function getChallengeDateStringByDayNumber(dayNumber: number, challengeYear?: number): string {
-  const year = challengeYear || new Date().getFullYear();
+  const year = challengeYear || new Date().getUTCFullYear();
   const startDate = getChallengeStartDate(year);
   // Create a new Date object from startDate to avoid modifying it directly
   const targetDate = new Date(startDate.getTime());
@@ -59,7 +55,7 @@ export function getChallengeDateStringByDayNumber(dayNumber: number, challengeYe
 // Helper function to calculate the challenge day number (1-133) from a date string
 export function getChallengeDayNumberFromDateString(dateString: string): number {
   const [year, month, day] = dateString.split('-').map(Number);
-  const currentDate = new Date(Date.UTC(year, month - 1, day));
+  const currentDate = new Date(Date.UTC(year, month - 1, day)); // Month is 0-indexed for Date constructor
 
   const challengeStartDate = getChallengeStartDate(currentDate.getUTCFullYear());
 
@@ -82,15 +78,15 @@ export function getTodaysDateClientLocal(): string {
   // 3. Uncomment the line below and update the string to "YYYY-MM-DD" for that date.
   //    Example: For Day 1 (June 21st, 2024), use "2024-06-21".
   //             For Day 5 (June 25th, 2024), use "2024-06-25".
-  // return "2024-06-29"; // Test specific date
+  return "2024-06-30"; // << EDIT THIS LINE FOR TESTING SPECIFIC DAYS
 
   // ORIGINAL IMPLEMENTATION (Revert to this after testing):
-  const now = new Date(); // Current moment in client's local timezone
+  /* const now = new Date(); // Current moment in client's local timezone
   const year = now.getFullYear();
   const month = (now.getMonth() + 1).toString().padStart(2, '0'); // JS months are 0-indexed
   const day = now.getDate().toString().padStart(2, '0');
   const localDateString = `${year}-${month}-${day}`;
-  return localDateString;
+  return localDateString; */
 }
 
 
@@ -637,5 +633,3 @@ export async function getTopUsers(count: number): Promise<UserProfile[]> {
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => mapDocToUserProfile(docSnap));
 }
-
-    
