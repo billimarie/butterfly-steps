@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
-import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIconLucide, Users as TeamIcon, LogOut, PlusCircle, CalendarDays, EggIcon, ShellIcon, SparklesIcon, Layers, Replace } from 'lucide-react';
+import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIconLucide, Users as TeamIcon, LogOut, PlusCircle, CalendarDays, EggIcon, ShellIcon as ShellIconLucide, SparklesIcon, Layers, Replace } from 'lucide-react'; // Renamed ShellIcon to ShellIconLucide
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ALL_BADGES, type BadgeData } from '@/lib/badges';
@@ -59,7 +59,7 @@ interface StreakAchievement {
 const STREAK_ACHIEVEMENTS: StreakAchievement[] = [
   { id: 'egg', name: 'Persistent Egg', requiredStreak: 30, icon: EggIcon, description: 'Logged in for 30 consecutive days! Hatching potential!' },
   { id: 'caterpillar', name: 'Curious Caterpillar', requiredStreak: 60, icon: WormIcon, description: '60 day streak! Munching through the days!' },
-  { id: 'chrysalis', name: 'Committed Chrysalis', requiredStreak: 90, icon: ShellIcon, description: '90 days of consistency! Transformation is near.' },
+  { id: 'chrysalis', name: 'Committed Chrysalis', requiredStreak: 90, icon: ShellIconLucide, description: '90 days of consistency! Transformation is near.' },
   { id: 'butterfly', name: 'Monarch Dedication', requiredStreak: 133, icon: SparklesIcon, description: 'Logged in every day of the challenge until Halloween! True Monarch Spirit!' },
 ];
 
@@ -91,20 +91,6 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     }
   };
 
-  const handleLeaveTeam = async () => {
-    if (!authUser || !profileData.teamId || !isOwnProfile) return;
-    setLeavingTeam(true);
-    try {
-      await leaveTeam(authUser.uid, profileData.teamId, profileData.currentSteps);
-      toast({ title: 'Left Team', description: `You have left ${profileData.teamName}.` });
-      await fetchAuthUserProfile(authUser.uid);
-    } catch (error) {
-      toast({ title: 'Error Leaving Team', description: (error as Error).message, variant: "destructive" });
-    } finally {
-      setLeavingTeam(false);
-    }
-  };
-
   const handleExistingBadgeClick = (badge: BadgeData) => {
     if (isOwnProfile) { 
         setSelectedExistingBadge(badge);
@@ -131,9 +117,9 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   return (
     <>
       <Card className="w-full max-w-2xl mx-auto shadow-xl">
-        <CardHeader className="text-center"> {/* Centered CardHeader for avatar */}
+        <CardHeader className="text-center"> 
           {profileData.photoURL === CHRYSALIS_AVATAR_IDENTIFIER && (
-            <div className="flex justify-center mb-6"> {/* Increased bottom margin */}
+            <div className="flex justify-center mb-6"> 
               <button
                 onClick={handleChrysalisAvatarClick}
                 className={cn(
@@ -143,11 +129,11 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                 aria-label={isOwnProfile ? "Change Chrysalis Avatar" : "Golden Chrysalis Avatar"}
                 disabled={!isOwnProfile}
               >
-                <ShellIcon className="h-32 w-32 md:h-36 md:w-36 text-primary animate-chrysalis-glow" data-ai-hint="chrysalis shell gold" />
+                <ShellIconLucide className="h-32 w-32 md:h-36 md:w-36 text-primary animate-chrysalis-glow" data-ai-hint="chrysalis shell gold" />
               </button>
             </div>
           )}
-          <div className="flex justify-between items-start text-left"> {/* Original header content alignment */}
+          <div className="flex justify-between items-start text-left">
             <div>
               <CardTitle className="font-headline text-3xl flex items-center">
                 <User className="mr-3 h-8 w-8 text-primary" />
@@ -156,6 +142,12 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
               {isOwnProfile && profileData.email && (
                 <CardDescription className="flex items-center mt-1">
                     <Mail className="mr-2 h-4 w-4 text-muted-foreground" /> {profileData.email}
+                </CardDescription>
+              )}
+              {profileData.teamId && profileData.teamName && (
+                <CardDescription className="flex items-center mt-1">
+                  <TeamIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                  On team: <Link href={`/teams/${profileData.teamId}`} className="font-semibold text-accent hover:underline ml-1">{profileData.teamName}</Link>
                 </CardDescription>
               )}
             </div>
@@ -194,7 +186,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
           <div className="space-y-3">
             <h3 className="text-lg font-semibold flex items-center"><Layers className="mr-2 h-5 w-5 text-primary" /> Chrysalis Coins</h3>
             <div className="flex items-center space-x-2">
-              <ShellIcon className="h-8 w-8 text-primary" data-ai-hint="chrysalis shell gold"/>
+              <ShellIconLucide className="h-8 w-8 text-primary" data-ai-hint="chrysalis shell gold"/>
               <p className="text-xl">
                 Collected: <span className="font-bold text-accent">{collectedCoinsCount}</span> / {CHALLENGE_DURATION_DAYS}
               </p>
@@ -204,13 +196,13 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
             )}
             {collectedCoinsCount > 0 && (
               <div className="flex flex-wrap gap-1 mt-2 items-center">
-                {Array.from({ length: Math.min(collectedCoinsCount, 7) }).map((_, i) => ( // Show up to 7, for example
-                  <ShellIcon key={`coin-display-${i}`} className="h-5 w-5 text-yellow-500" data-ai-hint="chrysalis shell gold"/>
+                {Array.from({ length: Math.min(collectedCoinsCount, 7) }).map((_, i) => ( 
+                  <ShellIconLucide key={`coin-display-${i}`} className="h-5 w-5 text-yellow-500" data-ai-hint="chrysalis shell gold"/>
                 ))}
                 {collectedCoinsCount > 7 && <span className="text-sm text-muted-foreground self-end">...and more!</span>}
               </div>
             )}
-            {isOwnProfile && profileData.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER && collectedCoinsCount > 0 && ( // Show only if avatar is not chrysalis but coins collected
+            {isOwnProfile && profileData.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER && collectedCoinsCount > 0 && ( 
                  <Button variant="outline" size="sm" onClick={handleChrysalisAvatarClick} className="mt-2">
                     <Replace className="mr-2 h-4 w-4" /> Set Chrysalis Avatar
                 </Button>
@@ -256,40 +248,6 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
               </div>
             </div>
           )}
-
-          <Separator className="my-6" />
-
-          <div className="space-y-3">
-            <h3 className="text-lg font-semibold flex items-center"><TeamIcon className="mr-2 h-5 w-5 text-primary" /> Team Information</h3>
-            {profileData.teamId && profileData.teamName ? (
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <p className="mb-1">{isOwnProfile ? "You are" : "This user is"} a member of: 
-                  <Link href={`/teams/${profileData.teamId}`} className="font-semibold text-accent hover:underline ml-1">
-                    {profileData.teamName}
-                  </Link>
-                </p>
-                {isOwnProfile && (
-                  <Button variant="outline" size="sm" onClick={handleLeaveTeam} disabled={leavingTeam}>
-                    <LogOut className="mr-2 h-4 w-4" /> {leavingTeam ? 'Leaving...' : 'Leave Team'}
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <p>{isOwnProfile ? "You are" : "This user is"} not currently on a team.</p>
-                {isOwnProfile && (
-                  <div className="mt-2 space-x-2">
-                    <Button size="sm" asChild>
-                      <Link href="/teams/create">Create a Team</Link>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href="/teams">Join a Team</Link>
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
 
           <Separator className="my-6" />
           
@@ -355,5 +313,6 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     </>
   );
 }
+    
 
     
