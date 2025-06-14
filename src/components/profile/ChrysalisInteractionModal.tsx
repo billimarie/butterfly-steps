@@ -9,9 +9,9 @@ import { ShellIcon, RefreshCw, Gift, CheckCircle, XCircle, User as UserIcon, Foo
 import { cn } from '@/lib/utils';
 import { getDailyStepForDate, getTodaysDateClientLocal } from '@/lib/firebaseService';
 import type { DailyStep } from '@/types';
+import { CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
 import { useRouter } from 'next/navigation';
 
-const CHRYSALIS_AVATAR_IDENTIFIER = 'lucide:shell';
 
 export default function ChrysalisInteractionModal() {
   const {
@@ -85,19 +85,26 @@ export default function ChrysalisInteractionModal() {
     setIsCollectingCoin(false);
   };
 
-  const isChrysalisAvatarActive = userProfile.photoURL === CHRYSALIS_AVATAR_IDENTIFIER;
+  const isChrysalisAvatarCurrentlyActive = userProfile.photoURL === CHRYSALIS_AVATAR_IDENTIFIER;
   const canAttemptCoinCollection = stepsLoggedToday === true && coinAlreadyCollected === false;
   const isLoadingCoinStatus = streakModalContext === 'login' && (stepsLoggedToday === null || coinAlreadyCollected === null);
 
 
-  const renderActivateAvatarContent = () => (
+  const renderActivateAvatarContent = () => {
+    const isProfileAvatarView = streakModalContext === 'profile_avatar_select';
+    const titleText = isProfileAvatarView ? "Your Chrysalis Avatar" : "Chrysalis Unlocked";
+    const descriptionText = isProfileAvatarView
+      ? "You earned the Golden Chrysalis, symbolizing the starting point of your journey."
+      : "Reach this Chrysalis when you log in for the first time.";
+
+    return (
     <>
       <DialogHeader className={cn(
           "p-6 pb-4 text-center items-center justify-center rounded-t-lg",
           "bg-gradient-to-br from-primary/90 via-primary/80 to-accent/70"
       )}>
         <DialogTitle className="font-headline text-3xl text-primary-foreground flex items-center justify-center">
-          {streakModalContext === 'profile_avatar_select' ? 'Set Chrysalis Avatar' : 'Chrysalis Unlocked'}
+          {titleText}
         </DialogTitle>
       </DialogHeader>
       <div className="pt-8 pb-8 px-6 space-y-4 text-center">
@@ -106,26 +113,27 @@ export default function ChrysalisInteractionModal() {
               GOLDEN CHRYSALIS
           </p>
           <p className="text-muted-foreground text-md mt-2 max-w-xs mx-auto">
-              {streakModalContext === 'profile_avatar_select'
-                ? 'Set the Golden Chrysalis as your profile picture.'
-                : 'Reach this Chrysalis when you log in for the first time.'
-              }
+              {descriptionText}
           </p>
       </div>
-      <DialogFooter className="px-6 py-4 bg-muted/30 border-t rounded-b-lg flex justify-center items-center">
-        <Button onClick={handleActivateAvatar} className="w-full sm:w-auto" size="lg" disabled={isActivatingAvatar}>
-          {isActivatingAvatar ? (
-            <>
-              <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
-              Activating...
-            </>
-          ) : (
-            'Activate Chrysalis'
-          )}
-        </Button>
-      </DialogFooter>
+      {/* Show button if chrysalis is NOT the active avatar, allowing activation */}
+      {!isChrysalisAvatarCurrentlyActive ? (
+        <DialogFooter className="px-6 py-4 bg-muted/30 border-t rounded-b-lg flex justify-center items-center">
+          <Button onClick={handleActivateAvatar} className="w-full sm:w-auto" size="lg" disabled={isActivatingAvatar}>
+            {isActivatingAvatar ? (
+              <>
+                <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                Activating...
+              </>
+            ) : (
+              'Activate Chrysalis'
+            )}
+          </Button>
+        </DialogFooter>
+      ) : null}
     </>
-  );
+    );
+  };
 
   const renderCollectCoinContent = () => {
     let statusText = "";
@@ -162,11 +170,11 @@ export default function ChrysalisInteractionModal() {
       );
     } else if (!stepsLoggedToday) {
       statusText = "Log your steps for today to unlock your Chrysalis Coin!";
-      IconComponentForStatus = Footprints; // Changed from XCircle to Footprints
+      IconComponentForStatus = Footprints;
       iconColorForStatus = "text-destructive";
       finalButton = (
         <Button className="w-full sm:w-auto" size="lg" disabled={true}>
-            <XCircle className="mr-2 h-5 w-5" /> {/* Or Footprints for consistency */}
+            <XCircle className="mr-2 h-5 w-5" />
             Log Steps to Unlock
         </Button>
       );
@@ -224,7 +232,7 @@ export default function ChrysalisInteractionModal() {
     <Dialog open={showStreakModal} onOpenChange={handleDialogClose}>
       <DialogOverlay className="bg-black/60 backdrop-blur-sm" />
       <DialogContent className="sm:max-w-md p-0 overflow-hidden shadow-2xl rounded-lg">
-        {streakModalContext === 'profile_avatar_select' || (streakModalContext === 'login' && !isChrysalisAvatarActive)
+        {streakModalContext === 'profile_avatar_select' || (streakModalContext === 'login' && !isChrysalisAvatarCurrentlyActive)
             ? renderActivateAvatarContent()
             : renderCollectCoinContent()
         }
@@ -232,3 +240,4 @@ export default function ChrysalisInteractionModal() {
     </Dialog>
   );
 }
+

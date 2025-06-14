@@ -151,8 +151,9 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       return;
     }
 
-    if (isUpdate && !userProfile) {
-      toast({ title: 'Profile Error', description: 'Your profile data could not be loaded for the update. Please try refreshing.', variant: "destructive" });
+    if (isUpdate && !userProfile && !isDirty) { // if it's an update, userProfile must exist. if !isDirty, don't submit.
+      toast({ title: 'No Changes', description: 'No changes were made to the profile.', variant: "default" });
+      router.push(`/profile/${user.uid}`); // Navigate back if no changes
       return;
     }
     setLoading(true);
@@ -165,38 +166,47 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
         finalStepGoal = parseInt(data.stepGoalOption.replace(/,/g, '').replace(' steps', ''));
       }
       
-      const baseProfile: UserProfile = userProfile ? { ...userProfile } : {
-        uid: user.uid,
-        email: user.email,
-        displayName: '',
-        activityStatus: null,
-        stepGoal: null,
-        currentSteps: 0,
-        profileComplete: false,
-        inviteLink: `${process.env.NEXT_PUBLIC_APP_URL || ''}/profile/${user.uid}`,
-        badgesEarned: [],
-        teamId: null,
-        teamName: null,
-        currentStreak: 0,
-        lastStreakLoginDate: null,
-        lastLoginTimestamp: null,
+      // Construct the base for profile data. If userProfile exists, use it as a starting point.
+      // Otherwise, create a new profile structure with defaults.
+      const existingProfileFieldsOrDefaults: UserProfile = userProfile 
+        ? { ...userProfile } 
+        : {
+            uid: user.uid, // This will be authoritative from 'user' object later
+            email: user.email, // This will be authoritative from 'user' object later
+            displayName: user.email?.split('@')[0] || '',
+            photoURL: user.photoURL || null,
+            activityStatus: 'Moderately Active' as ActivityStatus,
+            stepGoal: parseInt(activityGoalsMap['Moderately Active'].goals[0].replace(/,/g, '').replace(' steps', '')),
+            currentSteps: 0,
+            profileComplete: false, 
+            inviteLink: `${process.env.NEXT_PUBLIC_APP_URL || ''}/profile/${user.uid}`,
+            badgesEarned: [] as BadgeId[],
+            teamId: null,
+            teamName: null,
+            currentStreak: 0,
+            lastStreakLoginDate: null,
+            lastLoginTimestamp: null,
+            chrysalisCoinDates: [] as string[],
+            dashboardLayout: { dashboardOrder: [], communityOrder: [] },
       };
       
+      // Merge existing/default fields with form data and authoritative fields
       const profileUpdateData: UserProfile = {
-        ...baseProfile,
+        ...existingProfileFieldsOrDefaults, // Spread existing or new profile defaults
+        // Overwrite with data from the form
         displayName: data.displayName,
         activityStatus: data.activityStatus,
         stepGoal: finalStepGoal,
-        profileComplete: true, 
+        profileComplete: true, // Always true after this form submission
+        // Explicitly use authoritative uid and email from the authenticated user object
+        uid: user.uid,
+        email: user.email,
       };
-
-      if (profileUpdateData.inviteLink === undefined) {
-        profileUpdateData.inviteLink = `${process.env.NEXT_PUBLIC_APP_URL || ''}/profile/${user.uid}`;
-      }
-
+      
       let awardedTeamBadgeFromAction: BadgeData | null | undefined = undefined;
       
-      const canPerformTeamAction = !profileUpdateData.teamId; 
+      // Check if user is already on a team FROM THE LOADED userProfile (not profileUpdateData yet)
+      const canPerformTeamAction = !userProfile?.teamId; 
 
       if (canPerformTeamAction && data.teamAction !== 'none') {
           if (data.teamAction === 'create' && data.newTeamName) {
@@ -218,8 +228,12 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
                   return; 
               }
           }
-      } else if (profileUpdateData.teamId && data.teamAction !== 'none' && (data.newTeamName || data.joinTeamId)) {
+      } else if (userProfile?.teamId && data.teamAction !== 'none' && (data.newTeamName || data.joinTeamId)) {
         toast({ title: 'Team Action Skipped', description: 'You are already on a team. Leave your current team to create or join another.', variant: 'default' });
+        // Reset team form fields visually as they were not processed
+        setValue('teamAction', 'none');
+        setValue('newTeamName', undefined);
+        setValue('joinTeamId', undefined);
       }
       
       if (awardedTeamBadgeFromAction && !profileUpdateData.badgesEarned?.includes(awardedTeamBadgeFromAction.id as BadgeId)) {
@@ -229,13 +243,15 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       await setDoc(doc(db, "users", user.uid), profileUpdateData, { merge: true });
       toast({ title: 'Profile Updated!', description: 'Your Butterfly Steps profile has been successfully saved.' });
       
-      const updatedFullProfile = await getUserProfile(user.uid);
+      const updatedFullProfile = await getUserProfile(user.uid); // Fetch the fully merged profile
       if (updatedFullProfile) {
-        setUserProfileState(updatedFullProfile);
+        setUserProfileState(updatedFullProfile); // Update context with the truly latest data from DB
         if (awardedTeamBadgeFromAction) {
              setShowNewBadgeModal(awardedTeamBadgeFromAction);
         }
       } else {
+        // Fallback to updating context with what we tried to save if fetch fails
+        setUserProfileState(profileUpdateData); 
         toast({ title: 'Profile Saved', description: 'Profile was saved, but there was an issue refreshing the display. Please manually refresh if needed.', variant: 'default' });
       }
       
@@ -257,13 +273,15 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
       await leaveTeam(user.uid, userProfile.teamId, userProfile.currentSteps);
       toast({ title: 'Left Team', description: `You have left ${userProfile.teamName}. You can now create or join a new team.` });
       
+      // Optimistically update local context
       const tempProfile = {...userProfile, teamId: null, teamName: null};
-      setUserProfileState(tempProfile);
+      setUserProfileState(tempProfile); // Update context
 
+      // Reset form fields related to team actions
       setValue('teamAction', 'none');
       setValue('joinTeamId', undefined);
       setValue('newTeamName', undefined);
-      trigger();
+      trigger(); // Re-validate the form state
 
     } catch (error) {
       toast({ title: 'Error Leaving Team', description: (error as Error).message, variant: "destructive" });
@@ -476,7 +494,7 @@ export default function ProfileSetupForm({ isUpdate = false }: ProfileSetupFormP
           <Button 
             type="submit" 
             className="w-full sm:w-auto" 
-            disabled={loading || !isDirty || !isValid}
+            disabled={loading || (isUpdate && !isDirty) || !isValid}
           >
             {loading ? (isUpdate ? 'Updating...' : 'Saving...') : (<><CheckCircle className="mr-2 h-5 w-5" /> {isUpdate ? 'Update Profile' : 'Save Profile & Start Challenge'}</>)}
           </Button>

@@ -26,8 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Menu, X, User, LogOut, LayoutDashboard, ShoppingCart, Plus, Settings as SettingsIcon, BarChart3, Shell } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
-
-const CHRYSALIS_AVATAR_IDENTIFIER = 'lucide:shell';
+import { CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
 
 export default function Navbar() {
   const { user, userProfile, logout, loading, fetchUserProfile } = useAuth();
@@ -79,7 +78,7 @@ export default function Navbar() {
   );
 
   const renderAvatarContent = () => {
-    // Check userProfile.photoURL first (from Firestore), then user.photoURL (from Firebase Auth)
+    // Prioritize Firestore profile's photoURL, then Firebase Auth user's, then fallback
     const currentPhotoURL = userProfile?.photoURL || user?.photoURL;
 
     if (currentPhotoURL === CHRYSALIS_AVATAR_IDENTIFIER) {
@@ -166,9 +165,9 @@ export default function Navbar() {
                     <DropdownMenuItem asChild>
                       <Link href="/shop"><ShoppingCart className="mr-2 h-4 w-4" />Shop</Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
+                    {/* <DropdownMenuItem asChild>
                       <Link href="/settings"><SettingsIcon className="mr-2 h-4 w-4" />Settings</Link>
-                    </DropdownMenuItem>
+                    </DropdownMenuItem> */}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={logout} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
                       <LogOut className="mr-2 h-4 w-4" />
@@ -209,9 +208,9 @@ export default function Navbar() {
                   <Link href="/shop" onClick={() => setMobileMenuOpen(false)} className="block">
                     <Button variant="ghost" className="w-full justify-start text-base py-3"><ShoppingCart className="mr-3 h-5 w-5" />Shop</Button>
                   </Link>
-                  <Link href="/settings" onClick={() => setMobileMenuOpen(false)} className="block">
+                  {/* <Link href="/settings" onClick={() => setMobileMenuOpen(false)} className="block">
                     <Button variant="ghost" className="w-full justify-start text-base py-3"><SettingsIcon className="mr-3 h-5 w-5" />Settings</Button>
-                  </Link>
+                  </Link> */}
                   <DropdownMenuSeparator className="my-1"/>
                   <Button variant="ghost" onClick={() => { logout(); setMobileMenuOpen(false); }} className="w-full justify-start text-base py-3 text-destructive hover:text-destructive focus:bg-destructive/10 focus:text-destructive">
                     <LogOut className="mr-3 h-5 w-5" />Log out

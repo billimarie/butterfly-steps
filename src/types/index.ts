@@ -5,6 +5,8 @@ import type { Timestamp } from 'firebase/firestore';
 
 export const CHALLENGE_DURATION_DAYS = 133; // June 21 to Oct 31
 
+export const CHRYSALIS_AVATAR_IDENTIFIER = 'lucide:shell';
+
 export type ActivityStatus = 'Sedentary' | 'Moderately Active' | 'Very Active';
 
 export interface UserProfile {

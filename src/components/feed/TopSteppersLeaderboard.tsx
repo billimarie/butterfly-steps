@@ -5,12 +5,12 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Medal, Footprints, Users as TeamIcon, Shell } from 'lucide-react'; // Added Shell
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // Added AvatarImage
+import { Medal, Footprints, Users as TeamIcon, Shell } from 'lucide-react'; 
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; 
 import { getTopUsers } from '@/lib/firebaseService';
 import type { UserProfile } from '@/types';
+import { CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
 
-const CHRYSALIS_AVATAR_IDENTIFIER = 'lucide:shell';
 
 const getInitials = (name: string | null | undefined) => {
     if (!name) return '?';
@@ -117,3 +117,4 @@ export default function TopSteppersLeaderboard({ count }: TopSteppersLeaderboard
     </div>
   );
 }
+
