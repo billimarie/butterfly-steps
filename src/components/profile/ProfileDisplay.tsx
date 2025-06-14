@@ -359,7 +359,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                 })}
               </div>
             ) : (
-              <p className="text-muted-foreground text-center">{isOwnProfile ? "Start logging steps" : "This user has not earned any badges"} to earn badges!</p>
+              <p className="text-muted-foreground text-center">{isOwnProfile ? "Start logging steps" : "This user is ready"} to earn badges!</p>
             )}
           </div>
 

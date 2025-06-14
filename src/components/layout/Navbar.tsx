@@ -178,11 +178,11 @@ export default function Navbar() {
               </>
             ) : (
               <>
-                <Button variant="ghost" asChild>
-                  <Link href="/login">Login</Link>
-                </Button>
-                <Button asChild className="ml-2">
+                <Button asChild variant="ghost">
                   <Link href="/signup">Sign Up</Link>
+                </Button>
+                <Button asChild  className="ml-2">
+                  <Link href="/login">Login</Link>
                 </Button>
               </>
             )

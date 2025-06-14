@@ -34,7 +34,7 @@ function getChallengeDayNumber(dateString: string): number {
   const [year, month, day] = dateString.split('-').map(Number);
   const currentDate = new Date(Date.UTC(year, month - 1, day));
 
-  const challengeStartDate = new Date(Date.UTC(currentDate.getUTCFullYear(), 5, 21)); // June 21st
+  const challengeStartDate = new Date(Date.UTC(currentDate.getUTCFullYear(), 5, 21)); 
 
   if (currentDate < challengeStartDate) return 0;
 
@@ -42,7 +42,7 @@ function getChallengeDayNumber(dateString: string): number {
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   
   const dayNumber = diffDays + 1;
-  return Math.max(1, Math.min(dayNumber, 133)); // Clamp between 1 and 133
+  return Math.max(1, Math.min(dayNumber, 133)); 
 }
 
 
@@ -60,6 +60,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [_showLogStepsModal, _setShowLogStepsModal] = useState(false);
   const [logStepsFlowOrigin, setLogStepsFlowOrigin] = useState<LogStepsModalOrigin>(null);
   const [justCollectedCoin, setJustCollectedCoin] = useState<ChrysalisVariantData | null>(null);
+  
+  const [showWelcomeMigrationModal, setShowWelcomeMigrationModal] = useState(false);
+  const [hasSeenWelcomeMigrationModal, setHasSeenWelcomeMigrationModal] = useState(false);
 
 
   const router = useRouter();
@@ -87,63 +90,59 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const fetchUserProfile = useCallback(async (uid: string, initialLogin: boolean = false) => {
+  const fetchUserProfile = useCallback(async (uid: string, isInitialAuthEvent: boolean = false, isPostSignup: boolean = false) => {
     setLoading(true);
+    setError(null);
     try {
-      let finalProfile: UserProfile | null = null;
-      let streakResult: StreakUpdateResults | null = null;
+      const streakResult = await updateUserStreakOnLogin(uid);
+      let finalProfile = await getUserProfile(uid);
 
-      if (initialLogin) {
-        streakResult = await updateUserStreakOnLogin(uid);
-        finalProfile = await getUserProfile(uid); 
+      const isFirstTimeSignupExperience = isInitialAuthEvent && isPostSignup && !hasSeenWelcomeMigrationModal && finalProfile?.profileComplete;
 
-        if (finalProfile?.profileComplete) {
+      if (isFirstTimeSignupExperience) {
+        setShowWelcomeMigrationModal(true);
+        setHasSeenWelcomeMigrationModal(true);
+        // SignupForm shows its own "Account Created" toast.
+        // No other modals (streak, badge, general welcome) shown here to avoid overload.
+      } else {
+        // Standard toast/modal logic for other scenarios (regular login, post-action updates)
+        if (isInitialAuthEvent && finalProfile?.profileComplete) { // This is for regular login, not post-signup
           if (streakResult.streakProcessedForToday) {
             toast({ title: 'Welcome Back!', description: "Your daily login streak has been updated." });
             setStreakModalContext('login');
             setShowStreakModal(true);
           } else {
-             toast({ title: 'Welcome Back!'});
+            toast({ title: 'Welcome Back!' });
           }
-        } else if (finalProfile) {
-            toast({ title: 'Welcome!', description: "Let's complete your profile setup." });
-        } else {
-            toast({ title: 'Welcome!', description: "Please set up your profile to get started." });
+        } else if (isInitialAuthEvent && finalProfile && !finalProfile.profileComplete) {
+          toast({ title: 'Welcome!', description: "Let's complete your profile setup." });
+        } else if (isInitialAuthEvent && !finalProfile) {
+          // This case implies user exists in Auth, but no Firestore profile (e.g., error during signup doc creation)
+          // Or, if called without UID for some reason.
+          toast({ title: 'Welcome!', description: "Please set up your profile to get started." });
         }
-      } else {
-        finalProfile = await getUserProfile(uid);
       }
 
-
+      // Badge processing (always run this to update profile data, display is conditional)
       if (finalProfile) {
         let currentEarnedBadges = finalProfile.badgesEarned ? [...finalProfile.badgesEarned] : [];
-        let newBadgesAwardedThisLogin: BadgeData[] = [];
+        let badgesActuallyAwardedInThisCall: BadgeData[] = [];
         let profileBadgesChanged = false;
 
-        // Determine the streak value to use for badge checking
-        // Use the direct result from updateUserStreakOnLogin if it's an initial login,
-        // otherwise use the streak from the fetched profile.
-        const streakValueForBadgeCheck = (initialLogin && streakResult) 
-                                          ? streakResult.updatedStreakCount 
-                                          : finalProfile.currentStreak;
-
-        // Award Streak Badges
         const streakBadgesToConsider = ALL_BADGES.filter(badge => badge.type === 'streak');
         for (const streakBadge of streakBadgesToConsider) {
-          if (streakValueForBadgeCheck >= streakBadge.milestone && !currentEarnedBadges.includes(streakBadge.id)) {
+          if (streakResult.updatedStreakCount >= streakBadge.milestone && !currentEarnedBadges.includes(streakBadge.id)) {
             currentEarnedBadges.push(streakBadge.id);
-            newBadgesAwardedThisLogin.push(streakBadge);
+            badgesActuallyAwardedInThisCall.push(streakBadge);
             profileBadgesChanged = true;
           }
         }
 
-        // Award Step Badges
-        // checkAndAwardStepBadges now only processes step-type badges
         const newlyAwardedStepBadges = await checkAndAwardStepBadges(uid, finalProfile.currentSteps, currentEarnedBadges);
         for (const stepBadge of newlyAwardedStepBadges) {
             if (!currentEarnedBadges.includes(stepBadge.id)) {
                 currentEarnedBadges.push(stepBadge.id);
-                newBadgesAwardedThisLogin.push(stepBadge);
+                badgesActuallyAwardedInThisCall.push(stepBadge);
                 profileBadgesChanged = true;
             }
         }
@@ -151,17 +150,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (profileBadgesChanged) {
           await updateUserProfileInFirestore(uid, { badgesEarned: currentEarnedBadges });
           finalProfile.badgesEarned = currentEarnedBadges; 
+        }
 
-          if (newBadgesAwardedThisLogin.length > 0 && !newlyEarnedBadgeToShow) {
-            setNewlyEarnedBadgeToShow(newBadgesAwardedThisLogin[0]);
-            for (let i = 1; i < newBadgesAwardedThisLogin.length; i++) {
-              toast({
-                title: `${newBadgesAwardedThisLogin[i].type === 'streak' ? 'Streak' : 'Step'} Badge Unlocked!`,
-                description: `You've also earned the "${newBadgesAwardedThisLogin[i].name}" badge!`,
-                duration: 5000,
-              });
+        // Conditionally show New Badge Modal (not during the very first signup experience)
+        if (!isFirstTimeSignupExperience && badgesActuallyAwardedInThisCall.length > 0 && !newlyEarnedBadgeToShow) {
+            setNewlyEarnedBadgeToShow(badgesActuallyAwardedInThisCall[0]);
+            for (let i = 1; i < badgesActuallyAwardedInThisCall.length; i++) {
+                const badge = badgesActuallyAwardedInThisCall[i];
+                 toast({
+                    title: `${badge.type.charAt(0).toUpperCase() + badge.type.slice(1)} Badge Unlocked!`,
+                    description: `You've also earned the "${badge.name}" badge! View it on your profile.`,
+                    duration: 5000,
+                 });
             }
-          }
         }
       }
 
@@ -177,30 +178,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUserProfile(null);
       setError(e as Error);
       applyTheme(null);
-      if (initialLogin) {
+      if (isInitialAuthEvent && !isPostSignup) { // Only show profile load issue if not part of signup's own error handling
         toast({ title: 'Profile Load Issue', description: "There was an issue loading your full profile details." });
       }
     } finally {
         setLoading(false);
     }
-  }, [toast, applyTheme, newlyEarnedBadgeToShow]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast, applyTheme, newlyEarnedBadgeToShow, hasSeenWelcomeMigrationModal ]);
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
       setError(null);
       if (firebaseUser) {
-        const isActuallyNewLogin = user === null || firebaseUser.uid !== user?.uid;
-        setUser(firebaseUser);
-        if (isActuallyNewLogin) {
-            await fetchUserProfile(firebaseUser.uid, true);
+        const isNewAuthUser = user === null || firebaseUser.uid !== user?.uid;
+        setUser(firebaseUser); // Set FirebaseUser first
+        if (isNewAuthUser) {
+            // This is an initial auth event (login or app load with existing session)
+            // isPostSignup will be false here, handled by direct call from SignupForm
+            await fetchUserProfile(firebaseUser.uid, true, false);
         } else {
-            setUser(prevUser => {
-                if(prevUser && JSON.stringify(prevUser) !== JSON.stringify(firebaseUser)){
-                    return firebaseUser;
-                }
-                return prevUser;
-            });
+            // Auth state changed but user is the same (e.g. token refresh), profile likely up-to-date
+            // Or fetchUserProfile was already called explicitly (e.g. post-signup)
             if (userProfile?.activeChrysalisThemeId) {
                 applyTheme(userProfile.activeChrysalisThemeId);
             } else {
@@ -208,7 +209,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
             setLoading(false);
         }
-      } else {
+      } else { // User logged out
         setUser(null);
         setUserProfile(null);
         setShowStreakModal(false);
@@ -218,6 +219,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         _setShowLogStepsModal(false);
         setLogStepsFlowOrigin(null);
         setJustCollectedCoin(null);
+        setShowWelcomeMigrationModal(false);
+        setHasSeenWelcomeMigrationModal(false);
         applyTheme(null);
         setLoading(false);
       }
@@ -225,6 +228,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setError(authError as Error);
       setUser(null);
       setUserProfile(null);
+      // Reset all modal states on auth error too
       setShowStreakModal(false);
       setStreakModalContext('login');
       setShowDailyGoalMetModal(false);
@@ -232,13 +236,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       _setShowLogStepsModal(false);
       setLogStepsFlowOrigin(null);
       setJustCollectedCoin(null);
+      setShowWelcomeMigrationModal(false);
+      setHasSeenWelcomeMigrationModal(false);
       applyTheme(null);
       setLoading(false);
     });
 
     return () => unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchUserProfile, user, applyTheme]); // Removed userProfile?.activeChrysalisThemeId from deps as applyTheme handles it internally based on current userProfile state.
+  }, [fetchUserProfile, user, applyTheme]); // user dependency ensures re-check if firebaseUser object instance changes
 
   const setUserProfileState = (profile: UserProfile | null) => {
     setUserProfile(profile);
@@ -250,16 +256,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    setLoading(true);
+    setLoading(true); 
     try {
       await firebaseSignOut(auth);
+      // Clear client-side state immediately after sign out call
+      setUser(null);
+      setUserProfile(null);
+      setShowStreakModal(false);
+      setStreakModalContext('login');
+      setShowDailyGoalMetModal(false);
+      setNewlyEarnedBadgeToShow(null);
+      _setShowLogStepsModal(false);
+      setLogStepsFlowOrigin(null);
+      setJustCollectedCoin(null);
+      setShowWelcomeMigrationModal(false);
+      setHasSeenWelcomeMigrationModal(false);
+      applyTheme(null);
+      router.push('/'); 
     } catch (e) {
       setError(e as Error);
       console.error("Logout failed:", e);
-      applyTheme(null);
+      applyTheme(null); // Reset theme even on error
     } finally {
-      setLoading(false);
-      router.push('/login');
+      // setLoading will be handled by onAuthStateChanged after successful sign-out,
+      // or here if sign-out itself fails.
+      if (error || auth.currentUser) { // If there was an error OR signout didn't complete
+        setLoading(false);
+      }
     }
   };
 
@@ -286,8 +309,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({ title: 'Error', description: 'You must be logged in and profile loaded.', variant: 'destructive' });
       return;
     }
-    const uid = auth.currentUser.uid;
-
+    
     const goldenChrysalisVariant = getChrysalisVariantByDay(1);
     if (!goldenChrysalisVariant) {
       toast({ title: 'Theme Error', description: 'Default Chrysalis theme not found.', variant: 'destructive' });
@@ -437,6 +459,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       justCollectedCoin,
       activateThemeFromCollectedCoin,
       clearJustCollectedCoinDetails,
+      showWelcomeMigrationModal,
+      setShowWelcomeMigrationModal,
     }}>
       {children}
     </AuthContext.Provider>
