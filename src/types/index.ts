@@ -2,6 +2,7 @@
 import type { User as FirebaseUser } from 'firebase/auth';
 import type { BadgeId, BadgeData } from '@/lib/badges'; // Import BadgeData
 import type { Timestamp } from 'firebase/firestore';
+import type { ChrysalisVariantData } from '@/lib/chrysalisVariants'; // Import ChrysalisVariantData
 
 export const CHALLENGE_DURATION_DAYS = 133; // June 21 to Oct 31
 
@@ -26,7 +27,8 @@ export interface UserProfile {
   lastStreakLoginDate: string | null; // YYYY-MM-DD
   lastLoginTimestamp: Timestamp | null;
   chrysalisCoinDates?: string[]; // Array of "YYYY-MM-DD" for collected coins
-  timezone?: string | null; // Added timezone field
+  timezone?: string | null;
+  activeChrysalisThemeId?: string | null; // ID of the coin variant used for theming
   dashboardLayout?: {
     dashboardOrder?: string[];
     communityOrder?: string[];
@@ -76,6 +78,7 @@ export interface TeamActionResult {
 }
 
 export type StreakModalViewContext = 'login' | 'profile_avatar_select';
+export type LogStepsModalOrigin = 'chrysalis' | 'direct' | null;
 
 export interface AuthContextType {
   user: FirebaseUser | null;
@@ -93,8 +96,15 @@ export interface AuthContextType {
   setShowDailyGoalMetModal: (show: boolean) => void;
   newlyEarnedBadgeToShow: BadgeData | null;
   setShowNewBadgeModal: (badge: BadgeData | null) => void;
-  activateChrysalisAsAvatar: () => Promise<void>;
+  activateChrysalisAsAvatar: () => Promise<void>; // For default Golden Chrysalis avatar/theme activation
   collectDailyChrysalisCoin: () => Promise<void>;
+  applyTheme: (themeId: string | null) => void;
+  activeChrysalisThemeId: string | null | undefined;
+  showLogStepsModal: boolean;
+  setShowLogStepsModal: (show: boolean, origin?: LogStepsModalOrigin) => void;
+  logStepsFlowOrigin: LogStepsModalOrigin;
+  justCollectedCoin: ChrysalisVariantData | null; // Details of the coin just collected
+  activateThemeFromCollectedCoin: (coinToActivate: ChrysalisVariantData) => Promise<void>; // Activates theme of any specific coin
+  clearJustCollectedCoinDetails: () => void; // Clears the justCollectedCoin state
 }
-
     

@@ -32,19 +32,65 @@ const COMMUNITY_COLLECTION = 'community';
 const COMMUNITY_STATS_DOC = 'stats';
 const DAILY_STEPS_SUBCOLLECTION = 'dailySteps';
 
-// Helper to get today's date in YYYY-MM-DD format (UTC)
+// Helper to get today's date in YYYY-MM-DD format (UTC) - Kept for reference if needed elsewhere
 function getTodayDateStringUTC(): string {
   return new Date().toISOString().split('T')[0];
 }
 
+// Helper function to get the challenge start date for a given year (UTC)
+export function getChallengeStartDate(year: number): Date {
+  return new Date(Date.UTC(year, 5, 21)); // June 21st, UTC
+}
+
+// Helper function to get the date string for a specific challenge day number
+export function getChallengeDateStringByDayNumber(dayNumber: number, challengeYear?: number): string {
+  const year = challengeYear || new Date().getFullYear();
+  const startDate = getChallengeStartDate(year);
+  // Create a new Date object from startDate to avoid modifying it directly
+  const targetDate = new Date(startDate.getTime());
+  targetDate.setUTCDate(startDate.getUTCDate() + dayNumber - 1);
+
+  const y = targetDate.getUTCFullYear();
+  const m = (targetDate.getUTCMonth() + 1).toString().padStart(2, '0');
+  const d = targetDate.getUTCDate().toString().padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+// Helper function to calculate the challenge day number (1-133) from a date string
+export function getChallengeDayNumberFromDateString(dateString: string): number {
+  const [year, month, day] = dateString.split('-').map(Number);
+  const currentDate = new Date(Date.UTC(year, month - 1, day));
+
+  const challengeStartDate = getChallengeStartDate(currentDate.getUTCFullYear());
+
+  if (currentDate < challengeStartDate) return 0; // Before challenge start
+
+  const diffTime = currentDate.getTime() - challengeStartDate.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  const dayNumber = diffDays + 1;
+  return Math.max(1, Math.min(dayNumber, CHALLENGE_DURATION_DAYS)); // Clamp between 1 and 133
+}
+
+
 // Helper to get today's date in YYYY-MM-DD format (Local to the client)
 export function getTodaysDateClientLocal(): string {
-  const now = new Date(); // Current moment in client's local timezone
+  // FOR TESTING CHRYSALIS VARIANTS:
+  // To test a specific day's Chrysalis variant:
+  // 1. Determine the target day number (1-133).
+  // 2. Calculate the date (June 21st is Day 1, Oct 31st is Day 133 for current year).
+  // 3. Uncomment the line below and update the string to "YYYY-MM-DD" for that date.
+  //    Example: For Day 1 (June 21st, 2024), use "2024-06-21".
+  //             For Day 5 (June 25th, 2024), use "2024-06-25".
+  return "2024-06-30"; // Test specific date
+
+  // ORIGINAL IMPLEMENTATION (Revert to this after testing):
+  /* const now = new Date(); // Current moment in client's local timezone
   const year = now.getFullYear();
   const month = (now.getMonth() + 1).toString().padStart(2, '0'); // JS months are 0-indexed
   const day = now.getDate().toString().padStart(2, '0');
   const localDateString = `${year}-${month}-${day}`;
-  return localDateString;
+  return localDateString; */
 }
 
 
@@ -71,7 +117,8 @@ function mapDocToUserProfile(docSnap: DocumentSnapshot): UserProfile {
     lastStreakLoginDate: data.lastStreakLoginDate || null,
     lastLoginTimestamp: data.lastLoginTimestamp instanceof Timestamp ? data.lastLoginTimestamp : null,
     chrysalisCoinDates: Array.isArray(data.chrysalisCoinDates) ? data.chrysalisCoinDates : [],
-    timezone: data.timezone || null, // Map timezone
+    timezone: data.timezone || null,
+    activeChrysalisThemeId: data.activeChrysalisThemeId || null,
     dashboardLayout: data.dashboardLayout || { dashboardOrder: [], communityOrder: [] },
   };
 }
@@ -111,34 +158,48 @@ export async function createUserProfile(firebaseUser: FirebaseUser, additionalDa
     lastStreakLoginDate: null,
     lastLoginTimestamp: null,
     chrysalisCoinDates: [],
-    timezone: browserTimezone, // Initialize timezone
+    timezone: additionalData.timezone !== undefined ? additionalData.timezone : browserTimezone,
+    activeChrysalisThemeId: null,
     dashboardLayout: { dashboardOrder: [], communityOrder: [] },
   };
+
   const profileData = { ...baseProfileData, ...additionalData };
+  profileData.email = firebaseUser.email;
+  profileData.uid = firebaseUser.uid;
+
   await setDoc(userProfileRef, profileData);
   return profileData;
 }
 
 export async function updateUserProfile(uid: string, data: Partial<UserProfile>): Promise<void> {
   const userRef = doc(db, USERS_COLLECTION, uid);
-  const updatePayload = { ...data, uid: uid };
+  const updatePayload: Partial<UserProfile> = { ...data };
+
+  delete updatePayload.uid;
+  delete updatePayload.email;
+
   if (updatePayload.inviteLink === undefined && data.inviteLink !== null) {
     updatePayload.inviteLink = `${process.env.NEXT_PUBLIC_APP_URL || ''}/profile/${uid}`;
+  }
+
+  if (data.hasOwnProperty('activeChrysalisThemeId')) {
+    updatePayload.activeChrysalisThemeId = data.activeChrysalisThemeId;
   }
   await setDoc(userRef, updatePayload, { merge: true });
 }
 
+
 export async function updateUserStreakOnLogin(uid: string): Promise<StreakUpdateResults> {
   const userRef = doc(db, USERS_COLLECTION, uid);
   const newLastLoginTimestamp = Timestamp.fromDate(new Date());
-  const todayDateStringUTC = getTodayDateStringUTC();
+  const todayDateStringLocal = getTodaysDateClientLocal();
 
   try {
     const result = await runTransaction(db, async (transaction) => {
       const userSnap = await transaction.get(userRef);
 
       if (!userSnap.exists()) {
-        console.warn(`User profile ${uid} not found during streak update. Streak update skipped. Profile should be created via signup flow.`);
+        console.warn(`User profile ${uid} not found during streak update. Streak update skipped.`);
         return {
             updatedStreakCount: 0,
             updatedLastStreakLoginDate: null,
@@ -156,22 +217,23 @@ export async function updateUserStreakOnLogin(uid: string): Promise<StreakUpdate
 
       if (!lastStreakLoginDateStr) {
         newStreakCount = 1;
-        newLastStreakLoginDate = todayDateStringUTC;
+        newLastStreakLoginDate = todayDateStringLocal;
         streakProcessedForToday = true;
-      } else if (lastStreakLoginDateStr !== todayDateStringUTC) {
+      } else if (lastStreakLoginDateStr !== todayDateStringLocal) {
         streakProcessedForToday = true;
-        const lastLoginDate = new Date(lastStreakLoginDateStr + 'T00:00:00Z');
-        const todayStart = new Date(todayDateStringUTC + 'T00:00:00Z');
+        const lastLoginDateParts = lastStreakLoginDateStr.split('-').map(Number);
+        const lastLoginDate = new Date(lastLoginDateParts[0], lastLoginDateParts[1] - 1, lastLoginDateParts[2]);
+        const todayLocalParts = todayDateStringLocal.split('-').map(Number);
+        const todayStartLocal = new Date(todayLocalParts[0], todayLocalParts[1] - 1, todayLocalParts[2]);
+        const yesterdayStartLocal = new Date(todayStartLocal);
+        yesterdayStartLocal.setDate(todayStartLocal.getDate() - 1);
 
-        const yesterdayStart = new Date(todayStart);
-        yesterdayStart.setUTCDate(todayStart.getUTCDate() - 1);
-
-        if (lastLoginDate.getTime() === yesterdayStart.getTime()) {
+        if (lastLoginDate.getTime() === yesterdayStartLocal.getTime()) {
           newStreakCount = currentStreak + 1;
         } else {
           newStreakCount = 1;
         }
-        newLastStreakLoginDate = todayDateStringUTC;
+        newLastStreakLoginDate = todayDateStringLocal;
       } else {
          streakProcessedForToday = false;
       }

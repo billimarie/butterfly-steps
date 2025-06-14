@@ -7,20 +7,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
-import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIconLucide, Users as TeamIcon, LogOut, PlusCircle, CalendarDays, EggIcon, ShellIcon as ShellIconLucide, SparklesIcon, Layers, Replace } from 'lucide-react'; // Renamed ShellIcon to ShellIconLucide
+import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIconLucide, Users as TeamIcon, LogOut, PlusCircle, CalendarDays, EggIcon, ShellIcon as ShellIconLucideOriginal, SparklesIcon, Layers, Replace, Palette } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ALL_BADGES, type BadgeData } from '@/lib/badges';
 import type { BadgeId } from '@/lib/badges';
-import { leaveTeam } from '@/lib/firebaseService';
+import { leaveTeam, getTodaysDateClientLocal, getChallengeDayNumberFromDateString, getChallengeDateStringByDayNumber } from '@/lib/firebaseService';
 import { useState, useEffect, useCallback } from 'react';
 import StepSubmissionForm from '@/components/dashboard/StepSubmissionForm';
 import { Separator } from '@/components/ui/separator';
-import type { UserProfile } from '@/types';
-import { CHALLENGE_DURATION_DAYS, CHRYSALIS_AVATAR_IDENTIFIER } from '@/types'; 
+import type { UserProfile, ChrysalisVariantData } from '@/types';
+import { CHALLENGE_DURATION_DAYS, CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import BadgeDetailModal from '@/components/profile/BadgeDetailModal';
+import { getChrysalisVariantByDay } from '@/lib/chrysalisVariants';
+import CoinDetailActivationModal from './CoinDetailActivationModal'; // New Import
 
 const WormIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -59,7 +61,7 @@ interface StreakAchievement {
 const STREAK_ACHIEVEMENTS: StreakAchievement[] = [
   { id: 'egg', name: 'Persistent Egg', requiredStreak: 30, icon: EggIcon, description: 'Logged in for 30 consecutive days! Hatching potential!' },
   { id: 'caterpillar', name: 'Curious Caterpillar', requiredStreak: 60, icon: WormIcon, description: '60 day streak! Munching through the days!' },
-  { id: 'chrysalis', name: 'Committed Chrysalis', requiredStreak: 90, icon: ShellIconLucide, description: '90 days of consistency! Transformation is near.' },
+  { id: 'chrysalis', name: 'Committed Chrysalis', requiredStreak: 90, icon: ShellIconLucideOriginal, description: '90 days of consistency! Transformation is near.' },
   { id: 'butterfly', name: 'Monarch Dedication', requiredStreak: 133, icon: SparklesIcon, description: 'Logged in every day of the challenge until Halloween! True Monarch Spirit!' },
 ];
 
@@ -69,12 +71,16 @@ interface ProfileDisplayProps {
 }
 
 export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDisplayProps) {
-  const { user: authUser, fetchUserProfile: fetchAuthUserProfile, setShowStreakModal, setStreakModalContext } = useAuth();
+  const { user: authUser, fetchUserProfile: fetchAuthUserProfile, setShowStreakModal, setStreakModalContext, activateThemeFromCollectedCoin } = useAuth();
   const { toast } = useToast();
   const [leavingTeam, setLeavingTeam] = useState(false);
 
   const [isExistingBadgeModalOpen, setIsExistingBadgeModalOpen] = useState(false);
   const [selectedExistingBadge, setSelectedExistingBadge] = useState<BadgeData | null>(null);
+
+  const [isCoinDetailModalOpen, setIsCoinDetailModalOpen] = useState(false);
+  const [selectedCoinForModal, setSelectedCoinForModal] = useState<ChrysalisVariantData | null>(null);
+
 
   const progressPercentage = profileData.stepGoal ? (profileData.currentSteps / profileData.stepGoal) * 100 : 0;
   const collectedCoinsCount = profileData.chrysalisCoinDates?.length || 0;
@@ -105,6 +111,11 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     }
   };
 
+  const handleCoinGalleryItemClick = (variant: ChrysalisVariantData) => {
+    setSelectedCoinForModal(variant);
+    setIsCoinDetailModalOpen(true);
+  };
+
 
   const earnedBadgeIds = profileData.badgesEarned || [];
   const earnedBadgesDetails: BadgeData[] = earnedBadgeIds
@@ -113,6 +124,10 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
 
   const hasAnyStreakAchievement = STREAK_ACHIEVEMENTS.some(ach => profileData.currentStreak >= ach.requiredStreak);
   const showStreakMilestonesSection = isOwnProfile || (!isOwnProfile && hasAnyStreakAchievement);
+
+  const currentChallengeDay = getChallengeDayNumberFromDateString(getTodaysDateClientLocal());
+  const challengeYear = new Date(profileData.lastLoginTimestamp ? profileData.lastLoginTimestamp.toDate() : Date.now()).getFullYear();
+
 
   return (
     <>
@@ -126,10 +141,10 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                   "p-2 rounded-full focus:outline-none focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-card",
                   isOwnProfile ? "cursor-pointer" : "cursor-default" 
                 )}
-                aria-label={isOwnProfile ? "Change Chrysalis Avatar" : "Golden Chrysalis Avatar"}
+                aria-label={isOwnProfile ? "Change Chrysalis Avatar or Theme" : "Chrysalis Avatar"}
                 disabled={!isOwnProfile}
               >
-                <ShellIconLucide className="h-32 w-32 md:h-36 md:w-36 text-primary animate-chrysalis-glow" data-ai-hint="chrysalis shell gold" />
+                <ShellIconLucideOriginal className="h-32 w-32 md:h-36 md:w-36 text-primary animate-chrysalis-glow" data-ai-hint="chrysalis shell gold" />
               </button>
             </div>
           )}
@@ -184,30 +199,61 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
           <Separator className="my-6" />
 
           <div className="space-y-3">
-            <h3 className="text-lg font-semibold flex items-center"><Layers className="mr-2 h-5 w-5 text-primary" /> Chrysalis Coins</h3>
-            <div className="flex items-center space-x-2">
-              <ShellIconLucide className="h-8 w-8 text-primary" data-ai-hint="chrysalis shell gold"/>
-              <p className="text-xl">
-                Collected: <span className="font-bold text-accent">{collectedCoinsCount}</span> / {CHALLENGE_DURATION_DAYS}
-              </p>
-            </div>
-            {collectedCoinsCount === 0 && isOwnProfile && (
-                <p className="text-sm text-muted-foreground">Log in and log your steps daily to collect coins!</p>
-            )}
-            {collectedCoinsCount > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2 items-center">
-                {Array.from({ length: Math.min(collectedCoinsCount, 7) }).map((_, i) => ( 
-                  <ShellIconLucide key={`coin-display-${i}`} className="h-5 w-5 text-yellow-500" data-ai-hint="chrysalis shell gold"/>
-                ))}
-                {collectedCoinsCount > 7 && <span className="text-sm text-muted-foreground self-end">...and more!</span>}
+            <h3 className="text-lg font-semibold flex items-center">
+              <Layers className="mr-2 h-5 w-5 text-primary" /> Chrysalis Coins Gallery
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Collected: <span className="font-bold text-accent">{collectedCoinsCount}</span> / {currentChallengeDay > 0 ? currentChallengeDay : CHALLENGE_DURATION_DAYS} days so far. Click a coin to view details or activate its theme.
+            </p>
+            {currentChallengeDay > 0 ? (
+              <div className="flex flex-wrap gap-x-3 gap-y-4 justify-center pt-2">
+                {Array.from({ length: currentChallengeDay }, (_, i) => i + 1).map((dayNum) => {
+                  const variant = getChrysalisVariantByDay(dayNum);
+                  if (!variant) return null;
+
+                  const challengeDateForDay = getChallengeDateStringByDayNumber(dayNum, challengeYear);
+                  const isCollected = profileData.chrysalisCoinDates?.includes(challengeDateForDay) ?? false;
+                  const CoinIcon = variant.icon || ShellIconLucideOriginal;
+
+                  return (
+                    <button
+                      key={variant.id}
+                      onClick={() => handleCoinGalleryItemClick(variant)}
+                      className={cn(
+                        "p-3 rounded-lg flex flex-col items-center w-28 min-h-[7.5rem] text-center shadow-sm transition-all justify-between", // Ensure items have consistent height
+                        "border hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary",
+                        isCollected ? "bg-card border-primary/30" : "bg-muted/40 border-muted-foreground/20 opacity-60 hover:opacity-100"
+                      )}
+                      aria-label={`View ${variant.name}`}
+                      disabled={!isOwnProfile && !isCollected} // Only allow clicking collected for others, any for self
+                    >
+                      <CoinIcon className={cn(
+                        "h-10 w-10 mb-1.5 flex-shrink-0", // Adjusted size and margin
+                        isCollected ? "text-primary" : "text-muted-foreground"
+                      )} />
+                      <div className="flex-grow flex flex-col justify-end w-full">
+                        <span className={cn(
+                          "text-xs font-medium block truncate w-full leading-tight", // Ensure text doesn't overflow and aligns well
+                          isCollected ? "text-foreground" : "text-muted-foreground"
+                        )}>
+                          {variant.name}
+                        </span>
+                        {!isCollected && <span className="text-xs text-muted-foreground/80 mt-0.5">(Missed)</span>}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
+            ) : (
+               <p className="text-muted-foreground text-center py-4">The challenge hasn't started yet. Coins will appear here once it begins!</p>
             )}
             {isOwnProfile && profileData.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER && collectedCoinsCount > 0 && ( 
-                 <Button variant="outline" size="sm" onClick={handleChrysalisAvatarClick} className="mt-2">
-                    <Replace className="mr-2 h-4 w-4" /> Set Chrysalis Avatar
+                 <Button variant="outline" size="sm" onClick={handleChrysalisAvatarClick} className="mt-3">
+                    <Replace className="mr-2 h-4 w-4" /> Set Golden Chrysalis Avatar
                 </Button>
             )}
           </div>
+
 
           <Separator className="my-6" />
           
@@ -308,6 +354,13 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
             isOpen={isExistingBadgeModalOpen}
             onOpenChange={setIsExistingBadgeModalOpen}
             badge={selectedExistingBadge}
+        />
+      )}
+      {isOwnProfile && (
+        <CoinDetailActivationModal
+          isOpen={isCoinDetailModalOpen}
+          onOpenChange={setIsCoinDetailModalOpen}
+          coinVariant={selectedCoinForModal}
         />
       )}
     </>
