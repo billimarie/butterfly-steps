@@ -24,8 +24,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, X, User, LogOut, LayoutDashboard, ShoppingCart, Plus, Settings as SettingsIcon, BarChart3 } from 'lucide-react';
+import { Menu, X, User, LogOut, LayoutDashboard, ShoppingCart, Plus, Settings as SettingsIcon, BarChart3, Shell } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+
+const CHRYSALIS_AVATAR_IDENTIFIER = 'lucide:shell';
 
 export default function Navbar() {
   const { user, userProfile, logout, loading, fetchUserProfile } = useAuth();
@@ -76,6 +78,22 @@ export default function Navbar() {
     )
   );
 
+  const renderAvatarContent = () => {
+    // Check userProfile.photoURL first (from Firestore), then user.photoURL (from Firebase Auth)
+    const currentPhotoURL = userProfile?.photoURL || user?.photoURL;
+
+    if (currentPhotoURL === CHRYSALIS_AVATAR_IDENTIFIER) {
+      return <Shell className="!h-full !w-full p-1.5 text-primary" data-ai-hint="chrysalis shell gold" />;
+    }
+    return (
+      <>
+        <AvatarImage src={currentPhotoURL || undefined} alt={userProfile?.displayName || user?.email || 'User'} />
+        <AvatarFallback>{getInitials(userProfile?.displayName || user?.email)}</AvatarFallback>
+      </>
+    );
+  };
+
+
   return (
     <header className="bg-background/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
       <nav className="container mx-auto px-4 py-3 flex justify-between items-center">
@@ -96,8 +114,7 @@ export default function Navbar() {
                   aria-label="Toggle Mobile Menu"
                 >
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={user.photoURL || undefined} alt={userProfile?.displayName || user.email || 'User'} />
-                    <AvatarFallback>{getInitials(userProfile?.displayName || user.email)}</AvatarFallback>
+                    {renderAvatarContent()}
                   </Avatar>
                 </Button>
               ) : (
@@ -125,8 +142,7 @@ export default function Navbar() {
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={user.photoURL || undefined} alt={userProfile?.displayName || user.email || 'User'} />
-                        <AvatarFallback>{getInitials(userProfile?.displayName || user.email)}</AvatarFallback>
+                        {renderAvatarContent()}
                       </Avatar>
                     </Button>
                   </DropdownMenuTrigger>

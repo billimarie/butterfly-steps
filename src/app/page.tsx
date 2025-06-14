@@ -20,6 +20,7 @@ import CountdownTimer from '@/components/dashboard/CountdownTimer';
 import InteractiveMap from '@/components/dashboard/InteractiveMap';
 import ButterflyAnimation from '@/components/dashboard/ButterflyAnimation';
 import CommunityProgressCard from '@/components/dashboard/CommunityProgressCard';
+import { auth } from '@/lib/firebase'; // Added auth import
 
 
 function LandingPage() {
@@ -28,19 +29,36 @@ function LandingPage() {
 
   const fetchLandingPageStats = useCallback(async () => {
     setStatsLoading(true);
-    try {
-      const stats = await getCommunityStats();
-      setCommunityStats(stats);
-    } catch (error) {
-      console.error("Failed to fetch community stats for landing page:", error);
-      setCommunityStats(null);
-    } finally {
-      setStatsLoading(false);
+    // Only attempt to fetch if a user might be logged in or rules allow unauthenticated access
+    // For now, let's assume rules might allow authenticated, so we check auth.currentUser
+    if (auth.currentUser) {
+        try {
+            const stats = await getCommunityStats();
+            setCommunityStats(stats);
+        } catch (error) {
+            console.error("Failed to fetch community stats for landing page:", error);
+            setCommunityStats(null); // Keep it null on error
+        } finally {
+            setStatsLoading(false);
+        }
+    } else {
+        // No user logged in, don't attempt to fetch to avoid permission errors.
+        // UI will show "unavailable" or loading state.
+        console.log("Landing page: No user logged in, skipping community stats fetch.");
+        setCommunityStats(null);
+        setStatsLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      // Re-fetch stats if auth state changes, to catch cases where user logs in/out
+      // while on the landing page, or initial auth state resolves.
+      fetchLandingPageStats();
+    });
+    // Initial fetch
     fetchLandingPageStats();
+    return () => unsubscribe();
   }, [fetchLandingPageStats]);
 
   return (
@@ -112,7 +130,16 @@ function LandingPage() {
       </div>
 
       <div id="community-landing" className="p-8 space-y-8 container mx-auto px-4">
-        <CommunityProgressCard communityStats={communityStats} />
+        {statsLoading ? (
+            <div className="space-y-3"><Skeleton className="h-40 w-full rounded-lg" /><Skeleton className="h-20 w-full rounded-lg" /></div>
+        ) : communityStats ? (
+            <CommunityProgressCard communityStats={communityStats} />
+        ) : (
+            <Card className="text-center">
+                <CardHeader><CardTitle className="font-headline text-2xl flex items-center justify-center"><Users className="mr-2 h-6 w-6 text-primary" />Community Progress</CardTitle></CardHeader>
+                <CardContent><p className="text-muted-foreground">Community stats are available after logging in or signing up.</p></CardContent>
+            </Card>
+        )}
       </div>
 
       <div className="p-8 space-y-8 container mx-auto px-4">
@@ -130,8 +157,8 @@ function LandingPage() {
           </div>
         ) : (
           <Card className="text-center">
-            <CardHeader className="text-left"><CardTitle className="font-headline text-2xl flex items-center"><Users className="mr-2 h-6 w-6 text-primary" />Community Progress Unavailable</CardTitle></CardHeader>
-            <CardContent className="text-left"><p className="text-muted-foreground">Could not load community progress at this time. Please check back later.</p></CardContent>
+            <CardHeader className="text-left"><CardTitle className="font-headline text-2xl flex items-center justify-center"><Users className="mr-2 h-6 w-6 text-primary" />Community Migration Map</CardTitle></CardHeader>
+            <CardContent className="text-left"><p className="text-muted-foreground">The migration map and progress are available after logging in or signing up.</p></CardContent>
           </Card>
         )}
       </div>
@@ -310,3 +337,4 @@ export default function HomePage() {
     </Suspense>
   );
 }
+

@@ -5,10 +5,12 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Medal, Footprints, Users as TeamIcon } from 'lucide-react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Medal, Footprints, Users as TeamIcon, Shell } from 'lucide-react'; // Added Shell
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // Added AvatarImage
 import { getTopUsers } from '@/lib/firebaseService';
 import type { UserProfile } from '@/types';
+
+const CHRYSALIS_AVATAR_IDENTIFIER = 'lucide:shell';
 
 const getInitials = (name: string | null | undefined) => {
     if (!name) return '?';
@@ -43,6 +45,18 @@ export default function TopSteppersLeaderboard({ count }: TopSteppersLeaderboard
     fetchTopUsersData();
   }, [fetchTopUsersData]);
 
+  const renderAvatarContent = (user: UserProfile) => {
+    if (user.photoURL === CHRYSALIS_AVATAR_IDENTIFIER) {
+      return <Shell className="h-full w-full p-1.5 text-primary" data-ai-hint="chrysalis shell gold" />;
+    }
+    return (
+      <>
+        <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} />
+        <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
+      </>
+    );
+  };
+
   return (
     <div>
       {loadingTopUsers ? (
@@ -70,11 +84,11 @@ export default function TopSteppersLeaderboard({ count }: TopSteppersLeaderboard
               href={`/profile/${user.uid}`}
               className="block rounded-lg transition-shadow hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
             >
-              <Card className="shadow-md"> {/* Removed hover, transition, and cursor styles from Card */}
+              <Card className="shadow-md">
                 <CardHeader className="flex flex-row items-center justify-between space-x-4 pb-3 pt-4 px-4">
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10 border">
-                      <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
+                      {renderAvatarContent(user)}
                     </Avatar>
                     <div>
                       <p className="text-sm font-medium leading-none">{user.displayName || 'Anonymous User'}</p>
