@@ -13,15 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { createUserWithEmailAndPassword, type AuthError } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { createTeam, joinTeam, incrementParticipantCount, getUserProfile } from '@/lib/firebaseService';
-import type { ActivityStatus, UserProfile, TeamActionResult } from '@/types';
+import { doc, setDoc } from 'firebase/firestore';
+import { incrementParticipantCount } from '@/lib/firebaseService';
+import type { ActivityStatus, UserProfile } from '@/types';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Mail, Lock, UserPlus, User as UserIcon, CheckCircle, Zap, TrendingUp, Target, Users, PlusCircle, LogIn, Globe } from 'lucide-react';
+import { Mail, Lock, UserPlus, User as UserIcon, CheckCircle, Zap, TrendingUp, Target, Globe } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Separator } from '@/components/ui/separator';
-import type { BadgeData, BadgeId } from '@/lib/badges';
 
 
 const activityGoalsMap: Record<ActivityStatus, { label: string; goals: string[] }> = {
@@ -44,7 +43,7 @@ const commonTimezones = [
 ];
 
 const signupSchema = z.object({
-  displayName: z.string().min(2, { message: 'Display name must be at least 2 characters' }).max(50),
+  displayName: z.string().trim().min(2, { message: 'Display name must be at least 2 characters' }).max(50, { message: 'Display name cannot exceed 50 characters' }),
   email: z.string().email({ message: 'Invalid email address' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
   activityStatus: z.enum(['Sedentary', 'Moderately Active', 'Very Active'], {
@@ -56,9 +55,6 @@ const signupSchema = z.object({
     z.number().positive('Custom goal must be a positive number.').optional()
   ),
   timezone: z.string().optional().nullable(),
-  teamAction: z.enum(['none', 'create', 'join']).default('none'),
-  newTeamName: z.string().min(3, "Team name must be at least 3 characters").max(50).optional(),
-  joinTeamId: z.string().min(5, "Team ID seems too short").optional(),
 }).refine(data => {
   if (data.stepGoalOption === 'Custom') {
     return data.customStepGoal !== undefined && data.customStepGoal > 0;
@@ -67,19 +63,12 @@ const signupSchema = z.object({
 }, {
   message: 'Custom step goal is required when "Custom" is selected.',
   path: ['customStepGoal'],
-}).refine(data => {
-    if (data.teamAction === 'create') return !!data.newTeamName;
-    return true;
-}, { message: 'Team name is required to create a team.', path: ['newTeamName']})
-.refine(data => {
-    if (data.teamAction === 'join') return !!data.joinTeamId;
-    return true;
-}, { message: 'Team ID is required to join a team.', path: ['joinTeamId']});
+});
 
 type SignupFormInputs = z.infer<typeof signupSchema>;
 
 interface SignupFormProps {
-    invitedTeamId?: string | null;
+    invitedTeamId?: string | null; // Keep prop for potential future use, but form won't use it now
 }
 
 export default function SignupForm({ invitedTeamId }: SignupFormProps) {
@@ -87,11 +76,8 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
-  const { fetchUserProfile, setShowNewBadgeModal } = useAuth(); 
+  const { fetchUserProfile } = useAuth(); 
 
-  const [invitedTeamDetailsLoading, setInvitedTeamDetailsLoading] = useState(false);
-  const [fetchedInvitedTeamName, setFetchedInvitedTeamName] = useState<string | null>(null);
-  const [fetchedInvitedTeamCreatorDisplayName, setFetchedInvitedTeamCreatorDisplayName] = useState<string | null>(null);
   const [browserTimezone, setBrowserTimezone] = useState<string | null>(null);
 
   useEffect(() => {
@@ -104,6 +90,7 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
   
   const { control, handleSubmit, watch, setValue, formState: { errors }, trigger } = useForm<SignupFormInputs>({
     resolver: zodResolver(signupSchema),
+    mode: 'onChange',
     defaultValues: {
       displayName: '',
       email: '',
@@ -112,14 +99,10 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
       stepGoalOption: undefined,
       customStepGoal: undefined,
       timezone: browserTimezone || null,
-      teamAction: invitedTeamId ? 'join' : 'none',
-      newTeamName: '',
-      joinTeamId: invitedTeamId || '',
     },
   });
 
   useEffect(() => {
-    // Set default timezone once browserTimezone is resolved
     if (browserTimezone && !watch('timezone')) {
         setValue('timezone', browserTimezone);
     }
@@ -127,59 +110,14 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
 
   const selectedActivityStatus = watch('activityStatus');
   const selectedStepGoalOption = watch('stepGoalOption');
-  const selectedTeamAction = watch('teamAction');
-  const currentJoinTeamIdValue = watch('joinTeamId');
-
-
-  const fetchInvitedTeamDetails = useCallback(async (teamIdToFetch: string) => {
-    if (!teamIdToFetch) return;
-    setInvitedTeamDetailsLoading(true);
-    try {
-      const teamDocRef = doc(db, 'teams', teamIdToFetch);
-      const teamSnap = await getDoc(teamDocRef);
-      if (teamSnap.exists()) {
-        const teamData = teamSnap.data();
-        setFetchedInvitedTeamName(teamData.name);
-        if (teamData.creatorUid) {
-          const creatorProfile = await getUserProfile(teamData.creatorUid);
-          setFetchedInvitedTeamCreatorDisplayName(creatorProfile?.displayName || 'Unknown Creator');
-        }
-      } else {
-        toast({ title: "Invite Invalid", description: "The team ID from the invite link could not be found. You can still join manually.", variant: "destructive" });
-        setFetchedInvitedTeamName(null);
-        setFetchedInvitedTeamCreatorDisplayName(null);
-        setValue('teamAction', 'none'); 
-        setValue('joinTeamId', '');
-      }
-    } catch (error) {
-      console.error("Error fetching invited team details:", error);
-      toast({ title: "Error", description: "Could not fetch details for the invited team.", variant: "destructive" });
-      setFetchedInvitedTeamName(null);
-      setFetchedInvitedTeamCreatorDisplayName(null);
-    } finally {
-      setInvitedTeamDetailsLoading(false);
-    }
-  }, [toast, setValue]);
-
-  useEffect(() => {
-    if (invitedTeamId) {
-      setValue('teamAction', 'join');
-      setValue('joinTeamId', invitedTeamId);
-      fetchInvitedTeamDetails(invitedTeamId);
-    }
-  }, [invitedTeamId, setValue, fetchInvitedTeamDetails]);
 
   const handleNextStep = async () => {
     let fieldsToValidate: (keyof SignupFormInputs)[] = [];
     if (currentStep === 1) {
       fieldsToValidate = ['displayName', 'email', 'password'];
-    } else if (currentStep === 2) {
-      fieldsToValidate = ['activityStatus', 'stepGoalOption', 'timezone'];
-      if (watch('stepGoalOption') === 'Custom') {
-        fieldsToValidate.push('customStepGoal');
-      }
-    }
-
+    } 
+    // No Step 2 validation here, submission happens on Step 2
+    
     const isValid = fieldsToValidate.length > 0 ? await trigger(fieldsToValidate) : true;
     if (isValid) {
       setCurrentStep(prev => prev + 1);
@@ -212,62 +150,42 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
       const fullProfileData: UserProfile = {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
-        displayName: data.displayName,
+        displayName: data.displayName.trim(), 
         activityStatus: data.activityStatus,
         stepGoal: finalStepGoal,
         timezone: data.timezone || browserTimezone || null,
         currentSteps: 0,
         profileComplete: true,
         inviteLink: `${process.env.NEXT_PUBLIC_APP_URL || ''}/profile/${firebaseUser.uid}`,
-        badgesEarned: [],
-        teamId: null,
-        teamName: null,
+        badgesEarned: [], // No team badge awarded at signup now
+        teamId: null,     // Team info is null at signup
+        teamName: null,   // Team info is null at signup
         currentStreak: 0,
         lastStreakLoginDate: null,
         lastLoginTimestamp: null,
+        chrysalisCoinDates: [],
+        activeChrysalisThemeId: null,
+        photoURL: firebaseUser.photoURL,
+        dashboardLayout: { dashboardOrder: [], communityOrder: [] },
       };
-
-      let awardedTeamBadgeFromAction: BadgeData | null | undefined = undefined;
-
-      if (data.teamAction === 'create' && data.newTeamName) {
-        const teamResult: TeamActionResult = await createTeam(firebaseUser.uid, data.newTeamName, 0);
-        fullProfileData.teamId = teamResult.teamId;
-        fullProfileData.teamName = teamResult.teamName;
-        awardedTeamBadgeFromAction = teamResult.awardedTeamBadge;
-      } else if (data.teamAction === 'join' && data.joinTeamId) {
-        const teamResult: TeamActionResult | null = await joinTeam(firebaseUser.uid, data.joinTeamId, 0);
-        if (teamResult) {
-          fullProfileData.teamId = teamResult.teamId;
-          fullProfileData.teamName = teamResult.teamName;
-          awardedTeamBadgeFromAction = teamResult.awardedTeamBadge;
-        } else {
-          toast({ title: 'Failed to Join Team', description: 'Please check the Team ID and try again, or the team may no longer exist.', variant: 'destructive'});
-          setLoading(false);
-          return;
-        }
-      }
-
-      if (awardedTeamBadgeFromAction && !fullProfileData.badgesEarned?.includes(awardedTeamBadgeFromAction.id as BadgeId)) {
-        fullProfileData.badgesEarned = [...(fullProfileData.badgesEarned || []), awardedTeamBadgeFromAction.id as BadgeId];
-      }
       
       await setDoc(doc(db, "users", firebaseUser.uid), fullProfileData);
       await incrementParticipantCount();
       
       toast({ title: 'Account Created & Profile Setup!', description: "Welcome to the Butterfly Steps challenge!" });
-
-      if (awardedTeamBadgeFromAction) {
-         setShowNewBadgeModal(awardedTeamBadgeFromAction);
-      }
       
       await fetchUserProfile(firebaseUser.uid, true); 
       
     } catch (error) {
       const authError = error as AuthError;
       console.error('Signup error:', authError);
+      let description = authError.message || 'An unexpected error occurred. Please try again.';
+      if (authError.code === 'auth/email-already-in-use') {
+        description = 'This email address is already registered. Please use a different email or log in.';
+      }
       toast({
         title: 'Signup Failed',
-        description: authError.message || 'An unexpected error occurred. Please try again.',
+        description: description,
         variant: 'destructive',
       });
     } finally {
@@ -406,7 +324,7 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
                             onValueChange={(value) => {
                                 field.onChange(value === "auto" ? browserTimezone : value);
                             }}
-                            value={field.value || "auto"} // Default to 'auto' if field.value is null/undefined
+                            value={field.value || "auto"} 
                         >
                             <SelectTrigger id="timezone">
                                 <SelectValue placeholder="Select your timezone" />
@@ -428,116 +346,6 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
             </div>
           </>
         );
-      case 3:
-        return (
-          <>
-            <h2 className="text-xl font-semibold font-headline text-primary border-b pb-2 mb-6">Step 3: Join a Team (Optional)</h2>
-            <div className="space-y-4">
-                <Controller
-                    name="teamAction"
-                    control={control}
-                    render={({ field }) => (
-                    <RadioGroup
-                        onValueChange={(newTeamActionValue) => {
-                        const action = newTeamActionValue as 'none' | 'create' | 'join';
-                        field.onChange(action);
-                        
-                        if (action === 'join') {
-                            setValue('newTeamName', '');
-                            if (invitedTeamId) {
-                                setValue('joinTeamId', invitedTeamId);
-                                if (!fetchedInvitedTeamName || currentJoinTeamIdValue !== invitedTeamId) {
-                                    fetchInvitedTeamDetails(invitedTeamId);
-                                }
-                            } else {
-                                if(currentJoinTeamIdValue === invitedTeamId && invitedTeamId){
-                                    // User manually selected 'join' but was already on the invite context, keep details
-                                } else {
-                                    setValue('joinTeamId', ''); 
-                                    setFetchedInvitedTeamName(null);
-                                    setFetchedInvitedTeamCreatorDisplayName(null);
-                                }
-                            }
-                        } else if (action === 'create') {
-                            setValue('joinTeamId', '');
-                            setFetchedInvitedTeamName(null);
-                            setFetchedInvitedTeamCreatorDisplayName(null);
-                        } else { 
-                            setValue('joinTeamId', '');
-                            setValue('newTeamName', '');
-                            setFetchedInvitedTeamName(null);
-                            setFetchedInvitedTeamCreatorDisplayName(null);
-                        }
-                        }}
-                        value={field.value} 
-                        className="space-y-2"
-                    >
-                        <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="none" id="signupTeamNone" />
-                        <Label htmlFor="signupTeamNone">No team action / Skip for now</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="create" id="signupTeamCreate" />
-                        <Label htmlFor="signupTeamCreate">Create a new team</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="join" id="signupTeamJoin" />
-                        <Label htmlFor="signupTeamJoin">Join an existing team</Label>
-                        </div>
-                    </RadioGroup>
-                    )}
-                />
-
-                {selectedTeamAction === 'create' && (
-                    <div className="space-y-2 pl-6 pt-2">
-                    <Label htmlFor="newTeamName">New Team Name</Label>
-                    <Controller
-                        name="newTeamName"
-                        control={control}
-                        render={({ field }) => <Input id="newTeamName" placeholder="e.g., The Monarch Trackers" {...field} />}
-                    />
-                    {errors.newTeamName && <p className="text-sm text-destructive">{errors.newTeamName.message}</p>}
-                    </div>
-                )}
-
-                {selectedTeamAction === 'join' && (
-                    <div className="space-y-2 pl-6 pt-2">
-                    {currentJoinTeamIdValue === invitedTeamId && invitedTeamId ? (
-                        invitedTeamDetailsLoading ? (
-                        <p className="text-sm text-muted-foreground">Loading team details for invite...</p>
-                        ) : fetchedInvitedTeamName ? (
-                        <div>
-                            <Label>Joining team from invite:</Label>
-                            <div className="p-3 mt-1 border rounded-md bg-muted/30 shadow-sm">
-                            <p className="font-semibold text-primary">{fetchedInvitedTeamName}</p>
-                            {fetchedInvitedTeamCreatorDisplayName && (
-                                <p className="text-xs text-muted-foreground">
-                                Created by: {fetchedInvitedTeamCreatorDisplayName}
-                                </p>
-                            )}
-                            </div>
-                            <Controller name="joinTeamId" control={control} defaultValue={invitedTeamId} render={({ field }) => ( <input type="hidden" {...field} /> )} />
-                        </div>
-                        ) : (
-                        <>
-                            <Label htmlFor="joinTeamIdManualFallback">Team ID to Join</Label>
-                            <Controller name="joinTeamId" control={control} defaultValue="" render={({ field }) => ( <Input id="joinTeamIdManualFallback" placeholder="Invited team not found. Enter ID manually." {...field} /> )} />
-                            {errors.joinTeamId && <p className="text-sm text-destructive">{errors.joinTeamId.message}</p>}
-                        </>
-                        )
-                    ) : (
-                        <>
-                        <Label htmlFor="joinTeamIdManual">Team ID to Join</Label>
-                        <Controller name="joinTeamId" control={control} render={({ field }) => ( <Input id="joinTeamIdManual" placeholder="Enter Team ID" {...field} value={field.value || ''} /> )} />
-                        {errors.joinTeamId && <p className="text-sm text-destructive">{errors.joinTeamId.message}</p>}
-                        <p className="text-xs text-muted-foreground">Ask the team creator for the Team ID.</p>
-                        </>
-                    )}
-                    </div>
-                )}
-            </div>
-          </>
-        );
       default:
         return null;
     }
@@ -555,19 +363,19 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
       <div className="flex flex-col space-y-3 sm:flex-row sm:justify-between sm:items-center sm:space-y-0">
         <div>
             {currentStep > 1 && (
-            <Button type="button" variant="outline" onClick={handlePrevStep} disabled={loading || invitedTeamDetailsLoading} className="w-full sm:w-auto">
+            <Button type="button" variant="outline" onClick={handlePrevStep} disabled={loading} className="w-full sm:w-auto">
                 Back
             </Button>
             )}
         </div>
         <div>
-            {currentStep < 3 ? (
-            <Button type="button" onClick={handleNextStep} disabled={loading || invitedTeamDetailsLoading} className="w-full sm:w-auto">
+            {currentStep < 2 ? ( // Only 2 steps now
+            <Button type="button" onClick={handleNextStep} disabled={loading} className="w-full sm:w-auto">
                 Continue
             </Button>
             ) : (
-            <Button type="submit" className="w-full sm:w-auto" disabled={loading || invitedTeamDetailsLoading}>
-                {loading || invitedTeamDetailsLoading ? 'Creating Account & Profile...' : (<><UserPlus className="mr-2 h-5 w-5" /> Sign Up & Start Challenge</>)}
+            <Button type="submit" className="w-full sm:w-auto" disabled={loading}>
+                {loading ? 'Creating Account & Profile...' : (<><UserPlus className="mr-2 h-5 w-5" /> Sign Up & Start Challenge</>)}
             </Button>
             )}
         </div>
@@ -584,3 +392,4 @@ export default function SignupForm({ invitedTeamId }: SignupFormProps) {
     </form>
   );
 }
+
