@@ -175,7 +175,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
       <Card className="w-full max-w-2xl mx-auto shadow-xl">
         <CardHeader className="text-center">
           <MainChrysalisAvatar />
-          <div className="flex justify-between items-start text-left">
+          <div className="flex justify-between items-start text-left flex-col space-y-4 sm:flex-row sm:space-y-0">
             <div>
               <CardTitle className="font-headline text-3xl flex items-center">
                 <User className="mr-3 h-8 w-8 text-primary" />

@@ -57,7 +57,7 @@ export default function Navbar() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 rounded-full text-muted-foreground hover:text-primary"
+            className="h-9 w-9 rounded-full text-muted-foreground hover:text-primary hover:bg-accent"
             aria-label="Log Steps"
           >
             <Plus className="h-6 w-6" />
@@ -108,7 +108,7 @@ export default function Navbar() {
               ) : user ? (
                 <Button
                   variant="ghost"
-                  className="relative h-9 w-9 rounded-full p-0 hover:bg-none"
+                  className="relative h-9 w-9 rounded-full p-0 hover:bg-transparent"
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                   aria-label="Toggle Mobile Menu"
                 >
@@ -121,7 +121,7 @@ export default function Navbar() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 text-muted-foreground hover:text-primary hover:bg-none"
+                    className="h-9 w-9 text-muted-foreground hover:bg-transparent hover:text-muted-foreground"
                     onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                     aria-label="Toggle Mobile Menu"
                   >
@@ -178,11 +178,11 @@ export default function Navbar() {
               </>
             ) : (
               <>
-                <Button asChild variant="ghost">
-                  <Link href="/signup">Sign Up</Link>
-                </Button>
-                <Button asChild  className="ml-2">
+                <Button variant="ghost" asChild>
                   <Link href="/login">Login</Link>
+                </Button>
+                <Button asChild className="ml-2">
+                  <Link href="/signup">Sign Up</Link>
                 </Button>
               </>
             )
