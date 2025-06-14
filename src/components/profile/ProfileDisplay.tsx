@@ -12,17 +12,19 @@ import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ALL_BADGES, type BadgeData } from '@/lib/badges';
 import type { BadgeId } from '@/lib/badges';
-import { leaveTeam, getTodaysDateClientLocal, getChallengeDayNumberFromDateString, getChallengeDateStringByDayNumber } from '@/lib/firebaseService';
+import { leaveTeam, getTodaysDateClientLocal, getChallengeDayNumberFromDateString, getChallengeDateStringByDayNumber, getUserDailySteps } from '@/lib/firebaseService';
 import { useState, useEffect, useCallback } from 'react';
 import StepSubmissionForm from '@/components/dashboard/StepSubmissionForm';
 import { Separator } from '@/components/ui/separator';
-import type { UserProfile, ChrysalisVariantData } from '@/types';
+import type { UserProfile, ChrysalisVariantData, DailyStep } from '@/types';
 import { CHALLENGE_DURATION_DAYS, CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import BadgeDetailModal from '@/components/profile/BadgeDetailModal';
 import { getChrysalisVariantByDay, getChrysalisVariantById } from '@/lib/chrysalisVariants';
-import CoinDetailActivationModal from './CoinDetailActivationModal'; 
+import CoinDetailActivationModal from './CoinDetailActivationModal';
+import DailyStepChart from '@/components/profile/DailyStepChart';
+
 
 const WormIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -82,9 +84,30 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   const [selectedCoinForModal, setSelectedCoinForModal] = useState<ChrysalisVariantData | null>(null);
   const [isViewingMissedCoin, setIsViewingMissedCoin] = useState(false);
 
+  const [dailyStepsData, setDailyStepsData] = useState<DailyStep[]>([]);
+  const [isLoadingChart, setIsLoadingChart] = useState(true);
 
   const progressPercentage = profileData.stepGoal ? (profileData.currentSteps / profileData.stepGoal) * 100 : 0;
   const collectedCoinsCount = profileData.chrysalisCoinDates?.length || 0;
+
+  useEffect(() => {
+    const fetchChartData = async () => {
+      if (profileData.uid) {
+        setIsLoadingChart(true);
+        try {
+          const data = await getUserDailySteps(profileData.uid, 30); // Get last 30 days of data
+          setDailyStepsData(data);
+        } catch (error) {
+          console.error("Failed to fetch daily steps data for chart:", error);
+          setDailyStepsData([]);
+        } finally {
+          setIsLoadingChart(false);
+        }
+      }
+    };
+    fetchChartData();
+  }, [profileData.uid]);
+
 
   const handleShare = () => {
     if (profileData.inviteLink) {
@@ -99,7 +122,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   };
 
   const handleExistingBadgeClick = (badge: BadgeData) => {
-    if (isOwnProfile) { 
+    if (isOwnProfile) {
         setSelectedExistingBadge(badge);
         setIsExistingBadgeModalOpen(true);
     }
@@ -112,9 +135,9 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     }
   };
 
-  const handleCoinGalleryItemClick = (variant: ChrysalisVariantData, isMissedAndPastCoin: boolean) => {
+  const handleCoinGalleryItemClick = (variant: ChrysalisVariantData, isMissed: boolean) => {
     setSelectedCoinForModal(variant);
-    setIsViewingMissedCoin(isMissedAndPastCoin);
+    setIsViewingMissedCoin(isMissed);
     setIsCoinDetailModalOpen(true);
   };
 
@@ -138,24 +161,28 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
         variantToShow = getChrysalisVariantById(profileData.activeChrysalisThemeId);
     }
     if (!variantToShow) {
-        variantToShow = getChrysalisVariantByDay(1); // Default to Golden if no theme set or not found
+        variantToShow = getChrysalisVariantByDay(1);
     }
-    
+
     const IconComponent = variantToShow?.icon || ShellIconOriginal;
-    
-    const iconColorStyle = isOwnProfile
-      ? { color: `hsl(var(--primary))` } 
-      : variantToShow?.themePrimaryHSL 
-        ? { color: `hsl(${variantToShow.themePrimaryHSL})` }
-        : { color: 'hsl(var(--muted-foreground))' }; // Fallback color for viewed user if somehow no themePrimaryHSL
+
+    let iconColorStyle: React.CSSProperties = {};
+    if (isOwnProfile) {
+        iconColorStyle = { color: `hsl(var(--primary))` }; // Uses the theme variable directly
+    } else if (variantToShow?.themePrimaryHSL) {
+        iconColorStyle = { color: `hsl(${variantToShow.themePrimaryHSL})` };
+    } else {
+        iconColorStyle = { color: 'hsl(var(--muted-foreground))' }; // Fallback
+    }
+
 
     const iconClassName = cn(
       "h-32 w-32 md:h-36 md:w-36",
       isOwnProfile ? "animate-chrysalis-glow" : "opacity-90"
     );
-    
-    const buttonAriaLabel = isOwnProfile 
-      ? "Change Chrysalis Avatar or Theme" 
+
+    const buttonAriaLabel = isOwnProfile
+      ? "Change Chrysalis Avatar or Theme"
       : `${variantToShow?.name || 'Chrysalis'} Avatar`;
 
     return (
@@ -179,7 +206,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   return (
     <>
       <Card className="w-full max-w-2xl mx-auto shadow-xl">
-        <CardHeader className="text-center"> 
+        <CardHeader className="text-center">
           <MainChrysalisAvatar />
           <div className="flex justify-between items-start text-left">
             <div>
@@ -228,7 +255,16 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                 )}
               </div>
           </div>
-          
+
+          <Separator className="my-6" />
+
+          <DailyStepChart
+            dailyStepsData={dailyStepsData}
+            isLoading={isLoadingChart}
+            userProfile={profileData}
+            chartType="user"
+          />
+
           <Separator className="my-6" />
 
           <div className="space-y-3">
@@ -254,24 +290,24 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                       key={variant.id}
                       onClick={() => isOwnProfile && handleCoinGalleryItemClick(variant, isMissedAndPast)}
                       className={cn(
-                        "p-3 rounded-lg flex flex-col items-center w-28 min-h-[8.5rem] text-center shadow-sm transition-all justify-between", 
+                        "p-3 rounded-lg flex flex-col items-center w-28 min-h-[8.5rem] text-center shadow-sm transition-all justify-between",
                         "border hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary",
                         isCollected ? "bg-card border-primary/30" : "bg-muted/40 border-muted-foreground/20",
                         isOwnProfile ? "cursor-pointer hover:opacity-100" : (isCollected ? "cursor-default" : "cursor-not-allowed opacity-50"),
-                        !isCollected && !isMissedAndPast && "opacity-50 cursor-not-allowed", // Future, uncollected
-                        isMissedAndPast && isOwnProfile && "hover:border-accent cursor-pointer opacity-75 hover:opacity-100", // Missed, own profile
-                        isMissedAndPast && !isOwnProfile && "opacity-50 cursor-not-allowed" // Missed, other's profile
+                        !isCollected && !isMissedAndPast && "opacity-50 cursor-not-allowed",
+                        isMissedAndPast && isOwnProfile && "hover:border-accent cursor-pointer opacity-75 hover:opacity-100",
+                        isMissedAndPast && !isOwnProfile && "opacity-50 cursor-not-allowed"
                       )}
                       aria-label={`View ${variant.name}`}
-                      disabled={!isOwnProfile && !isCollected && !isMissedAndPast} 
+                      disabled={!isOwnProfile && !isCollected && !isMissedAndPast}
                     >
                       <CoinIcon className={cn(
-                        "h-12 w-12 mb-1.5 flex-shrink-0", 
+                        "h-12 w-12 mb-1.5 flex-shrink-0",
                         isCollected ? "text-primary" : "text-muted-foreground"
-                      )} />
+                      )} data-ai-hint={variant.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"} />
                       <div className="flex-grow flex flex-col justify-end w-full">
                         <span className={cn(
-                          "text-xs font-medium block truncate w-full leading-tight", 
+                          "text-xs font-medium block truncate w-full leading-tight",
                           isCollected ? "text-foreground" : "text-muted-foreground"
                         )}>
                           {variant.name}
@@ -286,7 +322,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
             ) : (
                <p className="text-muted-foreground text-center py-4">The challenge hasn't started yet. Coins will appear here once it begins!</p>
             )}
-            {isOwnProfile && profileData.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER && collectedCoinsCount > 0 && ( 
+            {isOwnProfile && profileData.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER && collectedCoinsCount > 0 && (
                  <Button variant="outline" size="sm" onClick={handleChrysalisAvatarClick} className="mt-3">
                     <Replace className="mr-2 h-4 w-4" /> Set Golden Chrysalis Avatar
                 </Button>
@@ -295,14 +331,14 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
 
 
           <Separator className="my-6" />
-          
+
           {showStreakMilestonesSection && (
             <div className="space-y-3">
               <h3 className="text-lg font-semibold flex items-center"><CalendarDays className="mr-2 h-5 w-5 text-primary" /> Streak Milestones</h3>
               {profileData.currentStreak > 0 ? (
                 <p className="text-sm text-muted-foreground">Current login streak: <strong className="text-accent">{profileData.currentStreak} day{profileData.currentStreak === 1 ? '' : 's'}</strong></p>
               ) : (
-                isOwnProfile && <p className="text-sm text-muted-foreground">This user hasn't started a login streak yet.</p> 
+                isOwnProfile && <p className="text-sm text-muted-foreground">This user hasn't started a login streak yet.</p>
               )}
               <div className="flex flex-wrap gap-3 justify-center">
                 {STREAK_ACHIEVEMENTS.map((achievement) => {
@@ -335,7 +371,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
           )}
 
           <Separator className="my-6" />
-          
+
           <div className="space-y-3">
             <h3 className="text-lg font-semibold flex items-center">
               <AwardIconLucide className="mr-2 h-5 w-5 text-primary" /> Badges Earned ({earnedBadgesDetails.length})
@@ -349,14 +385,14 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                   const nonInteractiveBadgeClasses = "cursor-default";
 
                   return (
-                    <div 
+                    <div
                       key={badge.id}
                       onClick={isOwnProfile ? () => handleExistingBadgeClick(badge) : undefined}
                       className={cn(
                         commonBadgeClasses,
                         isOwnProfile ? interactiveBadgeClasses : nonInteractiveBadgeClasses
                       )}
-                      role={isOwnProfile ? "button" : "img"} 
+                      role={isOwnProfile ? "button" : "img"}
                       tabIndex={isOwnProfile ? 0 : -1}
                       aria-label={isOwnProfile ? `View details for ${badge.name} badge` : badge.name}
                       onKeyDown={isOwnProfile ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleExistingBadgeClick(badge); } : undefined}
@@ -371,7 +407,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
               <p className="text-muted-foreground text-center">{isOwnProfile ? "Start logging steps" : "This user has not earned any badges"} to earn badges!</p>
             )}
           </div>
-          
+
           {isOwnProfile && profileData.inviteLink && (
             <div className="space-y-2">
               <h3 className="text-lg font-semibold flex items-center"><Share2 className="mr-2 h-5 w-5 text-primary" />Share Profile</h3>
@@ -387,7 +423,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
 
         </CardContent>
       </Card>
-      
+
       {isOwnProfile && (
         <BadgeDetailModal
             isOpen={isExistingBadgeModalOpen}

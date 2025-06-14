@@ -19,7 +19,7 @@ export default function DailyGoalMetModal() {
         <DialogHeader className="p-6 pb-2 text-center bg-gradient-to-br from-primary via-primary to-accent">
           <DialogTitle className="font-headline text-3xl text-primary-foreground flex items-center justify-center">
             <Target className="mr-3 h-8 w-8 text-yellow-300" />
-            Daily Goal Achieved!
+            Daily Goal Achieved
           </DialogTitle>
         </DialogHeader>
         <div className="pt-6 pb-6 px-6 space-y-6 text-center">
@@ -29,12 +29,12 @@ export default function DailyGoalMetModal() {
                 Fantastic!
               </p>
               <p className="text-lg text-muted-foreground mt-1">
-                You've met your step target for today. Keep up the great work!
+                You've met your step target for today.
               </p>
             </div>
         </div>
         <DialogFooter className="px-6 py-4 bg-muted/30 flex justify-center items-center space-x-2">
-          <p className="text-sm text-muted-foreground">Way to go, champion!</p>
+          <p className="text-sm text-muted-foreground">Keep up the great work!</p>
           <img
             src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1749691114/Cartoons/catti-the-caterpillar_b9skmk.png"
             className="w-10 h-10 animate-catti-wiggle"
