@@ -79,7 +79,9 @@ export default function CommunityFeedTabContent() {
             <TopSteppersLeaderboard count={5} />
           </CardContent>
           <CardFooter>
-            <a href="#" className="text-sm text-muted-foreground ml-auto order-2 underline">View All</a>
+            <Link href="/participants" className="text-sm text-muted-foreground ml-auto order-2 underline hover:text-primary">
+              View All Participants
+            </Link>
           </CardFooter>
         </Card>
 
