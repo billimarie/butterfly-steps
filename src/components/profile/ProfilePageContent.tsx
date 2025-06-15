@@ -36,7 +36,16 @@ interface ProfilePageContentProps {
 }
 
 export default function ProfilePageContent({ viewedUserId }: ProfilePageContentProps) {
-  const { user: authUser, userProfile: authUserProfile, loading: authLoading, fetchUserProfile, setShowNewBadgeModal, recordSectionVisit } = useAuth();
+  const { 
+    user: authUser, 
+    userProfile: authUserProfile, 
+    loading: authLoading, 
+    isLoggingOut, // Get isLoggingOut from context
+    fetchUserProfile, 
+    setShowNewBadgeModal, 
+    recordSectionVisit 
+  } = useAuth();
+  
   useAuthRedirect({ requireAuth: true });
 
   const searchParams = useSearchParams();
@@ -49,11 +58,15 @@ export default function ProfilePageContent({ viewedUserId }: ProfilePageContentP
 
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || isLoggingOut) return; // If AuthContext is loading OR logging out, wait.
 
     if (!authUser) {
       setIsLoadingTargetProfile(false);
-      setProfileError("You must be logged in to view profiles.");
+      // Only set error if not actively logging out.
+      // The useAuthRedirect hook should handle navigation to /login if requireAuth is true.
+      if (!isLoggingOut) { 
+        setProfileError("You must be logged in to view profiles.");
+      }
       return;
     }
 
@@ -84,11 +97,12 @@ export default function ProfilePageContent({ viewedUserId }: ProfilePageContentP
           setIsLoadingTargetProfile(false);
         });
     }
-  }, [viewedUserId, authUser, authUserProfile, authLoading, recordSectionVisit]);
+  }, [viewedUserId, authUser, authUserProfile, authLoading, isLoggingOut, recordSectionVisit]); // Added isLoggingOut
 
   useEffect(() => {
-    // Award 'social-butterfly' badge if viewing another profile for the first time
-    if (!authLoading && authUser && authUserProfile && profileToDisplay && !isOwnProfileView) {
+    if (authLoading || isLoggingOut) return; // Also guard this effect
+
+    if (authUser && authUserProfile && profileToDisplay && !isOwnProfileView) {
       const socialButterflyBadgeId: BadgeId = 'social-butterfly';
       const alreadyHasBadge = authUserProfile.badgesEarned?.includes(socialButterflyBadgeId);
 
@@ -98,7 +112,6 @@ export default function ProfilePageContent({ viewedUserId }: ProfilePageContentP
             const awardedBadge = await awardSpecificBadgeIfUnearned(authUser.uid, socialButterflyBadgeId);
             if (awardedBadge) {
               setShowNewBadgeModal(awardedBadge);
-              // Refresh authUserProfile to include the new badge for future checks
               await fetchUserProfile(authUser.uid);
             }
           } catch (error) {
@@ -108,10 +121,10 @@ export default function ProfilePageContent({ viewedUserId }: ProfilePageContentP
         attemptAward();
       }
     }
-  }, [authLoading, authUser, authUserProfile, profileToDisplay, isOwnProfileView, setShowNewBadgeModal, fetchUserProfile, viewedUserId]);
+  }, [authLoading, isLoggingOut, authUser, authUserProfile, profileToDisplay, isOwnProfileView, setShowNewBadgeModal, fetchUserProfile, viewedUserId]); // Added isLoggingOut
 
 
-  if (authLoading || isLoadingTargetProfile) {
+  if (authLoading || isLoadingTargetProfile || isLoggingOut) { // Check isLoggingOut here too
     return <ProfilePageSkeleton />;
   }
 
@@ -137,7 +150,7 @@ export default function ProfilePageContent({ viewedUserId }: ProfilePageContentP
             </Card>
         );
     }
-    return <ProfilePageSkeleton />;
+    return <ProfilePageSkeleton />; // Should be caught by authLoading or isLoadingTargetProfile
   }
 
   if (isOwnProfileView && (!profileToDisplay.profileComplete || editMode)) {

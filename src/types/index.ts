@@ -51,20 +51,20 @@ export interface Team {
 export interface Challenge {
   id: string; // Firestore document ID
   name: string;
-  structuredDescription: string; // Auto-generated descriptive sentence
-  creatorMessage?: string; // Optional personal message from creator
+  structuredDescription: string; 
+  creatorMessage?: string; 
   challengeType: 'directUser' | 'teamChallenge' | 'openChallenge';
-  creatorUid: string; // User who initiated the challenge
-  creatorName?: string; // Display name of the creator, denormalized for easier display in lists
+  creatorUid: string; 
+  creatorName?: string; 
 
-  opponentUid?: string; // The UID of the user being challenged (for directUser type)
-  opponentName?: string; // Display name of the opponent, denormalized
-  opponentStatus?: 'pending' | 'accepted' | 'declined'; // Opponent's response (for directUser type)
+  opponentUid?: string; 
+  opponentName?: string; 
+  opponentStatus?: 'pending' | 'accepted' | 'declined'; 
 
-  participantUids: string[]; // UIDs of all accepted/active participants
+  participantUids: string[]; 
   
-  goalType: 'steps' | 'activeDays'; // What is being measured
-  goalValue: number; // The target value for the goalType
+  goalType: 'steps' | 'activeDays'; 
+  goalValue: number; 
 
   startDate: Timestamp;
   endDate: Timestamp;
@@ -73,16 +73,16 @@ export interface Challenge {
 
   participantProgress?: {
     [uid: string]: {
-      currentValue: number; // e.g., steps taken since challenge startDate for this specific challenge
+      currentValue: number; 
       lastUpdated: Timestamp;
     };
   };
   
-  winnerUids?: string[]; // UIDs of users who won the challenge
-  badgeToAwardOnCompletion?: BadgeId; // Optional: Badge for all who complete/meet criteria
-  badgeToAwardOnWin?: BadgeId; // Optional: Badge for winners
+  winnerUids?: string[]; 
+  badgeToAwardOnCompletion?: BadgeId; 
+  badgeToAwardOnWin?: BadgeId; 
 
-  stakes?: string; // Optional: User-defined fun stakes for the challenge
+  stakes?: string; 
 
   repetition?: {
     type: 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -134,6 +134,7 @@ export interface AuthContextType {
   user: FirebaseUser | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  isLoggingOut: boolean; // New property
   error: Error | null;
   logout: () => Promise<void>;
   fetchUserProfile: (
@@ -164,14 +165,17 @@ export interface AuthContextType {
   showWelcomeMigrationModal: boolean;
   setShowWelcomeMigrationModal: (show: boolean) => void;
   recordSectionVisit: (sectionKey: ExplorerSectionKey) => Promise<void>;
+  pendingChallengeInvitationToShow: Challenge | null;
+  setShowChallengeInvitationModal: (challenge: Challenge | null) => void;
+  acceptChallengeInvitation: (challengeId: string) => Promise<void>;
+  declineChallengeInvitation: (challengeId: string) => Promise<void>;
 }
 
 export interface ChallengeCreationData {
   goalValue: number;
-  startDate: Date;
+  startDate: Date; 
   name?: string;
-  structuredDescription: string; // Main structured description
-  creatorMessage?: string; // Optional personal message from creator
+  structuredDescription: string;
+  creatorMessage?: string;
   stakes?: string;
 }
-

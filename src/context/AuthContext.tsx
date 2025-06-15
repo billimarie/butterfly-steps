@@ -5,7 +5,7 @@ import type { User as FirebaseUser } from 'firebase/auth';
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, signOut as firebaseSignOut, updateProfile } from 'firebase/auth';
-import type { UserProfile, AuthContextType, StreakUpdateResults, BadgeData, StreakModalViewContext, LogStepsModalOrigin, ChrysalisVariantData, ExplorerSectionKey } from '@/types';
+import type { UserProfile, AuthContextType, StreakUpdateResults, BadgeData, StreakModalViewContext, LogStepsModalOrigin, ChrysalisVariantData, ExplorerSectionKey, Challenge } from '@/types';
 import { CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
 import {
   getUserProfile,
@@ -15,6 +15,9 @@ import {
   getTodaysDateClientLocal,
   checkAndAwardBadges as checkAndAwardStepBadges,
   awardSpecificBadgeIfUnearned,
+  getPendingChallengeInvitations, 
+  acceptChallenge as acceptChallengeService, 
+  declineChallenge as declineChallengeService, 
 } from '@/lib/firebaseService';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -55,6 +58,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false); // New state
   const [error, setError] = useState<Error | null>(null);
   const [showStreakModal, setShowStreakModal] = useState(false);
   const [streakModalContext, setStreakModalContext] = useState<StreakModalViewContext>('login');
@@ -68,6 +72,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const [showWelcomeMigrationModal, setShowWelcomeMigrationModal] = useState(false);
   const [hasSeenWelcomeMigrationModal, setHasSeenWelcomeMigrationModal] = useState(false);
+
+  const [pendingChallengeInvitationToShow, setPendingChallengeInvitationToShow] = useState<Challenge | null>(null);
 
 
   const router = useRouter();
@@ -122,9 +128,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (isInitialAuthEvent && !isPostSignup && finalProfile && !finalProfile.profileComplete) {
           toast({ title: 'Welcome!', description: "Let's complete your profile setup." });
         } else if (isInitialAuthEvent && !isPostSignup && !finalProfile) {
-          // This case should ideally not happen if user exists in auth but not Firestore.
-          // SignupForm creates the Firestore doc.
-          // For safety, prompt to set up profile.
           toast({ title: 'Welcome!', description: "Please set up your profile to get started." });
         }
       }
@@ -170,6 +173,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                  });
             }
         }
+        if (finalProfile.profileComplete) {
+            const invitations = await getPendingChallengeInvitations(uid);
+            if (invitations.length > 0 && !pendingChallengeInvitationToShow) { 
+                setPendingChallengeInvitationToShow(invitations[0]);
+            }
+        }
+
       }
 
       setUserProfile(finalProfile);
@@ -191,27 +201,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast, applyTheme, newlyEarnedBadgeToShow, hasSeenWelcomeMigrationModal ]);
+  }, [toast, applyTheme, newlyEarnedBadgeToShow, hasSeenWelcomeMigrationModal, pendingChallengeInvitationToShow ]);
 
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setLoading(true);
       setError(null);
       if (firebaseUser) {
         const isNewAuthUser = user === null || firebaseUser.uid !== user?.uid;
+        setLoading(true); // Set loading true when auth state changes to user
         setUser(firebaseUser);
         if (isNewAuthUser) {
             await fetchUserProfile(firebaseUser.uid, true, false, false);
         } else {
+            // User is the same, profile might have been updated elsewhere, or just apply theme
             if (userProfile?.activeChrysalisThemeId) {
                 applyTheme(userProfile.activeChrysalisThemeId);
             } else {
                 applyTheme(null);
             }
-            setLoading(false);
+            setLoading(false); // No full fetch, so set loading false
         }
-      } else {
+      } else { // firebaseUser is null (logged out)
         setUser(null);
         setUserProfile(null);
         setShowStreakModal(false);
@@ -223,8 +234,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setJustCollectedCoin(null);
         setShowWelcomeMigrationModal(false);
         setHasSeenWelcomeMigrationModal(false);
+        setPendingChallengeInvitationToShow(null);
         applyTheme(null);
         setLoading(false);
+        setIsLoggingOut(false); // Ensure isLoggingOut is false after state is cleared
       }
     }, (authError) => {
       setError(authError as Error);
@@ -239,13 +252,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setJustCollectedCoin(null);
       setShowWelcomeMigrationModal(false);
       setHasSeenWelcomeMigrationModal(false);
+      setPendingChallengeInvitationToShow(null);
       applyTheme(null);
       setLoading(false);
+      setIsLoggingOut(false);
     });
 
     return () => unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchUserProfile, user, applyTheme]);
+  }, [fetchUserProfile, user, applyTheme]); // Removed userProfile from here to avoid loops if profile updates trigger refetch unnecessarily
 
   const setUserProfileState = (profile: UserProfile | null) => {
     setUserProfile(profile);
@@ -257,28 +272,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    setLoading(true);
+    setIsLoggingOut(true);
     try {
+      router.push('/'); 
       await firebaseSignOut(auth);
-      router.push('/');
-      setUser(null);
-      setUserProfile(null);
-      setShowStreakModal(false);
-      setStreakModalContext('login');
-      setShowDailyGoalMetModal(false);
-      setNewlyEarnedBadgeToShow(null);
-      _setShowLogStepsModal(false);
-      setLogStepsFlowOrigin(null);
-      setJustCollectedCoin(null);
-      setShowWelcomeMigrationModal(false);
-      setHasSeenWelcomeMigrationModal(false);
-      applyTheme(null);
+      // `onAuthStateChanged` will handle resetting user state, profile, loading, and isLoggingOut
     } catch (e) {
       setError(e as Error);
       console.error("Logout failed:", e);
-      applyTheme(null);
-    } finally {
-      // setLoading(false) will be handled by onAuthStateChanged
+      // Attempt to gracefully handle a failed sign-out
+      router.push('/'); // Ensure redirect to home
+      if (auth.currentUser) { // If sign-out *really* failed, user might still be "logged in"
+        // Don't clear local state if Firebase still thinks user is logged in, to avoid inconsistency
+      } else {
+        // If Firebase auth state is null despite error, manually clear things as a fallback
+        setUser(null); setUserProfile(null); setShowStreakModal(false); /* ...etc. */ applyTheme(null);
+      }
+      setIsLoggingOut(false); // Reset flag on error
+      setLoading(false); // Ensure loading is false if onAuthStateChanged doesn't handle it
     }
   };
 
@@ -448,16 +459,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const awardedBadge = await awardSpecificBadgeIfUnearned(user.uid, EXPLORER_BADGE_ID);
         if (awardedBadge) {
           setShowNewBadgeModal(awardedBadge);
-          // Refresh entire profile to ensure badgesEarned is up-to-date in context
           await fetchUserProfile(user.uid);
         }
       }
     } catch (e) {
       console.error("Failed to record section visit or award explorer badge:", e);
-      // Optionally revert local state change if Firestore update fails
       setUserProfile(prev => prev ? { ...prev, visitedSections: currentVisited } : null);
     }
   }, [user, userProfile, fetchUserProfile, setShowNewBadgeModal]);
+
+  const acceptChallengeInvitation = async (challengeId: string) => {
+    if (!user) {
+        toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
+        return;
+    }
+    try {
+        await acceptChallengeService(challengeId, user.uid);
+        toast({ title: "Challenge Accepted!", description: "Let the friendly competition begin!" });
+        setPendingChallengeInvitationToShow(null); 
+        await fetchUserProfile(user.uid); 
+    } catch (e) {
+        toast({ title: "Failed to Accept Challenge", description: (e as Error).message, variant: "destructive" });
+        console.error("Failed to accept challenge:", e);
+    }
+  };
+
+  const declineChallengeInvitation = async (challengeId: string) => {
+    if (!user) {
+        toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
+        return;
+    }
+    try {
+        await declineChallengeService(challengeId, user.uid);
+        toast({ title: "Challenge Declined", description: "The challenge invitation has been declined." });
+        setPendingChallengeInvitationToShow(null);
+        await fetchUserProfile(user.uid); 
+    } catch (e) {
+        toast({ title: "Failed to Decline Challenge", description: (e as Error).message, variant: "destructive" });
+        console.error("Failed to decline challenge:", e);
+    }
+  };
+
+  const internalSetShowChallengeInvitationModal = (challenge: Challenge | null) => {
+    setPendingChallengeInvitationToShow(challenge);
+  };
 
 
   return (
@@ -465,6 +510,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user,
       userProfile,
       loading,
+      isLoggingOut, // Pass down new state
       error,
       logout,
       fetchUserProfile,
@@ -490,6 +536,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       showWelcomeMigrationModal,
       setShowWelcomeMigrationModal,
       recordSectionVisit,
+      pendingChallengeInvitationToShow,
+      setShowChallengeInvitationModal: internalSetShowChallengeInvitationModal,
+      acceptChallengeInvitation,
+      declineChallengeInvitation,
     }}>
       {children}
     </AuthContext.Provider>
