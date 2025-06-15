@@ -28,6 +28,14 @@ import type { User as FirebaseUser } from 'firebase/auth';
 import { ALL_BADGES, type BadgeData, type BadgeId, getBadgeDataById } from '@/lib/badges';
 import { format } from 'date-fns';
 
+// Define Firestore collection/document constants
+const USERS_COLLECTION = "users";
+const DAILY_STEPS_SUBCOLLECTION = "dailySteps";
+const COMMUNITY_COLLECTION = "community";
+const COMMUNITY_STATS_DOC = "stats";
+const TEAMS_COLLECTION = "teams";
+const CHALLENGES_COLLECTION = "challenges";
+
 
 // Helper function to get the challenge start date for a given year (UTC)
 export function getChallengeStartDate(year: number): Date {
@@ -622,34 +630,37 @@ export async function getTopUsers(count: number): Promise<UserProfile[]> {
 }
 
 export async function issueDirectChallenge(
-  creatorProfile: UserProfile,
+  creatorUid: string,
+  creatorDisplayName: string | undefined,
   opponentUid: string,
-  opponentName: string,
+  opponentDisplayName: string,
   challengeCreationDetails: ChallengeCreationData
 ): Promise<string> {
   const challengesRef = collection(db, CHALLENGES_COLLECTION);
 
   const { startDate, goalValue, name, structuredDescription, creatorMessage, stakes } = challengeCreationDetails;
 
-  const challengeStartDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-  const challengeEndDate = new Date(challengeStartDate);
-  challengeEndDate.setHours(23, 59, 59, 999);
+  const challengeStartDateUTC = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate()));
+  
+  const challengeEndDateUTC = new Date(challengeStartDateUTC);
+  challengeEndDateUTC.setUTCHours(23, 59, 59, 999);
+
 
   const newChallengeData: Omit<Challenge, 'id'> = {
-    name: name || `${creatorProfile.displayName || 'Challenger'} vs ${opponentName}: Daily Step Battle!`,
+    name: name || `${creatorDisplayName || 'Challenger'} vs ${opponentDisplayName}: Daily Step Battle!`,
     structuredDescription: structuredDescription,
     creatorMessage: creatorMessage,
     challengeType: 'directUser',
-    creatorUid: creatorProfile.uid,
-    creatorName: creatorProfile.displayName || undefined,
+    creatorUid: creatorUid, // Use the passed creatorUid
+    creatorName: creatorDisplayName, // Use the passed creatorDisplayName
     opponentUid: opponentUid,
-    opponentName: opponentName,
+    opponentName: opponentDisplayName,
     opponentStatus: 'pending',
-    participantUids: [],
+    participantUids: [], 
     goalType: 'steps',
     goalValue: goalValue,
-    startDate: Timestamp.fromDate(challengeStartDate),
-    endDate: Timestamp.fromDate(challengeEndDate),
+    startDate: Timestamp.fromDate(challengeStartDateUTC),
+    endDate: Timestamp.fromDate(challengeEndDateUTC),
     status: 'invitation',
     participantProgress: {},
     winnerUids: [],
@@ -657,6 +668,14 @@ export async function issueDirectChallenge(
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
   };
+
+  if (!creatorUid) {
+    throw new Error("Creator UID is undefined in issueDirectChallenge.");
+  }
+  if (!opponentUid) {
+    throw new Error("Opponent UID is undefined in issueDirectChallenge.");
+  }
+
 
   const docRef = await addDoc(challengesRef, newChallengeData);
   return docRef.id;
