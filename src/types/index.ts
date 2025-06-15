@@ -51,7 +51,8 @@ export interface Team {
 export interface Challenge {
   id: string; // Firestore document ID
   name: string;
-  description?: string;
+  structuredDescription: string; // Auto-generated descriptive sentence
+  creatorMessage?: string; // Optional personal message from creator
   challengeType: 'directUser' | 'teamChallenge' | 'openChallenge';
   creatorUid: string; // User who initiated the challenge
   creatorName?: string; // Display name of the creator, denormalized for easier display in lists
@@ -66,7 +67,7 @@ export interface Challenge {
   goalValue: number; // The target value for the goalType
 
   startDate: Timestamp;
-  endDate: Timestamp; // For daily challenges, this will be the end of the startDate.
+  endDate: Timestamp;
 
   status: 'invitation' | 'accepted' | 'active' | 'complete' | 'cancelled';
 
@@ -83,7 +84,7 @@ export interface Challenge {
 
   stakes?: string; // Optional: User-defined fun stakes for the challenge
 
-  repetition?: { // Optional: For recurring challenges
+  repetition?: {
     type: 'daily' | 'weekly' | 'monthly' | 'yearly';
     nextInstanceStartDate?: Timestamp;
   };
@@ -167,10 +168,10 @@ export interface AuthContextType {
 
 export interface ChallengeCreationData {
   goalValue: number;
-  startDate: Date; // User selects the start date for the daily challenge
-  // Optional fields for future expansion
+  startDate: Date;
   name?: string;
-  description?: string;
+  structuredDescription: string; // Main structured description
+  creatorMessage?: string; // Optional personal message from creator
   stakes?: string;
 }
 

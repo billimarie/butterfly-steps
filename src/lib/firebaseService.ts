@@ -26,13 +26,7 @@ import type { UserProfile, CommunityStats, Team, DailyStep, StreakUpdateResults,
 import { CHALLENGE_DURATION_DAYS } from '@/types'; // Import the constant
 import type { User as FirebaseUser } from 'firebase/auth';
 import { ALL_BADGES, type BadgeData, type BadgeId, getBadgeDataById } from '@/lib/badges';
-
-const USERS_COLLECTION = 'users';
-const TEAMS_COLLECTION = 'teams';
-const COMMUNITY_COLLECTION = 'community';
-const COMMUNITY_STATS_DOC = 'stats';
-const DAILY_STEPS_SUBCOLLECTION = 'dailySteps';
-const CHALLENGES_COLLECTION = 'challenges';
+import { format } from 'date-fns';
 
 
 // Helper function to get the challenge start date for a given year (UTC)
@@ -635,31 +629,31 @@ export async function issueDirectChallenge(
 ): Promise<string> {
   const challengesRef = collection(db, CHALLENGES_COLLECTION);
 
-  const { startDate, goalValue, name, description, stakes } = challengeCreationDetails;
+  const { startDate, goalValue, name, structuredDescription, creatorMessage, stakes } = challengeCreationDetails;
 
-  // Calculate endDate as the end of the startDate (UTC)
-  const challengeStartDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()); // Start of day, local to form
+  const challengeStartDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
   const challengeEndDate = new Date(challengeStartDate);
-  challengeEndDate.setHours(23, 59, 59, 999); // End of day, local to form
+  challengeEndDate.setHours(23, 59, 59, 999);
 
   const newChallengeData: Omit<Challenge, 'id'> = {
     name: name || `${creatorProfile.displayName || 'Challenger'} vs ${opponentName}: Daily Step Battle!`,
-    description: description || `A friendly competition to see who takes more steps or reaches ${goalValue.toLocaleString()} steps first on ${format(startDate, "PPP")}.`,
+    structuredDescription: structuredDescription,
+    creatorMessage: creatorMessage,
     challengeType: 'directUser',
     creatorUid: creatorProfile.uid,
     creatorName: creatorProfile.displayName || undefined,
     opponentUid: opponentUid,
     opponentName: opponentName,
-    opponentStatus: 'pending', // Opponent needs to accept
-    participantUids: [], // Populated when opponent accepts
+    opponentStatus: 'pending',
+    participantUids: [],
     goalType: 'steps',
     goalValue: goalValue,
     startDate: Timestamp.fromDate(challengeStartDate),
-    endDate: Timestamp.fromDate(challengeEndDate), // Challenge is for the single selected day
-    status: 'invitation', // Initial status until opponent accepts
+    endDate: Timestamp.fromDate(challengeEndDate),
+    status: 'invitation',
     participantProgress: {},
     winnerUids: [],
-    stakes: stakes || "Bragging rights!",
+    stakes: stakes,
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
   };

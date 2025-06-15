@@ -15,19 +15,19 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { issueDirectChallenge } from '@/lib/firebaseService';
 import type { ChallengeCreationData } from '@/types';
-import { Footprints, CalendarIcon, Target, FileText, Gift as GiftIcon, Send } from 'lucide-react';
+import { Footprints, CalendarIcon, Target, FileText, Gift as GiftIcon, Send, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
 const createChallengeSchema = z.object({
   name: z.string().trim().min(3, "Challenge name must be at least 3 characters.").max(100, "Challenge name is too long (max 100 characters).").optional(),
-  description: z.string().max(200, "Description is too long (max 200 characters).").optional(),
+  creatorMessage: z.string().max(200, "Personal message is too long (max 200 characters).").optional(),
   goalValue: z.preprocess(
     (val) => (val === "" ? undefined : Number(String(val).replace(/,/g, ''))),
     z.number().int().positive({ message: 'Steps goal must be a positive number.' }).min(100, 'Daily challenge goal should be at least 100 steps.')
   ),
   startDate: z.date({ required_error: "Please select a start date." })
-    .min(new Date(new Date().setHours(0, 0, 0, 0)), { message: "Start date cannot be in the past." }), // Today or future
+    .min(new Date(new Date().setHours(0, 0, 0, 0)), { message: "Start date cannot be in the past." }),
   stakes: z.string().max(100, "Stakes description is too long (max 100 characters).").optional(),
 });
 
@@ -45,17 +45,16 @@ export default function CreateChallengeForm({ opponentUid, opponentDisplayName, 
   const { toast } = useToast();
 
   const defaultName = `${creatorProfile?.displayName || 'You'} vs ${opponentDisplayName}: Daily Step Battle!`;
-  const defaultDescription = `A friendly competition to see who takes more steps or reaches the goal first on the selected day.`;
   const defaultStakes = "Bragging rights!";
 
   const { control, register, handleSubmit, formState: { errors }, watch } = useForm<CreateChallengeFormInputs>({
     resolver: zodResolver(createChallengeSchema),
     defaultValues: {
       name: defaultName,
-      description: defaultDescription,
+      creatorMessage: "", // Default empty, user can add a personal note
       stakes: defaultStakes,
-      startDate: new Date(new Date().setHours(0,0,0,0)), // Default to today
-      goalValue: 5000, // Default goal
+      startDate: new Date(new Date().setHours(0,0,0,0)),
+      goalValue: 5000,
     }
   });
 
@@ -63,13 +62,13 @@ export default function CreateChallengeForm({ opponentUid, opponentDisplayName, 
   const watchedGoalValue = watch("goalValue");
   const watchedStakes = watch("stakes");
 
-  const generatedChallengeSentence = () => {
-    const creatorName = creatorProfile?.displayName || "Challenger";
-    const opponent = opponentDisplayName || "Opponent";
+  const generateStructuredDescription = () => {
+    const creatorNameStr = creatorProfile?.displayName || "Challenger";
+    const opponentNameStr = opponentDisplayName || "Opponent";
     const dateStr = watchedStartDate ? format(watchedStartDate, "PPP") : "[Date]";
     const goalStr = watchedGoalValue ? watchedGoalValue.toLocaleString() : "[Goal]";
     const stakesStr = watchedStakes || "bragging rights";
-    return `${creatorName} and ${opponent} will begin their daily challenge on ${dateStr}. Whoever reaches ${goalStr} steps OR has the highest number of steps by the end of the day, will receive the following: ${stakesStr}.`;
+    return `${creatorNameStr} and ${opponentNameStr} will begin their daily challenge on ${dateStr}. Whoever reaches ${goalStr} steps OR has the highest number of steps by the end of the day, will receive the following: ${stakesStr}.`;
   };
 
   const onSubmit: SubmitHandler<CreateChallengeFormInputs> = async (data) => {
@@ -79,11 +78,14 @@ export default function CreateChallengeForm({ opponentUid, opponentDisplayName, 
     }
     setLoading(true);
     try {
+      const structuredDesc = generateStructuredDescription();
+      
       const challengeDetails: ChallengeCreationData = {
         startDate: data.startDate,
         goalValue: data.goalValue,
         name: data.name || defaultName,
-        description: data.description || generatedChallengeSentence(), // Use generated sentence if description is empty
+        structuredDescription: structuredDesc,
+        creatorMessage: data.creatorMessage,
         stakes: data.stakes || defaultStakes,
       };
       const challengeId = await issueDirectChallenge(creatorProfile, opponentUid, opponentDisplayName, challengeDetails);
@@ -103,12 +105,6 @@ export default function CreateChallengeForm({ opponentUid, opponentDisplayName, 
         <Label htmlFor="name">Challenge Name (Optional)</Label>
         <Input id="name" {...register('name')} className="pl-3" />
         {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
-      </div>
-      
-      <div className="space-y-1">
-        <Label htmlFor="description">Description (Optional)</Label>
-         <Textarea id="description" {...register('description')} rows={2} />
-        {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
       </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -162,9 +158,10 @@ export default function CreateChallengeForm({ opponentUid, opponentDisplayName, 
         {errors.stakes && <p className="text-sm text-destructive">{errors.stakes.message}</p>}
       </div>
 
-      <div className="p-3 bg-muted/50 rounded-md border text-sm text-muted-foreground">
-        <p className="font-semibold text-foreground mb-1">Challenge Summary:</p>
-        <p>{generatedChallengeSentence()}</p>
+      <div className="space-y-1">
+        <Label htmlFor="creatorMessage">Add a Personal Message (Optional) <MessageSquare className="inline h-4 w-4 text-primary"/></Label>
+         <Textarea id="creatorMessage" {...register('creatorMessage')} placeholder="e.g., Get ready to step up!" rows={2} />
+        {errors.creatorMessage && <p className="text-sm text-destructive">{errors.creatorMessage.message}</p>}
       </div>
 
       <Button type="submit" className="w-full" disabled={loading}>
@@ -173,4 +170,3 @@ export default function CreateChallengeForm({ opponentUid, opponentDisplayName, 
     </form>
   );
 }
-
