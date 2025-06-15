@@ -48,6 +48,51 @@ export interface Team {
   createdAt: any;
 }
 
+export interface Challenge {
+  id: string; // Firestore document ID
+  name: string;
+  description?: string;
+  challengeType: 'directUser' | 'teamChallenge' | 'openChallenge';
+  creatorUid: string; // User who initiated the challenge
+  creatorName?: string; // Display name of the creator, denormalized for easier display in lists
+
+  opponentUid?: string; // The UID of the user being challenged (for directUser type)
+  opponentName?: string; // Display name of the opponent, denormalized
+  opponentStatus?: 'pending' | 'accepted' | 'declined'; // Opponent's response (for directUser type)
+
+  participantUids: string[]; // UIDs of all accepted/active participants
+  
+  goalType: 'steps' | 'activeDays'; // What is being measured
+  goalValue: number; // The target value for the goalType
+
+  startDate: Timestamp;
+  endDate: Timestamp; // For daily challenges, this will be the end of the startDate.
+
+  status: 'invitation' | 'accepted' | 'active' | 'complete' | 'cancelled';
+
+  participantProgress?: {
+    [uid: string]: {
+      currentValue: number; // e.g., steps taken since challenge startDate for this specific challenge
+      lastUpdated: Timestamp;
+    };
+  };
+  
+  winnerUids?: string[]; // UIDs of users who won the challenge
+  badgeToAwardOnCompletion?: BadgeId; // Optional: Badge for all who complete/meet criteria
+  badgeToAwardOnWin?: BadgeId; // Optional: Badge for winners
+
+  stakes?: string; // Optional: User-defined fun stakes for the challenge
+
+  repetition?: { // Optional: For recurring challenges
+    type: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    nextInstanceStartDate?: Timestamp;
+  };
+
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+
 export interface CommunityStats {
   totalSteps: number;
   totalParticipants: number;
@@ -119,3 +164,13 @@ export interface AuthContextType {
   setShowWelcomeMigrationModal: (show: boolean) => void;
   recordSectionVisit: (sectionKey: ExplorerSectionKey) => Promise<void>;
 }
+
+export interface ChallengeCreationData {
+  goalValue: number;
+  startDate: Date; // User selects the start date for the daily challenge
+  // Optional fields for future expansion
+  name?: string;
+  description?: string;
+  stakes?: string;
+}
+

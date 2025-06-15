@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
-import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIconLucide, Users as TeamIcon, LogOut, PlusCircle, CalendarDays, Layers, Replace, Palette, Gift } from 'lucide-react';
+import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIconLucide, Users as TeamIcon, LogOut, PlusCircle, CalendarDays, Layers, Replace, Palette, Gift, Swords } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ALL_BADGES, type BadgeData } from '@/lib/badges';
@@ -24,6 +24,7 @@ import BadgeDetailModal from '@/components/profile/BadgeDetailModal';
 import { getChrysalisVariantByDay, getChrysalisVariantById } from '@/lib/chrysalisVariants';
 import CoinDetailActivationModal from './CoinDetailActivationModal';
 import DailyStepChart from '@/components/profile/DailyStepChart';
+import ChallengeDefinitionModal from '@/components/challenges/ChallengeDefinitionModal'; // New import
 import { Shell as ShellIconLucide } from 'lucide-react';
 
 
@@ -46,6 +47,9 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
 
   const [dailyStepsData, setDailyStepsData] = useState<DailyStep[]>([]);
   const [isLoadingChart, setIsLoadingChart] = useState(true);
+
+  const [showChallengeModal, setShowChallengeModal] = useState(false); // State for challenge modal
+
 
   const progressPercentage = profileData.stepGoal ? (profileData.currentSteps / profileData.stepGoal) * 100 : 0;
   const collectedCoinsCount = profileData.chrysalisCoinDates?.length || 0;
@@ -200,13 +204,20 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
               )}
 
             </div>
-            {isOwnProfile && (
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/profile/${profileData.uid}?edit=true`}>
-                  <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
-                </Link>
-              </Button>
-            )}
+             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                {!isOwnProfile && authUser && profileData.profileComplete && (
+                <Button variant="default" size="sm" onClick={() => setShowChallengeModal(true)}>
+                    <Swords className="mr-2 h-4 w-4" /> Challenge {profileData.displayName?.split(' ')[0] || 'User'}
+                </Button>
+                )}
+                {isOwnProfile && (
+                <Button variant="outline" size="sm" asChild>
+                    <Link href={`/profile/${profileData.uid}?edit=true`}>
+                    <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
+                    </Link>
+                </Button>
+                )}
+            </div>
           </div>
         </CardHeader>
 
@@ -390,6 +401,14 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
           onOpenChange={setIsCoinDetailModalOpen}
           coinVariant={selectedCoinForModal}
           isMissedAndPast={isViewingMissedCoin}
+        />
+      )}
+      {!isOwnProfile && profileData && (
+        <ChallengeDefinitionModal
+            isOpen={showChallengeModal}
+            onOpenChange={setShowChallengeModal}
+            opponentUid={profileData.uid}
+            opponentDisplayName={profileData.displayName || 'User'}
         />
       )}
     </>
