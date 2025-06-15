@@ -129,6 +129,15 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   return null;
 }
 
+export async function getAllUserProfiles(): Promise<UserProfile[]> {
+  const usersRef = collection(db, USERS_COLLECTION);
+  // Only fetch profiles that are complete
+  const q = query(usersRef, where("profileComplete", "==", true));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(docSnap => mapDocToUserProfile(docSnap));
+}
+
+
 export async function createUserProfile(firebaseUser: FirebaseUser, additionalData: Partial<UserProfile> = {}): Promise<UserProfile> {
   const userProfileRef = doc(db, USERS_COLLECTION, firebaseUser.uid);
   let browserTimezone: string | null = null;
