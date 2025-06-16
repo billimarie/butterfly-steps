@@ -79,15 +79,15 @@ export function getTodaysDateClientLocal(): string {
   // 3. Uncomment the line below and update the string to "YYYY-MM-DD" for that date.
   //    Example: For Day 1 (June 21st, 2024), use "2024-06-21".
   //             For Day 5 (June 25th, 2024), use "2024-06-25".
-  return "2024-06-22"; // << EDIT THIS LINE FOR TESTING SPECIFIC DAYS
+  // return "2024-06-22"; // << EDIT THIS LINE FOR TESTING SPECIFIC DAYS
 
   // ORIGINAL IMPLEMENTATION (Revert to this after testing):
-  /* const now = new Date(); 
+  const now = new Date(); 
   const year = now.getFullYear();
   const month = (now.getMonth() + 1).toString().padStart(2, '0'); 
   const day = now.getDate().toString().padStart(2, '0');
   const localDateString = `${year}-${month}-${day}`;
-  return localDateString; */
+  return localDateString;
 }
 
 
