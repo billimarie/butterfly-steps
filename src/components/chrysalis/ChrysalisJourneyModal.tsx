@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogOverlay, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Shell as ShellIconLucide, RefreshCw, Palette, Check, Sparkle as SparkleIconLucide, MoveRight, X, Gift, Footprints, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { CHALLENGE_DURATION_DAYS } from '@/types';
-import { getTodaysDateClientLocal, getDailyStepForDate, getChallengeDayNumberFromDateString } from '@/lib/firebaseService';
+import { getTodaysDateClientLocal, getDailyStepForDate } from '@/lib/firebaseService';
+import { getChallengeDayNumberFromDateString } from '@/lib/dateUtils';
 import type { ChrysalisVariantData, UserProfile } from '@/types';
-import { CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
+import { CHRYSALIS_AVATAR_IDENTIFIER, CHALLENGE_DURATION_DAYS } from '@/types';
 import { getChrysalisVariantByDay, getChrysalisVariantById } from '@/lib/chrysalisVariants';
 import { useRouter } from 'next/navigation';
 
@@ -33,7 +33,7 @@ export default function ChrysalisJourneyModal() {
     setShowChrysalisJourneyModal,
     chrysalisJourneyModalContext,
     setChrysalisJourneyModalContext,
-    activateChrysalisAsAvatar,
+    // activateChrysalisAsAvatar, // Removed as per new flow
     activateThemeFromCollectedCoin,
     justCollectedCoin,
     clearJustCollectedCoinDetails,
@@ -42,7 +42,7 @@ export default function ChrysalisJourneyModal() {
   } = authContext;
 
   const router = useRouter();
-  const [isActivatingAvatar, setIsActivatingAvatar] = useState(false);
+  // const [isActivatingAvatar, setIsActivatingAvatar] = useState(false); // No longer needed
   const [isActivatingTheme, setIsActivatingTheme] = useState(false);
 
   const [stepsLoggedToday, setStepsLoggedToday] = useState(false);
@@ -57,14 +57,12 @@ export default function ChrysalisJourneyModal() {
     if (
         !showChrysalisJourneyModal ||
         !userProfile ||
-        // Only proceed to check if justCollectedCoin is NOT set; if it is, gamified view will render
         justCollectedCoin 
     ) {
         setIsLoadingCoinStatus(false);
         return;
     }
 
-    // This logic is for the "Collect Coin" view. If we're activating avatar or already showing gamified, skip.
     if (chrysalisJourneyModalContext === 'login' && userProfile.photoURL === CHRYSALIS_AVATAR_IDENTIFIER) {
         setIsLoadingCoinStatus(true);
         const checkStatus = async () => {
@@ -74,8 +72,9 @@ export default function ChrysalisJourneyModal() {
 
             const alreadyCollected = userProfile.chrysalisCoinDates?.includes(currentDate) ?? false;
             setCoinAlreadyCollectedThisSessionOrInDB(alreadyCollected);
+            // console.log(`[ChrysalisJourneyModal useEffect] Date: ${currentDate}, StepsLogged: ${!!dailyStepDoc && dailyStepDoc.steps > 0}, CoinCollectedInDB: ${alreadyCollected}`);
         } catch (error) {
-            console.error("Error checking coin status in ChrysalisJourneyModal:", error);
+            // console.error("Error checking coin status in ChrysalisJourneyModal:", error);
             setStepsLoggedToday(false);
             setCoinAlreadyCollectedThisSessionOrInDB(false);
         } finally {
@@ -84,56 +83,46 @@ export default function ChrysalisJourneyModal() {
         };
         checkStatus();
     } else {
-        // Conditions for checking coin status not met (e.g., avatar not active yet)
+        // console.log("[ChrysalisJourneyModal useEffect] Conditions for coin status check not met (e.g., avatar not active OR gamified view will render).");
         setIsLoadingCoinStatus(false); 
     }
     
-  // Effect dependencies
   }, [showChrysalisJourneyModal, userProfile, currentDate, chrysalisJourneyModalContext, justCollectedCoin]);
 
 
   const handleDialogClose = (isOpen: boolean) => {
-    // Prevent closing if an action is in progress
-    if (isActivatingAvatar || isActivatingTheme) return;
+    if (isActivatingTheme) return; // Prevent closing if activating theme
 
     if (!isOpen) {
-        // If the modal is closed and `justCollectedCoin` was set (meaning gamified view was shown), clear it
         if (justCollectedCoin) {
+            // console.log("[ChrysalisJourneyModal handleDialogClose] Clearing justCollectedCoin details as modal closes.");
             clearJustCollectedCoinDetails();
         }
         setShowChrysalisJourneyModal(false);
-        // Reset context if it was 'login' to ensure next opening behaves as expected
         if (chrysalisJourneyModalContext === 'login') {
+            // console.log("[ChrysalisJourneyModal handleDialogClose] Resetting context to 'login'.");
             setChrysalisJourneyModalContext('login');
         }
     }
   };
 
-  const handleActivateDefaultChrysalis = async () => {
-    setIsActivatingAvatar(true);
-    await activateChrysalisAsAvatar();
-    setIsActivatingAvatar(false);
-    // Modal will be closed by activateChrysalisAsAvatar via AuthContext's fetchUserProfile
-  };
 
   const handleActivateCollectedCoinTheme = async () => {
     if (!justCollectedCoin) return;
     setIsActivatingTheme(true);
-    await activateThemeFromCollectedCoin(justCollectedCoin);
+    await activateThemeFromCollectedCoin(justCollectedCoin); // This will now also handle setting avatar to Chrysalis mode if not already set
     setIsActivatingTheme(false);
-    // Modal will be closed by activateThemeFromCollectedCoin
   };
   
   const handleLogStepsPrompt = () => {
-    setShowChrysalisJourneyModal(false); // Close this modal
-    setShowLogStepsModal(true, 'chrysalis'); // Open log steps modal with specific origin
+    setShowChrysalisJourneyModal(false); 
+    setShowLogStepsModal(true, 'chrysalis'); 
   };
 
 
   const renderGamifiedCoinCollectedView = () => {
     const coinVariantToDisplay = authContext.justCollectedCoin;
 
-    // More robust guard clause: Check for coinVariantToDisplay and essential HSL strings
     if (
       !coinVariantToDisplay ||
       typeof coinVariantToDisplay.id !== 'string' || !coinVariantToDisplay.id ||
@@ -144,8 +133,7 @@ export default function ChrysalisJourneyModal() {
       typeof coinVariantToDisplay.themeAccentHSL !== 'string' || !coinVariantToDisplay.themeAccentHSL ||
       typeof coinVariantToDisplay.themeAccentForegroundHSL !== 'string' || !coinVariantToDisplay.themeAccentForegroundHSL
     ) {
-      console.error("ChrysalisJourneyModal: justCollectedCoin is null or malformed/incomplete in renderGamifiedCoinCollectedView. Value:", coinVariantToDisplay);
-      // Return a fallback UI or null to prevent crash
+      // console.error("ChrysalisJourneyModal: justCollectedCoin is null or malformed/incomplete in renderGamifiedCoinCollectedView. Value:", coinVariantToDisplay);
       return (
         <>
         <DialogHeader className="p-6 pb-4 border-b">
@@ -172,7 +160,7 @@ export default function ChrysalisJourneyModal() {
       color: `hsl(${coinVariantToDisplay.themePrimaryForegroundHSL}, 0.9)` 
     };
 
-    let dynamicActionButtonHoverStyle: React.CSSProperties;
+    let dynamicActionButtonHoverStyle: React.CSSProperties = { filter: 'brightness(0.9)' }; // Fallback
     const primaryHSLPartsForHover = coinVariantToDisplay.themePrimaryHSL.split(' ');
     if (primaryHSLPartsForHover.length === 3) {
         const hValue = primaryHSLPartsForHover[0];
@@ -183,14 +171,8 @@ export default function ChrysalisJourneyModal() {
             dynamicActionButtonHoverStyle = {
                 backgroundColor: `hsl(${hValue} ${sValue} ${lValueHover}%)`,
             };
-        } else {
-            console.warn(`ChrysalisJourneyModal: Could not parse L value for hover from themePrimaryHSL: '${coinVariantToDisplay.themePrimaryHSL}'. Using fallback hover style.`);
-            dynamicActionButtonHoverStyle = { filter: 'brightness(0.9)' }; // Fallback
-        }
-    } else {
-        console.warn(`ChrysalisJourneyModal: themePrimaryHSL '${coinVariantToDisplay.themePrimaryHSL}' is malformed for hover. Using fallback hover style.`);
-        dynamicActionButtonHoverStyle = { filter: 'brightness(0.9)' }; // Fallback
-    }
+        } // else: console warning for parsing L value already handled in previous version if needed
+    } // else: console warning for malformed HSL already handled in previous version if needed
 
 
     const dynamicActionButtonStyle: React.CSSProperties = {
@@ -256,7 +238,7 @@ export default function ChrysalisJourneyModal() {
                 }}
             >
             {isActivatingTheme ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Palette className="mr-2 h-4 w-4"/>}
-            Activate Theme
+            Activate Theme & Avatar
             </Button>
             <Button
                 onClick={() => handleDialogClose(false)}
@@ -273,43 +255,9 @@ export default function ChrysalisJourneyModal() {
     );
   };
 
-
-  const renderActivateAvatarContent = () => {
-    const displayedVariantData = getChrysalisVariantByDay(1); // Always Golden Chrysalis for initial activation
-    const DisplayedIcon = displayedVariantData.icon || ShellIconLucide;
-    
-    return (
-    <>
-      <DialogHeader className={cn(
-          "p-6 pb-4 text-center items-center justify-center rounded-t-lg",
-          "bg-gradient-to-br from-primary/90 via-primary/80 to-accent/70" // Consistent with badge modal header
-      )}>
-        <DialogTitle className="font-headline text-3xl text-primary-foreground flex items-center justify-center">
-           Chrysalis Unlocked!
-        </DialogTitle>
-      </DialogHeader>
-      <div className="pt-8 pb-8 px-6 space-y-4 text-center">
-          <DisplayedIcon 
-            className="!h-28 !w-28 mx-auto mb-5 animate-pulse" // Uses ! to ensure size override
-            style={{color: `hsl(${displayedVariantData.themePrimaryHSL})`}} // Use its own theme color
-            data-ai-hint={displayedVariantData.name.toLowerCase().includes("shell") ? "chrysalis shell gold" : "icon nature"}
-          />
-          <DialogDescription className="text-muted-foreground text-md mt-2 max-w-xs mx-auto">
-             Activate your Chrysalis Avatar! Then, collect unique Chrysalis Coins by reaching your daily step goal.
-          </DialogDescription>
-      </div>
-      
-      <DialogFooter className="px-6 py-4 bg-muted/30 border-t rounded-b-lg flex flex-col sm:flex-row justify-center items-center gap-3">
-          <Button onClick={handleActivateDefaultChrysalis} className="w-full sm:w-auto" size="lg" disabled={isActivatingAvatar}>
-            {isActivatingAvatar ? ( <><RefreshCw className="mr-2 h-5 w-5 animate-spin" /> Activating...</> ) : ( 'Set Golden Chrysalis as Avatar' )}
-          </Button>
-          <Button onClick={() => handleDialogClose(false)} variant="outline" className="w-full sm:w-auto" size="lg">Later</Button>
-      </DialogFooter>
-    </>
-    );
-  };
-
   const renderCollectCoinContent = () => {
+    // This view is for when the Chrysalis avatar is active,
+    // but the coin isn't collected yet, or steps not logged.
     if (!userProfile) {
         return (
             <div className="p-8 text-center">
@@ -333,7 +281,6 @@ export default function ChrysalisJourneyModal() {
         ? Math.round(userProfile.stepGoal / CHALLENGE_DURATION_DAYS)
         : 0;
 
-    // This view is shown if Chrysalis avatar is active, but coin isn't collected / steps not logged
     if (coinAlreadyCollectedThisSessionOrInDB) {
       const todaysCoinVariant = getChrysalisVariantByDay(currentDayNumberForCoin);
       return (
@@ -345,7 +292,6 @@ export default function ChrysalisJourneyModal() {
           </DialogHeader>
           <div className="p-6 text-center space-y-3">
             <DialogDescription className="text-muted-foreground">You've already collected the Chrysalis Coin for today ({currentDate}).</DialogDescription>
-            {/* Option to re-activate today's theme if it's not currently active */}
             {todaysCoinVariant && userProfile && userProfile.activeChrysalisThemeId !== todaysCoinVariant.id && userProfile.photoURL === CHRYSALIS_AVATAR_IDENTIFIER && (
                 <Button onClick={() => activateThemeFromCollectedCoin(todaysCoinVariant, true)} disabled={isActivatingTheme} size="sm">
                     {isActivatingTheme ? <RefreshCw className="mr-2 h-4 w-4 animate-spin"/> : <Palette className="mr-2 h-4 w-4"/>}
@@ -395,7 +341,6 @@ export default function ChrysalisJourneyModal() {
           <DialogDescription className="text-muted-foreground">You've met your daily goal! Ready to collect your Chrysalis Coin for today?</DialogDescription>
         </div>
         <DialogFooter className="px-6 py-4 bg-muted/30 border-t rounded-b-lg">
-          {/* This button press effectively does what the DailyGoalMetModal's unlock button does */}
           <Button onClick={() => authContext.collectDailyChrysalisCoin()} className="w-full">
              <SparkleIconLucide className="mr-2 h-5 w-5"/>
             Collect Coin
@@ -409,26 +354,41 @@ export default function ChrysalisJourneyModal() {
   let contentToRender;
   const currentJustCollectedCoin = authContext.justCollectedCoin;
 
-  // This is the primary view when a coin has *just* been collected via `collectDailyChrysalisCoin`
   if (
     currentJustCollectedCoin &&
-    typeof currentJustCollectedCoin.id === 'string' && // Core check
-    typeof currentJustCollectedCoin.themePrimaryHSL === 'string' && // Ensure HSL is present
-    typeof currentJustCollectedCoin.themeAccentHSL === 'string' && // Ensure HSL is present
-    chrysalisJourneyModalContext === 'login' // And it's part of the login/collection flow
+    typeof currentJustCollectedCoin.id === 'string' &&
+    typeof currentJustCollectedCoin.themePrimaryHSL === 'string' && 
+    typeof currentJustCollectedCoin.themeAccentHSL === 'string' &&   
+    chrysalisJourneyModalContext === 'login'
   ) {
+      // console.log("[ChrysalisJourneyModal] Rendering gamified coin collected view for:", currentJustCollectedCoin.name);
       contentToRender = renderGamifiedCoinCollectedView();
   } 
-  // If avatar isn't active (either on login, or if opened from profile)
-  else if (chrysalisJourneyModalContext === 'profile_avatar_select' || (chrysalisJourneyModalContext === 'login' && userProfile && userProfile.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER)) { 
-      contentToRender = renderActivateAvatarContent();
+  // If avatar IS active (photoURL is the identifier) and modal is opened (e.g., from profile avatar click), show coin collection status.
+  else if (userProfile && userProfile.photoURL === CHRYSALIS_AVATAR_IDENTIFIER && chrysalisJourneyModalContext === 'login') { 
+      // console.log("[ChrysalisJourneyModal] Avatar is active, rendering collect coin content.");
+      contentToRender = renderCollectCoinContent();
   } 
-  // If avatar IS active and modal is opened (e.g., from profile, or if DailyMotivation was skipped/closed)
-  else if (userProfile && chrysalisJourneyModalContext === 'login') { 
-      contentToRender = renderCollectCoinContent(); // This will show "Log Steps" or "Already Collected"
-  } 
-  // Fallback / Loading state (should ideally be brief or not hit if conditions above are robust)
+  // If the avatar is NOT active yet (photoURL is NOT the identifier) AND the context is for avatar selection OR it's a login context (implicitly meaning it's not set)
+  // This state is now less likely as the explicit "Activate Avatar" modal is removed.
+  // Opt-in happens via first theme activation.
+  // This modal might still be opened via profile click even if avatar isn't chrysalis,
+  // but the more common path is already having it and re-engaging daily.
+  // For now, if avatar not active and context is login, implies user hasn't "opted-in" via theme.
+  // This could potentially show a generic message or be handled by DailyMotivationModal primarily.
+  // Let's assume DailyMotivation covers the "get started" and this modal is for when avatar *is* active.
+  else if (chrysalisJourneyModalContext === 'profile_avatar_select') {
+    // console.log("[ChrysalisJourneyModal] Context is profile_avatar_select. Showing generic info or user needs to activate a theme first.");
+    contentToRender = ( // Placeholder if somehow reached
+        <div className="p-4 text-center">
+            <DialogHeader><DialogTitle>Chrysalis Journey</DialogTitle></DialogHeader>
+            <DialogDescription>Activate a theme from a collected coin to set your Chrysalis Avatar.</DialogDescription>
+            <Button onClick={() => handleDialogClose(false)} variant="outline" className="mt-4">Close</Button>
+        </div>
+    );
+  }
   else { 
+    // console.log("[ChrysalisJourneyModal] Fallback/Loading state. UserProfile:", userProfile, "Context:", chrysalisJourneyModalContext, "JustCollectedCoin:", currentJustCollectedCoin);
     contentToRender = (
         <div className="p-4 text-center">
             <DialogHeader><DialogTitle>Information</DialogTitle></DialogHeader>
@@ -440,6 +400,7 @@ export default function ChrysalisJourneyModal() {
 
   // Avoid showing this modal if the DailyGoalMetModal is supposed to be shown (and it's not for justCollectedCoin view)
   if (showDailyGoalMetModal && chrysalisJourneyModalContext === 'login' && !justCollectedCoin) {
+    // console.log("[ChrysalisJourneyModal] DailyGoalMetModal is active and no new coin just collected, so this modal is suppressed.");
     return null;
   }
 
@@ -452,4 +413,3 @@ export default function ChrysalisJourneyModal() {
     </Dialog>
   );
 }
-

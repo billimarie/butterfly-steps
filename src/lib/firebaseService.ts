@@ -27,6 +27,21 @@ import { CHALLENGE_DURATION_DAYS } from '@/types'; // Import the constant
 import type { User as FirebaseUser } from 'firebase/auth';
 import { ALL_BADGES, type BadgeData, type BadgeId, getBadgeDataById } from '@/lib/badges';
 import { format as formatDate } from 'date-fns'; // Aliased to avoid conflict
+import {
+  isChallengeActive as isChallengeActiveUtil,
+  getChallengeDayNumberFromDateString as getChallengeDayNumberFromDateStringUtil,
+  getChallengeDateStringByDayNumber as getChallengeDateStringByDayNumberUtil,
+  CHALLENGE_START_YEAR as CHALLENGE_START_YEAR_FROM_UTILS
+} from './dateUtils'; // Correct relative path
+
+// Re-export for convenience if still needed by other parts of firebaseService, or import directly where needed.
+export {
+  isChallengeActiveUtil as isChallengeActive,
+  getChallengeDayNumberFromDateStringUtil as getChallengeDayNumberFromDateString,
+  getChallengeDateStringByDayNumberUtil as getChallengeDateStringByDayNumber,
+  CHALLENGE_START_YEAR_FROM_UTILS as CHALLENGE_START_YEAR
+};
+
 
 // Define Firestore collection/document constants
 const USERS_COLLECTION = "users";
@@ -36,57 +51,23 @@ const COMMUNITY_STATS_DOC = "stats";
 const TEAMS_COLLECTION = "teams";
 const CHALLENGES_COLLECTION = "challenges";
 
-// Challenge Date Configuration (Fixed to 2025 as per user prompt)
-export const CHALLENGE_START_YEAR = 2025;
-export const CHALLENGE_START_MONTH_JS = 5; // 0-indexed for June
-export const CHALLENGE_START_DAY_JS = 21;
-export const CHALLENGE_END_MONTH_JS = 9; // 0-indexed for October
-export const CHALLENGE_END_DAY_JS = 31;
 
-export function isChallengeActive(currentDate: Date = new Date()): boolean {
-  const startDate = new Date(CHALLENGE_START_YEAR, CHALLENGE_START_MONTH_JS, CHALLENGE_START_DAY_JS, 0, 0, 0, 0);
-  const endDate = new Date(CHALLENGE_START_YEAR, CHALLENGE_END_MONTH_JS, CHALLENGE_END_DAY_JS, 23, 59, 59, 999);
-  return currentDate >= startDate && currentDate <= endDate;
-}
-
-// Helper function to get the challenge start date for a given year (UTC)
-export function getChallengeStartDateForYear(year: number): Date {
-  return new Date(Date.UTC(year, CHALLENGE_START_MONTH_JS, CHALLENGE_START_DAY_JS)); // June 21st, UTC (Month is 0-indexed, so 5 is June)
-}
-
-// Helper function to get the date string for a specific challenge day number
-export function getChallengeDateStringByDayNumber(dayNumber: number): string {
-  // Uses the fixed CHALLENGE_START_YEAR
-  const startDate = getChallengeStartDateForYear(CHALLENGE_START_YEAR);
-  const targetDate = new Date(startDate.getTime());
-  targetDate.setUTCDate(startDate.getUTCDate() + dayNumber - 1);
-
-  const y = targetDate.getUTCFullYear();
-  const m = (targetDate.getUTCMonth() + 1).toString().padStart(2, '0');
-  const d = targetDate.getUTCDate().toString().padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-export function getChallengeDayNumberFromDateString(dateString: string): number {
-  const [year, month, day] = dateString.split('-').map(Number);
-  // Ensure we are comparing against the correct challenge year's start date
-  if (year !== CHALLENGE_START_YEAR) return 0; // Or handle as an error/invalid if date is outside challenge year
-
-  const currentDate = new Date(Date.UTC(year, month - 1, day));
-  const challengeStartDate = getChallengeStartDateForYear(CHALLENGE_START_YEAR);
-
-  if (currentDate < challengeStartDate) return 0;
-
-  const diffTime = currentDate.getTime() - challengeStartDate.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-  const dayNumber = diffDays + 1;
-  return Math.max(1, Math.min(dayNumber, CHALLENGE_DURATION_DAYS));
-}
-
-// Helper to get today's date in YYYY-MM-DD format (Local to the client)
 export function getTodaysDateClientLocal(): string {
-  //  ORIGINAL IMPLEMENTATION (Revert to this after testing):
+  // FOR TESTING CHRYSALIS VARIANTS:
+  // To test a specific day's Chrysalis variant:
+  // 1. Determine the target day number (1-133).
+  // 2. Calculate the date (June 21st is Day 1, Oct 31st is Day 133 for CHALLENGE_START_YEAR).
+  // 3. In your browser's developer console, set: window.__TEST_OVERRIDE_DATE__ = "YYYY-MM-DD";
+  //    Example: For Day 1 (June 21st, CHALLENGE_START_YEAR), set window.__TEST_OVERRIDE_DATE__ = "2025-06-21".
+  //             For Day 5 (June 25th, CHALLENGE_START_YEAR), set window.__TEST_OVERRIDE_DATE__ = "2025-06-25".
+  // To revert to current date, clear the variable: delete window.__TEST_OVERRIDE_DATE__ or set it to null/undefined.
+
+  if (typeof window !== 'undefined' && (window as any).__TEST_OVERRIDE_DATE__) {
+    const overrideDate = (window as any).__TEST_OVERRIDE_DATE__;
+    // // console.log(`[firebaseService.getTodaysDateClientLocal] USING TEST OVERRIDE DATE: ${overrideDate}`);
+    return overrideDate;
+  }
+
   const now = new Date(); // Current moment in client's local timezone
   const year = now.getFullYear();
   const month = (now.getMonth() + 1).toString().padStart(2, '0'); // JS months are 0-indexed
@@ -94,6 +75,7 @@ export function getTodaysDateClientLocal(): string {
   const localDateString = `${year}-${month}-${day}`;
   return localDateString;
 }
+
 
 function mapDocToUserProfile(docSnap: DocumentSnapshot): UserProfile {
   const data = docSnap.data();
@@ -149,7 +131,6 @@ function mapDocToChallenge(docSnap: DocumentSnapshot): Challenge {
     participantProgress: data.participantProgress,
     winnerUids: Array.isArray(data.winnerUids) ? data.winnerUids : [],
     stakes: data.stakes,
-    repetition: data.repetition,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
   };
@@ -179,7 +160,7 @@ export async function createUserProfile(firebaseUser: FirebaseUser, additionalDa
   try {
     browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   } catch (e) {
-    console.warn("Could not determine browser timezone for new user profile.", e);
+    // // console.warn("Could not determine browser timezone for new user profile.", e);
   }
 
   const baseProfileData: UserProfile = {
@@ -244,7 +225,7 @@ export async function updateUserStreakOnLogin(uid: string): Promise<StreakUpdate
       const userSnap = await transaction.get(userRef);
 
       if (!userSnap.exists()) {
-        console.warn(`User profile ${uid} not found during streak update. Streak update skipped.`);
+        // // console.warn(`User profile ${uid} not found during streak update. Streak update skipped.`);
         return {
             updatedStreakCount: 0,
             updatedLastStreakLoginDate: null,
@@ -302,7 +283,7 @@ export async function updateUserStreakOnLogin(uid: string): Promise<StreakUpdate
     });
     return result;
   } catch (error) {
-    console.error("Transaction failed for streak update: ", error);
+    // // console.error("Transaction failed for streak update: ", error);
     const fallbackProfile = await getUserProfile(uid);
     return {
         updatedStreakCount: fallbackProfile?.currentStreak || 0,
@@ -332,6 +313,7 @@ export async function checkAndAwardBadges(
   }
 
   if (newlyEarnedBadgesData.length > 0) {
+    // // console.log(`[firebaseService.checkAndAwardBadges] User ${uid} earned new step badges:`, newlyEarnedBadgesData.map(b => b.name));
   }
   return newlyEarnedBadgesData;
 }
@@ -342,7 +324,7 @@ export async function awardSpecificBadgeIfUnearned(userId: string, badgeIdToAwar
     const awardedBadgeData = await runTransaction(db, async (transaction) => {
       const userSnap = await transaction.get(userRef);
       if (!userSnap.exists()) {
-        console.warn(`User profile ${userId} not found. Cannot award badge ${badgeIdToAward}.`);
+        // // console.warn(`User profile ${userId} not found. Cannot award badge ${badgeIdToAward}.`);
         return null;
       }
 
@@ -355,17 +337,18 @@ export async function awardSpecificBadgeIfUnearned(userId: string, badgeIdToAwar
 
       const badgeDefinition = getBadgeDataById(badgeIdToAward);
       if (!badgeDefinition) {
-        console.warn(`Badge definition for ${badgeIdToAward} not found.`);
+        // // console.warn(`Badge definition for ${badgeIdToAward} not found.`);
         return null;
       }
 
       const newBadgesArray = [...currentBadges, badgeIdToAward];
       transaction.update(userRef, { badgesEarned: newBadgesArray });
+      // // console.log(`[firebaseService.awardSpecificBadge] Awarded badge "${badgeDefinition.name}" to user ${userId}`);
       return badgeDefinition;
     });
     return awardedBadgeData;
   } catch (error) {
-    console.error(`Error awarding badge ${badgeIdToAward} to user ${userId}:`, error);
+    // // console.error(`Error awarding badge ${badgeIdToAward} to user ${userId}:`, error);
     return null;
   }
 }
@@ -377,6 +360,7 @@ export async function submitSteps(uid: string, stepsToAdd: number): Promise<Step
   }
 
   const clientLocalDateString = getTodaysDateClientLocal();
+  // // console.log(`[firebaseService.submitSteps] Submitting ${stepsToAdd} steps for user ${uid} on date ${clientLocalDateString}`);
 
   const userDocRef = doc(db, USERS_COLLECTION, uid);
   const communityStatsRef = doc(db, COMMUNITY_COLLECTION, COMMUNITY_STATS_DOC);
@@ -397,10 +381,13 @@ export async function submitSteps(uid: string, stepsToAdd: number): Promise<Step
       throw new Error("User profile does not exist for step submission.");
     }
     userProfileDataBeforeUpdate = mapDocToUserProfile(userDocSnap);
+    // // console.log(`[firebaseService.submitSteps TXN] User ${uid} profile stepGoal: ${userProfileDataBeforeUpdate.stepGoal}`);
     updatedCurrentTotalSteps = (userProfileDataBeforeUpdate.currentSteps || 0) + stepsToAdd;
+
 
     const userDailyStepSnap = await transaction.get(userDailyStepDocRef);
     const userDailyStepDataBeforeUpdate = userDailyStepSnap.data() as DailyStep | undefined;
+    // // console.log(`[firebaseService.submitSteps TXN] User ${uid} dailyStepDataBeforeUpdate for ${clientLocalDateString}:`, userDailyStepDataBeforeUpdate);
 
     let teamDocSnap: DocumentSnapshot | undefined;
     if (userProfileDataBeforeUpdate.teamId) {
@@ -424,23 +411,41 @@ export async function submitSteps(uid: string, stepsToAdd: number): Promise<Step
 
     if (userProfileDataBeforeUpdate?.stepGoal && userProfileDataBeforeUpdate.stepGoal > 0) {
         const dailyCalculatedGoal = Math.round(userProfileDataBeforeUpdate.stepGoal / CHALLENGE_DURATION_DAYS);
+        // // console.log(`[firebaseService.submitSteps TXN] User ${uid} dailyCalculatedGoal: ${dailyCalculatedGoal}, newUserDailyStepsValue: ${newUserDailyStepsValue}`);
+
         if (newUserDailyStepsValue >= dailyCalculatedGoal && !userDailyStepDataBeforeUpdate?.dailyGoalMetOnThisDate) {
             userDailyStepUpdatePayload.dailyGoalMetOnThisDate = true;
             dailyGoalAchieved = true;
+            // // console.log(`[firebaseService.submitSteps TXN] User ${uid} daily goal MET for ${clientLocalDateString}. dailyGoalAchieved = true.`);
         } else if (userDailyStepDataBeforeUpdate?.dailyGoalMetOnThisDate) {
-            userDailyStepUpdatePayload.dailyGoalMetOnThisDate = true;
+            userDailyStepUpdatePayload.dailyGoalMetOnThisDate = true; // Keep it true if already met
+            dailyGoalAchieved = true; // Still considered achieved for the day for modal purposes
+            // // console.log(`[firebaseService.submitSteps TXN] User ${uid} daily goal ALREADY MET for ${clientLocalDateString}. dailyGoalAchieved = true (retained).`);
+        } else {
+            dailyGoalAchieved = false;
+            // // console.log(`[firebaseService.submitSteps TXN] User ${uid} daily goal NOT YET MET for ${clientLocalDateString}. dailyGoalAchieved = false.`);
         }
+    } else {
+        // // console.log(`[firebaseService.submitSteps TXN] User ${uid} has no stepGoal or it's 0. Not checking daily goal.`);
+        dailyGoalAchieved = false; // No goal, so can't achieve it in this specific sense
     }
+    // // console.log(`[firebaseService.submitSteps TXN] User ${uid} dailyGoalMetOnThisDate (before setting):`, userDailyStepDataBeforeUpdate?.dailyGoalMetOnThisDate);
+    // // console.log(`[firebaseService.submitSteps TXN] User ${uid} final dailyGoalAchieved status:`, dailyGoalAchieved);
+
     transaction.set(userDailyStepDocRef, userDailyStepUpdatePayload, { merge: true });
+    // // console.log(`[firebaseService.submitSteps TXN] User ${uid} updated/set daily steps for ${clientLocalDateString}:`, userDailyStepUpdatePayload);
+
 
     transaction.set(communityDailyStepDocRef, { date: clientLocalDateString, steps: increment(stepsToAdd) }, { merge: true });
+    // // console.log(`[firebaseService.submitSteps TXN] Community daily steps for ${clientLocalDateString} incremented by ${stepsToAdd}`);
 
 
     if (userProfileDataBeforeUpdate?.teamId && teamDocRef && teamDocSnap?.exists()) {
       transaction.update(teamDocRef, { totalSteps: increment(stepsToAdd) });
+      // // console.log(`[firebaseService.submitSteps TXN] Team ${userProfileDataBeforeUpdate.teamId} totalSteps incremented by ${stepsToAdd}`);
     }
   });
-
+  // // console.log(`[firebaseService.submitSteps] Returning with dailyGoalAchieved: ${dailyGoalAchieved}`);
   return { newlyAwardedBadges: [], dailyGoalAchieved: dailyGoalAchieved };
 }
 
@@ -556,7 +561,7 @@ export async function createTeam(creatorUserId: string, teamName: string, creato
       awardedTeamBadge = getBadgeDataById('team-player');
     }
     transaction.update(userProfileDocRef, userProfileUpdates);
-
+    // // console.log(`[firebaseService.createTeam] Team "${teamName}" created by ${creatorUserId}. User profile updated.`);
     return { teamId: newTeamDocRef.id, teamName: teamName, awardedTeamBadge };
   });
 }
@@ -580,6 +585,7 @@ export async function joinTeam(userId: string, teamIdToJoin: string, userCurrent
     const newTeamData = newTeamSnap.data() as Team;
 
     if (userProfileData.teamId === teamIdToJoin) {
+      // // console.log(`[firebaseService.joinTeam] User ${userId} already member of team ${teamIdToJoin}. No action needed.`);
       return { teamId: userProfileData.teamId, teamName: userProfileData.teamName!, awardedTeamBadge: undefined };
     }
 
@@ -600,7 +606,7 @@ export async function joinTeam(userId: string, teamIdToJoin: string, userCurrent
        awardedTeamBadge = getBadgeDataById('team-player');
     }
     transaction.update(userDocRef, userProfileUpdates);
-
+    // // console.log(`[firebaseService.joinTeam] User ${userId} joined team "${newTeamData.name}" (${teamIdToJoin}). User profile updated.`);
     return { teamId: teamIdToJoin, teamName: newTeamData.name, awardedTeamBadge };
   });
 }
@@ -617,7 +623,7 @@ export async function leaveTeam(userId: string, teamId: string, userCurrentSteps
     const teamSnap = await transaction.get(teamDocRef);
     if (!teamSnap.exists()) {
         transaction.update(userDocRef, { teamId: null, teamName: null });
-        console.warn(`User ${userId} tried to leave team ${teamId} which was not found. Clearing user's team info.`);
+        // // console.warn(`User ${userId} tried to leave team ${teamId} which was not found. Clearing user's team info.`);
         return;
     }
 
@@ -628,6 +634,7 @@ export async function leaveTeam(userId: string, teamId: string, userCurrentSteps
       totalSteps: increment(-stepsToDecrement),
     });
     transaction.update(userDocRef, { teamId: null, teamName: null });
+    // // console.log(`[firebaseService.leaveTeam] User ${userId} left team ${teamId}. Steps decremented: ${stepsToDecrement}.`);
   });
 }
 

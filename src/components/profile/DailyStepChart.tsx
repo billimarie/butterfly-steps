@@ -31,8 +31,8 @@ export default function DailyStepChart({
   userProfile,
   chartType = 'user',
 }: DailyStepChartProps) {
-  console.log(`[DailyStepChart] Rendering. Type: ${chartType}. Received dailyStepsData prop:`, JSON.stringify(dailyStepsData, null, 2).substring(0, 200) + "...");
-  console.log(`[DailyStepChart] isLoading: ${isLoading}, userProfile UID: ${userProfile?.uid}`);
+  // console.log(`[DailyStepChart] Rendering. Type: ${chartType}. Received dailyStepsData prop:`, JSON.stringify(dailyStepsData, null, 2).substring(0, 200) + "...");
+  // console.log(`[DailyStepChart] isLoading: ${isLoading}, userProfile UID: ${userProfile?.uid}`);
 
   const chartConfig = useMemo(() => {
     const config: ChartConfig = {
@@ -53,7 +53,7 @@ export default function DailyStepChart({
 
 
   const formattedData = useMemo(() => {
-    console.log(`[DailyStepChart useMemo ${chartType}] Calculating formattedData. Input dailyStepsData:`, JSON.stringify(dailyStepsData, null, 2).substring(0, 200) + "...");
+    // console.log(`[DailyStepChart useMemo ${chartType}] Calculating formattedData. Input dailyStepsData:`, JSON.stringify(dailyStepsData, null, 2).substring(0, 200) + "...");
     
     const dailyCalculatedGoal = (chartType === 'user' && userProfile?.stepGoal && userProfile.stepGoal > 0)
       ? userProfile.stepGoal / CHALLENGE_DURATION_DAYS
@@ -70,7 +70,7 @@ export default function DailyStepChart({
       const displayDateObj = new Date(Number(dateParts[0]), Number(dateParts[1]) - 1, Number(dateParts[2]));
       const displayDateStr = displayDateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
       
-      console.log(`[DailyStepChart useMemo ${chartType} item ${index}] original date: ${item.date}, displayDateStr: ${displayDateStr}, logged: ${logged}, remaining: ${Math.round(remaining)}, dailyCalculatedGoal: ${Math.round(dailyCalculatedGoal)}`);
+      // console.log(`[DailyStepChart useMemo ${chartType} item ${index}] original date: ${item.date}, displayDateStr: ${displayDateStr}, logged: ${logged}, remaining: ${Math.round(remaining)}, dailyCalculatedGoal: ${Math.round(dailyCalculatedGoal)}`);
 
       return {
         date: item.date, 
@@ -80,7 +80,7 @@ export default function DailyStepChart({
         dailyCalculatedGoal: chartType === 'user' ? Math.round(dailyCalculatedGoal) : undefined, // Only for user chart
       };
     });
-    console.log(`[DailyStepChart useMemo ${chartType}] Output formattedData:`, JSON.stringify(result, null, 2).substring(0,200) + "...");
+    // console.log(`[DailyStepChart useMemo ${chartType}] Output formattedData:`, JSON.stringify(result, null, 2).substring(0,200) + "...");
     return result;
   }, [dailyStepsData, userProfile?.stepGoal, chartType]);
 
