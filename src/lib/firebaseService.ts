@@ -19,30 +19,45 @@ import {
   limit as firestoreLimit,
   type DocumentSnapshot,
   type DocumentReference,
-  writeBatch
+  writeBatch,
+  addDoc
 } from 'firebase/firestore';
-import type { UserProfile, CommunityStats, Team, DailyStep, StreakUpdateResults, StepSubmissionResult, ExplorerSectionKey } from '@/types';
+import type { UserProfile, CommunityStats, Team, DailyStep, StreakUpdateResults, StepSubmissionResult, ExplorerSectionKey, Challenge, ChallengeCreationData } from '@/types';
 import { CHALLENGE_DURATION_DAYS } from '@/types'; // Import the constant
 import type { User as FirebaseUser } from 'firebase/auth';
 import { ALL_BADGES, type BadgeData, type BadgeId, getBadgeDataById } from '@/lib/badges';
+import { format as formatDate } from 'date-fns'; // Aliased to avoid conflict
 
-const USERS_COLLECTION = 'users';
-const TEAMS_COLLECTION = 'teams';
-const COMMUNITY_COLLECTION = 'community';
-const COMMUNITY_STATS_DOC = 'stats';
-const DAILY_STEPS_SUBCOLLECTION = 'dailySteps';
+// Define Firestore collection/document constants
+const USERS_COLLECTION = "users";
+const DAILY_STEPS_SUBCOLLECTION = "dailySteps";
+const COMMUNITY_COLLECTION = "community";
+const COMMUNITY_STATS_DOC = "stats";
+const TEAMS_COLLECTION = "teams";
+const CHALLENGES_COLLECTION = "challenges";
 
+// Challenge Date Configuration (Fixed to 2025 as per user prompt)
+export const CHALLENGE_START_YEAR = 2025;
+export const CHALLENGE_START_MONTH_JS = 5; // 0-indexed for June
+export const CHALLENGE_START_DAY_JS = 21;
+export const CHALLENGE_END_MONTH_JS = 9; // 0-indexed for October
+export const CHALLENGE_END_DAY_JS = 31;
+
+export function isChallengeActive(currentDate: Date = new Date()): boolean {
+  const startDate = new Date(CHALLENGE_START_YEAR, CHALLENGE_START_MONTH_JS, CHALLENGE_START_DAY_JS, 0, 0, 0, 0);
+  const endDate = new Date(CHALLENGE_START_YEAR, CHALLENGE_END_MONTH_JS, CHALLENGE_END_DAY_JS, 23, 59, 59, 999);
+  return currentDate >= startDate && currentDate <= endDate;
+}
 
 // Helper function to get the challenge start date for a given year (UTC)
-export function getChallengeStartDate(year: number): Date {
-  return new Date(Date.UTC(year, 5, 21)); // June 21st, UTC (Month is 0-indexed, so 5 is June)
+export function getChallengeStartDateForYear(year: number): Date {
+  return new Date(Date.UTC(year, CHALLENGE_START_MONTH_JS, CHALLENGE_START_DAY_JS)); // June 21st, UTC (Month is 0-indexed, so 5 is June)
 }
 
 // Helper function to get the date string for a specific challenge day number
-export function getChallengeDateStringByDayNumber(dayNumber: number, challengeYear?: number): string {
-  const year = challengeYear || new Date().getUTCFullYear();
-  const startDate = getChallengeStartDate(year);
-  // Create a new Date object from startDate to avoid modifying it directly
+export function getChallengeDateStringByDayNumber(dayNumber: number): string {
+  // Uses the fixed CHALLENGE_START_YEAR
+  const startDate = getChallengeStartDateForYear(CHALLENGE_START_YEAR);
   const targetDate = new Date(startDate.getTime());
   targetDate.setUTCDate(startDate.getUTCDate() + dayNumber - 1);
 
@@ -52,35 +67,26 @@ export function getChallengeDateStringByDayNumber(dayNumber: number, challengeYe
   return `${y}-${m}-${d}`;
 }
 
-// Helper function to calculate the challenge day number (1-133) from a date string
 export function getChallengeDayNumberFromDateString(dateString: string): number {
   const [year, month, day] = dateString.split('-').map(Number);
-  const currentDate = new Date(Date.UTC(year, month - 1, day)); // Month is 0-indexed for Date constructor
+  // Ensure we are comparing against the correct challenge year's start date
+  if (year !== CHALLENGE_START_YEAR) return 0; // Or handle as an error/invalid if date is outside challenge year
 
-  const challengeStartDate = getChallengeStartDate(currentDate.getUTCFullYear());
+  const currentDate = new Date(Date.UTC(year, month - 1, day));
+  const challengeStartDate = getChallengeStartDateForYear(CHALLENGE_START_YEAR);
 
-  if (currentDate < challengeStartDate) return 0; // Before challenge start
+  if (currentDate < challengeStartDate) return 0;
 
   const diffTime = currentDate.getTime() - challengeStartDate.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
   const dayNumber = diffDays + 1;
-  return Math.max(1, Math.min(dayNumber, CHALLENGE_DURATION_DAYS)); // Clamp between 1 and 133
+  return Math.max(1, Math.min(dayNumber, CHALLENGE_DURATION_DAYS));
 }
-
 
 // Helper to get today's date in YYYY-MM-DD format (Local to the client)
 export function getTodaysDateClientLocal(): string {
-  // FOR TESTING CHRYSALIS VARIANTS:
-  // To test a specific day's Chrysalis variant:
-  // 1. Determine the target day number (1-133).
-  // 2. Calculate the date (June 21st is Day 1, Oct 31st is Day 133 for current year).
-  // 3. Uncomment the line below and update the string to "YYYY-MM-DD" for that date.
-  //    Example: For Day 1 (June 21st, 2024), use "2024-06-21".
-  //             For Day 5 (June 25th, 2024), use "2024-06-25".
-  // return "2024-06-21"; // << EDIT THIS LINE FOR TESTING SPECIFIC DAYS
-
-  // ORIGINAL IMPLEMENTATION (Revert to this after testing):
+  //  ORIGINAL IMPLEMENTATION (Revert to this after testing):
   const now = new Date(); // Current moment in client's local timezone
   const year = now.getFullYear();
   const month = (now.getMonth() + 1).toString().padStart(2, '0'); // JS months are 0-indexed
@@ -89,8 +95,6 @@ export function getTodaysDateClientLocal(): string {
   return localDateString;
 }
 
-
-// Helper function to map Firestore document snapshot to UserProfile
 function mapDocToUserProfile(docSnap: DocumentSnapshot): UserProfile {
   const data = docSnap.data();
   if (!data) {
@@ -120,6 +124,38 @@ function mapDocToUserProfile(docSnap: DocumentSnapshot): UserProfile {
   };
 }
 
+function mapDocToChallenge(docSnap: DocumentSnapshot): Challenge {
+  const data = docSnap.data();
+  if (!data) {
+    throw new Error(`Document data not found for challenge ${docSnap.id}`);
+  }
+  return {
+    id: docSnap.id,
+    name: data.name,
+    structuredDescription: data.structuredDescription,
+    creatorMessage: data.creatorMessage,
+    challengeType: data.challengeType,
+    creatorUid: data.creatorUid,
+    creatorName: data.creatorName,
+    opponentUid: data.opponentUid,
+    opponentName: data.opponentName,
+    opponentStatus: data.opponentStatus,
+    participantUids: Array.isArray(data.participantUids) ? data.participantUids : [],
+    goalType: data.goalType,
+    goalValue: data.goalValue,
+    startDate: data.startDate,
+    endDate: data.endDate,
+    status: data.status,
+    participantProgress: data.participantProgress,
+    winnerUids: Array.isArray(data.winnerUids) ? data.winnerUids : [],
+    stakes: data.stakes,
+    repetition: data.repetition,
+    createdAt: data.createdAt,
+    updatedAt: data.updatedAt,
+  };
+}
+
+
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   const docRef = doc(db, USERS_COLLECTION, uid);
   const docSnap = await getDoc(docRef);
@@ -131,7 +167,6 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 
 export async function getAllUserProfiles(): Promise<UserProfile[]> {
   const usersRef = collection(db, USERS_COLLECTION);
-  // Only fetch profiles that are complete
   const q = query(usersRef, where("profileComplete", "==", true));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => mapDocToUserProfile(docSnap));
@@ -279,12 +314,6 @@ export async function updateUserStreakOnLogin(uid: string): Promise<StreakUpdate
 }
 
 
-/**
- * Checks and awards step-based badges to a user.
- * This function ONLY processes badges of type: 'step'.
- * Streak badges are handled separately in AuthContext.
- * Event badges (like 'team-player', 'social-butterfly') are awarded at the time of the event.
- */
 export async function checkAndAwardBadges(
   uid: string,
   currentTotalSteps: number,
@@ -293,9 +322,7 @@ export async function checkAndAwardBadges(
   const newlyEarnedBadgesData: BadgeData[] = [];
   const newBadgeIdsToSaveSet = new Set<BadgeId>(currentUserBadgeIds);
 
-  // Only process badges of type 'step'
   for (const badge of ALL_BADGES.filter(b => b.type === 'step')) {
-    // 'first-step' has milestone 1 (step), others have step counts
     if (currentTotalSteps >= badge.milestone && !currentUserBadgeIds.includes(badge.id)) {
       if (!newBadgeIdsToSaveSet.has(badge.id)) {
          newlyEarnedBadgesData.push(badge);
@@ -305,11 +332,6 @@ export async function checkAndAwardBadges(
   }
 
   if (newlyEarnedBadgesData.length > 0) {
-    // The actual update to Firestore should happen in AuthContext after all badge processing
-    // to ensure a single write with all new badges (step and streak).
-    // For now, this function returns the badges that *would* be awarded.
-    // If AuthContext is changed to not update, then this line would be reinstated:
-    // await updateUserProfile(uid, { badgesEarned: Array.from(newBadgeIdsToSaveSet) });
   }
   return newlyEarnedBadgesData;
 }
@@ -328,7 +350,7 @@ export async function awardSpecificBadgeIfUnearned(userId: string, badgeIdToAwar
       const currentBadges = userProfile.badgesEarned || [];
 
       if (currentBadges.includes(badgeIdToAward)) {
-        return null; // Already has it
+        return null;
       }
 
       const badgeDefinition = getBadgeDataById(badgeIdToAward);
@@ -393,10 +415,10 @@ export async function submitSteps(uid: string, stepsToAdd: number): Promise<Step
     } else {
       transaction.update(communityStatsRef, { totalSteps: increment(stepsToAdd) });
     }
-    
+
     const newUserDailyStepsValue = (userDailyStepDataBeforeUpdate?.steps || 0) + stepsToAdd;
     const userDailyStepUpdatePayload: DailyStep = {
-        date: clientLocalDateString, 
+        date: clientLocalDateString,
         steps: newUserDailyStepsValue,
     };
 
@@ -419,8 +441,6 @@ export async function submitSteps(uid: string, stepsToAdd: number): Promise<Step
     }
   });
 
-  // Badge awarding logic is now primarily handled in AuthContext after profile refresh.
-  // This function returns dailyGoalAchieved, and AuthContext will call checkAndAwardBadges.
   return { newlyAwardedBadges: [], dailyGoalAchieved: dailyGoalAchieved };
 }
 
@@ -433,7 +453,7 @@ export async function getUserDailySteps(uid: string, limitDays: number = 30): Pr
   querySnapshot.forEach((docSnap) => {
     const data = docSnap.data();
     dailySteps.push({
-      date: data.date, 
+      date: data.date,
       steps: data.steps,
       dailyGoalMetOnThisDate: data.dailyGoalMetOnThisDate || false,
     });
@@ -469,7 +489,7 @@ export async function getCommunityDailySteps(limitDays: number = 30): Promise<Da
       steps: data.steps,
     });
   });
-  return dailySteps.reverse(); 
+  return dailySteps.reverse();
 }
 
 
@@ -653,4 +673,122 @@ export async function getTopUsers(count: number): Promise<UserProfile[]> {
   const q = query(usersRef, where("profileComplete", "==", true), orderBy('currentSteps', 'desc'), firestoreLimit(count));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => mapDocToUserProfile(docSnap));
+}
+
+export async function issueDirectChallenge(
+  creatorUid: string,
+  creatorName: string | undefined,
+  opponentUid: string,
+  opponentName: string,
+  challengeCreationDetails: ChallengeCreationData
+): Promise<string> {
+  const challengesRef = collection(db, CHALLENGES_COLLECTION);
+
+  const { startDate, goalValue, creatorMessage, stakes } = challengeCreationDetails;
+
+  const jsStartDate = new Date(startDate);
+  const challengeStartDateUTC = new Date(Date.UTC(jsStartDate.getFullYear(), jsStartDate.getMonth(), jsStartDate.getDate()));
+
+  const challengeEndDateUTC = new Date(challengeStartDateUTC);
+  challengeEndDateUTC.setUTCHours(23, 59, 59, 999);
+
+  if (!creatorUid) {
+    throw new Error("Creator UID is missing or invalid.");
+  }
+  if (!opponentUid) {
+    throw new Error("Opponent UID is missing or invalid.");
+  }
+
+  const autoGeneratedName = `${creatorName || 'Challenger'} vs ${opponentName}: Daily Step Battle!`;
+  const formattedStartDate = formatDate(challengeStartDateUTC, "PPP");
+  const autoGeneratedStructuredDescription = `${creatorName || 'Challenger'} challenged ${opponentName} to a daily step battle starting on ${formattedStartDate}. Goal: ${goalValue.toLocaleString()} steps. Stakes: ${stakes || 'bragging rights'}.`;
+
+
+  const newChallengeData: Omit<Challenge, 'id'> = {
+    name: autoGeneratedName,
+    structuredDescription: autoGeneratedStructuredDescription,
+    creatorMessage: creatorMessage,
+    challengeType: 'directUser',
+    creatorUid: creatorUid,
+    creatorName: creatorName,
+    opponentUid: opponentUid,
+    opponentName: opponentName,
+    opponentStatus: 'pending',
+    participantUids: [],
+    goalType: 'steps',
+    goalValue: goalValue,
+    startDate: Timestamp.fromDate(challengeStartDateUTC),
+    endDate: Timestamp.fromDate(challengeEndDateUTC),
+    status: 'invitation',
+    participantProgress: {},
+    winnerUids: [],
+    stakes: stakes,
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  };
+
+  const docRef = await addDoc(challengesRef, newChallengeData);
+  return docRef.id;
+}
+
+export async function getPendingChallengeInvitations(userId: string): Promise<Challenge[]> {
+  const challengesRef = collection(db, CHALLENGES_COLLECTION);
+  const q = query(
+    challengesRef,
+    where("opponentUid", "==", userId),
+    where("opponentStatus", "==", "pending"),
+    orderBy("createdAt", "desc")
+  );
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(docSnap => mapDocToChallenge(docSnap));
+}
+
+export async function acceptChallenge(challengeId: string, opponentUid: string): Promise<void> {
+  const challengeRef = doc(db, CHALLENGES_COLLECTION, challengeId);
+  const challengeSnap = await getDoc(challengeRef);
+
+  if (!challengeSnap.exists()) {
+    throw new Error("Challenge not found.");
+  }
+  const challengeData = mapDocToChallenge(challengeSnap);
+
+  if (challengeData.opponentUid !== opponentUid || challengeData.opponentStatus !== 'pending') {
+    throw new Error("Cannot accept this challenge. It may not be for you or is no longer pending.");
+  }
+
+  const updates: Partial<Challenge> = {
+    opponentStatus: 'accepted',
+    participantUids: arrayUnion(challengeData.creatorUid, opponentUid) as unknown as string[],
+    updatedAt: Timestamp.now(),
+  };
+
+  const now = new Date();
+  const startDate = challengeData.startDate.toDate();
+  if (startDate <= now) {
+    updates.status = 'active';
+  } else {
+    updates.status = 'accepted';
+  }
+
+  await updateDoc(challengeRef, updates);
+}
+
+export async function declineChallenge(challengeId: string, opponentUid: string): Promise<void> {
+  const challengeRef = doc(db, CHALLENGES_COLLECTION, challengeId);
+  const challengeSnap = await getDoc(challengeRef);
+
+  if (!challengeSnap.exists()) {
+    throw new Error("Challenge not found.");
+  }
+  const challengeData = mapDocToChallenge(challengeSnap);
+
+  if (challengeData.opponentUid !== opponentUid || challengeData.opponentStatus !== 'pending') {
+    throw new Error("Cannot decline this challenge. It may not be for you or is no longer pending.");
+  }
+
+  await updateDoc(challengeRef, {
+    opponentStatus: 'declined',
+    status: 'cancelled',
+    updatedAt: Timestamp.now(),
+  });
 }

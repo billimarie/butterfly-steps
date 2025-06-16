@@ -25,12 +25,12 @@ const stepSubmissionSchema = z.object({
 type StepSubmissionFormInputs = z.infer<typeof stepSubmissionSchema>;
 
 interface StepSubmissionFormProps {
-  onStepSubmit?: () => void | Promise<void>; // Callback, can be async
-  isModalVersion?: boolean; // Optional prop to indicate if it's used in a modal
+  onStepSubmit?: () => void | Promise<void>; 
+  isModalVersion?: boolean; 
 }
 
 export default function StepSubmissionForm({ onStepSubmit, isModalVersion = false }: StepSubmissionFormProps) {
-  const { user, userProfile, setShowDailyGoalMetModal, setShowNewBadgeModal } = useAuth();
+  const { user, userProfile, setShowDailyGoalMetModal, setShowNewBadgeModal, setCanCollectTodaysChrysalisCoin } = useAuth();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { register, handleSubmit, reset, formState: { errors } } = useForm<StepSubmissionFormInputs>({
@@ -51,8 +51,6 @@ export default function StepSubmissionForm({ onStepSubmit, isModalVersion = fals
       }
 
       if (result.newlyAwardedBadges && result.newlyAwardedBadges.length > 0) {
-        // AuthContext handles showing the first new badge.
-        // Subsequent new badges from the same submission could be toasted here if needed.
         setShowNewBadgeModal(result.newlyAwardedBadges[0]);
          if (result.newlyAwardedBadges.length > 1) {
             for (let i = 1; i < result.newlyAwardedBadges.length; i++) {
@@ -68,11 +66,12 @@ export default function StepSubmissionForm({ onStepSubmit, isModalVersion = fals
 
       if (result.dailyGoalAchieved) {
         setShowDailyGoalMetModal(true);
+        setCanCollectTodaysChrysalisCoin(true); // Set flag for DailyGoalMetModal
       }
 
       reset();
       if (onStepSubmit) {
-        await onStepSubmit(); // Await if it's a promise
+        await onStepSubmit(); 
       }
     } catch (error) {
       console.error('Step submission error:', error);
@@ -82,7 +81,6 @@ export default function StepSubmissionForm({ onStepSubmit, isModalVersion = fals
     }
   };
 
-  // If it's not modal version and profile is incomplete, show the card version.
   if (!isModalVersion && !userProfile?.profileComplete) {
     return (
       <Card>
@@ -94,7 +92,6 @@ export default function StepSubmissionForm({ onStepSubmit, isModalVersion = fals
     );
   }
 
-  // Common form structure for both modal and card versions
   const formContent = (
     <>
       <div className="space-y-2">
@@ -125,16 +122,15 @@ export default function StepSubmissionForm({ onStepSubmit, isModalVersion = fals
 
   if (isModalVersion) {
     return (
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2"> {/* Adjusted padding for modal */}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2"> 
         {formContent}
-        <div className="pt-2"> {/* Add padding top to separate button from input */}
+        <div className="pt-2"> 
          {formFooter}
         </div>
       </form>
     );
   }
 
-  // Default Card version for dashboard page etc.
   return (
     <Card className="shadow-lg">
       <CardHeader>

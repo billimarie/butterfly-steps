@@ -15,8 +15,6 @@ export default function FloatingLogStepsButton() {
     showLogStepsModal,      
     setShowLogStepsModal,   
     logStepsFlowOrigin,     
-    // setShowStreakModal,    // No longer directly controlled here
-    // setStreakModalContext  // No longer directly controlled here
   } = useAuth();
 
   if (!user || !userProfile?.profileComplete) {
@@ -25,15 +23,11 @@ export default function FloatingLogStepsButton() {
 
   const handleFormSubmitSuccess = async () => {
     if (user?.uid) {
-      const wasFromChrysalisWelcomeFlow = logStepsFlowOrigin === 'chrysalis';
-      // Call fetchUserProfile, indicating if this submission was part of the initial welcome flow
-      await fetchUserProfile(user.uid, false, false, wasFromChrysalisWelcomeFlow); 
+      // No longer need to force show streak modal, as coin collection is tied to DailyGoalMetModal
+      await fetchUserProfile(user.uid, false, false, logStepsFlowOrigin === 'chrysalis'); 
     }
     
-    // setShowLogStepsModal will be called with 'direct' to ensure flowOrigin is reset
     setShowLogStepsModal(false, 'direct'); 
-    // The explicit re-opening of the streak modal if origin was 'chrysalis' is REMOVED.
-    // fetchUserProfile now handles the logic of when to show (or not show) the streak modal.
   };
 
   const handleOpenChange = (isOpen: boolean) => {

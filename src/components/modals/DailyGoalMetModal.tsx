@@ -3,24 +3,60 @@
 
 import { useAuth } from '@/context/AuthContext';
 import { Dialog, DialogContent, DialogOverlay, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Target, CheckCircle, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Target, CheckCircle, Sparkles, Gift, X } from 'lucide-react';
+import { getTodaysDateClientLocal } from '@/lib/firebaseService';
 
 export default function DailyGoalMetModal() {
-  const { userProfile, showDailyGoalMetModal, setShowDailyGoalMetModal } = useAuth();
+  const { 
+    userProfile, 
+    showDailyGoalMetModal, 
+    setShowDailyGoalMetModal,
+    canCollectTodaysChrysalisCoin,
+    collectDailyChrysalisCoin,
+    setCanCollectTodaysChrysalisCoin
+  } = useAuth();
 
   if (!userProfile || !userProfile.profileComplete) {
     return null;
   }
 
+  const today = getTodaysDateClientLocal();
+  const coinAlreadyCollectedToday = userProfile.chrysalisCoinDates?.includes(today) ?? false;
+  const showUnlockButton = canCollectTodaysChrysalisCoin && !coinAlreadyCollectedToday;
+
+  const handleUnlockCoin = () => {
+    collectDailyChrysalisCoin();
+    setShowDailyGoalMetModal(false); 
+  };
+
+  const handleClose = () => {
+    setShowDailyGoalMetModal(false);
+    if (canCollectTodaysChrysalisCoin) {
+      // If they close without unlocking, reset the flag so it doesn't persist incorrectly
+      setCanCollectTodaysChrysalisCoin(false);
+    }
+  };
+
   return (
-    <Dialog open={showDailyGoalMetModal} onOpenChange={(isOpen) => setShowDailyGoalMetModal(isOpen)}>
+    <Dialog open={showDailyGoalMetModal} onOpenChange={(isOpen) => {
+      if (!isOpen) handleClose(); // Ensure flag is reset if closed via overlay click etc.
+      else setShowDailyGoalMetModal(true);
+    }}>
       <DialogOverlay className="bg-black/60 backdrop-blur-sm" />
       <DialogContent className="sm:max-w-md p-0 overflow-hidden shadow-2xl">
-        <DialogHeader className="p-6 pb-2 text-center bg-gradient-to-br from-primary via-primary to-accent">
+        <DialogHeader className="p-6 pb-2 text-center bg-gradient-to-br from-primary via-primary to-accent relative">
           <DialogTitle className="font-headline text-3xl text-primary-foreground flex items-center justify-center">
             <Target className="mr-3 h-8 w-8 text-yellow-300" />
             Daily Goal Achieved
           </DialogTitle>
+           <button 
+            onClick={handleClose} 
+            className="absolute top-3 right-3 p-1 rounded-full bg-white/20 hover:bg-white/40 text-primary-foreground hover:text-white transition-colors z-10"
+            aria-label="Close dialog"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </DialogHeader>
         <div className="pt-6 pb-6 px-6 space-y-6 text-center">
             <div className="text-center space-y-2 min-h-[100px] flex flex-col justify-center items-center">
@@ -32,6 +68,12 @@ export default function DailyGoalMetModal() {
                 You've met your step target for today.
               </p>
             </div>
+            {showUnlockButton && (
+              <Button onClick={handleUnlockCoin} size="lg" className="w-full">
+                <Gift className="mr-2 h-5 w-5" />
+                Unlock Today's Chrysalis Coin
+              </Button>
+            )}
         </div>
         <DialogFooter className="px-6 py-4 bg-muted/30 flex justify-center items-center space-x-2">
           <p className="text-sm text-muted-foreground">Keep up the great work!</p>

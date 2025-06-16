@@ -12,23 +12,25 @@ interface UseAuthRedirectOptions {
 }
 
 export function useAuthRedirect(options: UseAuthRedirectOptions = {}) {
-  const { user, userProfile, loading } = useAuth();
+  const { user, userProfile, loading, isLoggingOut } = useAuth(); // Added isLoggingOut
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || isLoggingOut) return; // If loading or logging out, do nothing yet
 
     const isAuthPage = pathname === '/login' || pathname === '/signup';
-    const isProfileSetupPage = pathname.startsWith('/profile'); // Includes /profile/[userId]
+    // const isProfileSetupPage = pathname.startsWith('/profile'); // Not directly used for this logic block
 
     if (options.redirectIfAuthenticated && user) {
-      // If user is authenticated and on a page like login/signup, redirect them.
-      // If profile is incomplete, redirect to their profile setup. Otherwise, to the specified path.
       if (userProfile && !userProfile.profileComplete) {
-        router.push(`/profile/${user.uid}?setup=true`); // or just /profile/${user.uid}
-      } else {
+        if (pathname !== `/profile/${user.uid}`) { // Avoid loop if already on their own profile setup
+          router.push(`/profile/${user.uid}?setup=true`);
+        }
+      } else if (userProfile?.profileComplete && isAuthPage) { // Only redirect from auth pages if profile is complete
         router.push(options.redirectIfAuthenticated);
+      } else if (isAuthPage) { // User exists, profile may be null or incomplete, on auth page
+         router.push(`/profile/${user.uid}?setup=true`); // Direct to setup
       }
       return;
     }
@@ -40,30 +42,23 @@ export function useAuthRedirect(options: UseAuthRedirectOptions = {}) {
 
     if (user && options.requireProfileComplete) {
       if (!userProfile || !userProfile.profileComplete) {
-        // If profile is incomplete, redirect to their own profile page for completion.
-        // Avoid redirecting if already on some version of the profile page.
-        // Check if current path IS NOT their own profile page.
         if (pathname !== `/profile/${user.uid}`) { 
-             router.push(`/profile/${user.uid}?setup=true`); // Add query param to indicate setup
+             router.push(`/profile/${user.uid}?setup=true`);
         }
       }
     }
 
-     if (isAuthPage && user) {
+     if (isAuthPage && user) { // This block might be redundant due to options.redirectIfAuthenticated
        if (userProfile && userProfile.profileComplete) {
          router.push('/');
-       } else if (userProfile) { // Profile exists but incomplete
-         router.push(`/profile/${user.uid}?setup=true`);
-       } else {
-        // User exists, but userProfile is null (still loading or error).
-        // This typically means AuthContext is still fetching.
-        // For now, to avoid loops, we can let it be or direct to a generic profile.
-        // The "?setup=true" helps ProfilePageContent know it's an initial setup.
-         router.push(`/profile/${user.uid}?setup=true`);
+       } else { 
+         if (pathname !== `/profile/${user.uid}`) {
+           router.push(`/profile/${user.uid}?setup=true`);
+         }
        }
      }
 
-  }, [user, userProfile, loading, router, pathname, options]);
+  }, [user, userProfile, loading, isLoggingOut, router, pathname, options]); // Added isLoggingOut
 
-  return { user, userProfile, loading };
+  return { user, userProfile, loading, isLoggingOut }; // Return isLoggingOut
 }
