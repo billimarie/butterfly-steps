@@ -45,9 +45,15 @@ export default function StepSubmissionForm({ onStepSubmit, isModalVersion = fals
     setLoading(true);
     try {
       const result: StepSubmissionResult = await submitSteps(user.uid, data.steps);
+      // console.log('[StepSubmissionForm] Result from submitSteps:', result);
 
-      if (!result.dailyGoalAchieved) {
-        toast({ title: 'Steps Submitted!', description: `${data.steps.toLocaleString()} steps added to your total.` });
+
+      if (result.dailyGoalAchieved) {
+        // console.log('[StepSubmissionForm] Daily goal achieved! Attempting to show DailyGoalMetModal.');
+        setShowDailyGoalMetModal(true);
+        setCanCollectTodaysChrysalisCoin(true); // Set flag for DailyGoalMetModal
+      } else {
+         toast({ title: 'Steps Submitted!', description: `${data.steps.toLocaleString()} steps added to your total.` });
       }
 
       if (result.newlyAwardedBadges && result.newlyAwardedBadges.length > 0) {
@@ -64,17 +70,12 @@ export default function StepSubmissionForm({ onStepSubmit, isModalVersion = fals
         }
       }
 
-      if (result.dailyGoalAchieved) {
-        setShowDailyGoalMetModal(true);
-        setCanCollectTodaysChrysalisCoin(true); // Set flag for DailyGoalMetModal
-      }
-
       reset();
       if (onStepSubmit) {
         await onStepSubmit(); 
       }
     } catch (error) {
-      console.error('Step submission error:', error);
+      // console.error('Step submission error:', error);
       toast({ title: 'Submission Failed', description: (error as Error).message || 'Could not submit steps. Please try again.', variant: 'destructive' });
     } finally {
       setLoading(false);
