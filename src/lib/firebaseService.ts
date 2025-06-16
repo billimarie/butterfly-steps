@@ -23,10 +23,12 @@ import {
   addDoc
 } from 'firebase/firestore';
 import type { UserProfile, CommunityStats, Team, DailyStep, StreakUpdateResults, StepSubmissionResult, ExplorerSectionKey, Challenge, ChallengeCreationData } from '@/types';
-import { CHALLENGE_DURATION_DAYS } from '@/types'; // Import the constant
+import { CHALLENGE_DURATION_DAYS } from '@/types'; // Keep this if used by functions remaining in this file
 import type { User as FirebaseUser } from 'firebase/auth';
 import { ALL_BADGES, type BadgeData, type BadgeId, getBadgeDataById } from '@/lib/badges';
-import { format } from 'date-fns';
+import { format as formatDate } from 'date-fns';
+import { isChallengeActive, CHALLENGE_START_YEAR, getChallengeDayNumberFromDateString, getChallengeDateStringByDayNumber } from './dateUtils'; // Import from new location
+
 
 // Define Firestore collection/document constants
 const USERS_COLLECTION = "users";
@@ -36,55 +38,24 @@ const COMMUNITY_STATS_DOC = "stats";
 const TEAMS_COLLECTION = "teams";
 const CHALLENGES_COLLECTION = "challenges";
 
-
-// Helper function to get the challenge start date for a given year (UTC)
-export function getChallengeStartDate(year: number): Date {
-  return new Date(Date.UTC(year, 5, 21)); // June 21st, UTC (Month is 0-indexed, so 5 is June)
-}
-
-// Helper function to get the date string for a specific challenge day number
-export function getChallengeDateStringByDayNumber(dayNumber: number, challengeYear?: number): string {
-  const year = challengeYear || new Date().getUTCFullYear();
-  const startDate = getChallengeStartDate(year);
-  const targetDate = new Date(startDate.getTime());
-  targetDate.setUTCDate(startDate.getUTCDate() + dayNumber - 1);
-
-  const y = targetDate.getUTCFullYear();
-  const m = (targetDate.getUTCMonth() + 1).toString().padStart(2, '0');
-  const d = targetDate.getUTCDate().toString().padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-export function getChallengeDayNumberFromDateString(dateString: string): number {
-  const [year, month, day] = dateString.split('-').map(Number);
-  const currentDate = new Date(Date.UTC(year, month - 1, day)); 
-
-  const challengeStartDate = getChallengeStartDate(currentDate.getUTCFullYear());
-
-  if (currentDate < challengeStartDate) return 0; 
-
-  const diffTime = currentDate.getTime() - challengeStartDate.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-  const dayNumber = diffDays + 1;
-  return Math.max(1, Math.min(dayNumber, CHALLENGE_DURATION_DAYS)); 
+// A global variable for testing purposes.
+// IMPORTANT: THIS SHOULD ONLY BE USED FOR DEVELOPMENT/TESTING.
+// IT SHOULD BE NULL OR UNDEFINED IN PRODUCTION.
+if (typeof window !== 'undefined') {
+  (window as any).__TEST_OVERRIDE_DATE__ = null;
 }
 
 
 export function getTodaysDateClientLocal(): string {
-  // FOR TESTING CHRYSALIS VARIANTS:
-  // To test a specific day's Chrysalis variant:
-  // 1. Determine the target day number (1-133).
-  // 2. Calculate the date (June 21st is Day 1, Oct 31st is Day 133 for current year).
-  // 3. Uncomment the line below and update the string to "YYYY-MM-DD" for that date.
-  //    Example: For Day 1 (June 21st, 2024), use "2024-06-21".
-  //             For Day 5 (June 25th, 2024), use "2024-06-25".
-  // return "2024-06-22"; // << EDIT THIS LINE FOR TESTING SPECIFIC DAYS
+  // Check if a test override date is set
+  if (typeof window !== 'undefined' && (window as any).__TEST_OVERRIDE_DATE__) {
+    console.warn(`USING TEST OVERRIDE DATE: ${(window as any).__TEST_OVERRIDE_DATE__}`);
+    return (window as any).__TEST_OVERRIDE_DATE__;
+  }
 
-  // ORIGINAL IMPLEMENTATION (Revert to this after testing):
-  const now = new Date(); 
+  const now = new Date();
   const year = now.getFullYear();
-  const month = (now.getMonth() + 1).toString().padStart(2, '0'); 
+  const month = (now.getMonth() + 1).toString().padStart(2, '0');
   const day = now.getDate().toString().padStart(2, '0');
   const localDateString = `${year}-${month}-${day}`;
   return localDateString;
@@ -346,7 +317,7 @@ export async function awardSpecificBadgeIfUnearned(userId: string, badgeIdToAwar
       const currentBadges = userProfile.badgesEarned || [];
 
       if (currentBadges.includes(badgeIdToAward)) {
-        return null; 
+        return null;
       }
 
       const badgeDefinition = getBadgeDataById(badgeIdToAward);
@@ -411,10 +382,10 @@ export async function submitSteps(uid: string, stepsToAdd: number): Promise<Step
     } else {
       transaction.update(communityStatsRef, { totalSteps: increment(stepsToAdd) });
     }
-    
+
     const newUserDailyStepsValue = (userDailyStepDataBeforeUpdate?.steps || 0) + stepsToAdd;
     const userDailyStepUpdatePayload: DailyStep = {
-        date: clientLocalDateString, 
+        date: clientLocalDateString,
         steps: newUserDailyStepsValue,
     };
 
@@ -449,7 +420,7 @@ export async function getUserDailySteps(uid: string, limitDays: number = 30): Pr
   querySnapshot.forEach((docSnap) => {
     const data = docSnap.data();
     dailySteps.push({
-      date: data.date, 
+      date: data.date,
       steps: data.steps,
       dailyGoalMetOnThisDate: data.dailyGoalMetOnThisDate || false,
     });
@@ -485,7 +456,7 @@ export async function getCommunityDailySteps(limitDays: number = 30): Promise<Da
       steps: data.steps,
     });
   });
-  return dailySteps.reverse(); 
+  return dailySteps.reverse();
 }
 
 
@@ -673,18 +644,18 @@ export async function getTopUsers(count: number): Promise<UserProfile[]> {
 
 export async function issueDirectChallenge(
   creatorUid: string,
-  creatorDisplayName: string | undefined,
+  creatorName: string | undefined,
   opponentUid: string,
-  opponentDisplayName: string,
+  opponentName: string,
   challengeCreationDetails: ChallengeCreationData
 ): Promise<string> {
   const challengesRef = collection(db, CHALLENGES_COLLECTION);
 
-  const { startDate, goalValue, name, structuredDescription, creatorMessage, stakes } = challengeCreationDetails;
+  const { startDate, goalValue, creatorMessage, stakes } = challengeCreationDetails;
 
-  const jsStartDate = new Date(startDate); 
+  const jsStartDate = new Date(startDate);
   const challengeStartDateUTC = new Date(Date.UTC(jsStartDate.getFullYear(), jsStartDate.getMonth(), jsStartDate.getDate()));
-  
+
   const challengeEndDateUTC = new Date(challengeStartDateUTC);
   challengeEndDateUTC.setUTCHours(23, 59, 59, 999);
 
@@ -695,17 +666,22 @@ export async function issueDirectChallenge(
     throw new Error("Opponent UID is missing or invalid.");
   }
 
+  const autoGeneratedName = `${creatorName || 'Challenger'} vs ${opponentName}: Daily Step Battle!`;
+  const formattedStartDate = formatDate(challengeStartDateUTC, "PPP");
+  const autoGeneratedStructuredDescription = `${creatorName || 'Challenger'} challenged ${opponentName} to a daily step battle starting on ${formattedStartDate}. Goal: ${goalValue.toLocaleString()} steps. Stakes: ${stakes || 'bragging rights'}.`;
+
+
   const newChallengeData: Omit<Challenge, 'id'> = {
-    name: name || `${creatorDisplayName || 'Challenger'} vs ${opponentDisplayName}: Daily Step Battle!`,
-    structuredDescription: structuredDescription,
+    name: autoGeneratedName,
+    structuredDescription: autoGeneratedStructuredDescription,
     creatorMessage: creatorMessage,
     challengeType: 'directUser',
     creatorUid: creatorUid,
-    creatorName: creatorDisplayName,
+    creatorName: creatorName,
     opponentUid: opponentUid,
-    opponentName: opponentDisplayName,
+    opponentName: opponentName,
     opponentStatus: 'pending',
-    participantUids: [], 
+    participantUids: [],
     goalType: 'steps',
     goalValue: goalValue,
     startDate: Timestamp.fromDate(challengeStartDateUTC),
@@ -779,7 +755,7 @@ export async function declineChallenge(challengeId: string, opponentUid: string)
 
   await updateDoc(challengeRef, {
     opponentStatus: 'declined',
-    status: 'cancelled', 
+    status: 'cancelled',
     updatedAt: Timestamp.now(),
   });
 }

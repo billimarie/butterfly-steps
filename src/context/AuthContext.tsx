@@ -6,12 +6,11 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, signOut as firebaseSignOut, updateProfile } from 'firebase/auth';
 import type { UserProfile, AuthContextType, StreakUpdateResults, BadgeData, ChrysalisJourneyModalContext, LogStepsModalOrigin, ChrysalisVariantData, ExplorerSectionKey, Challenge } from '@/types';
-import { CHRYSALIS_AVATAR_IDENTIFIER, CHALLENGE_DURATION_DAYS } from '@/types';
+import { CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
 import {
   getUserProfile,
   updateUserStreakOnLogin,
   updateUserProfile as updateUserProfileInFirestore,
-  getDailyStepForDate,
   getTodaysDateClientLocal,
   checkAndAwardBadges as checkAndAwardStepBadges,
   awardSpecificBadgeIfUnearned,
@@ -19,6 +18,7 @@ import {
   acceptChallenge as acceptChallengeService,
   declineChallenge as declineChallengeService,
 } from '@/lib/firebaseService';
+import { isChallengeActive, getChallengeDayNumberFromDateString } from '@/lib/dateUtils';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { arrayUnion, doc, updateDoc } from 'firebase/firestore';
@@ -36,22 +36,6 @@ const DEFAULT_THEME_VALUES = {
 
 const EXPLORER_SECTIONS: readonly ExplorerSectionKey[] = ['profile', 'dashboard', 'community', 'donate'] as const;
 const EXPLORER_BADGE_ID: BadgeId = 'explorer-award';
-
-
-function getChallengeDayNumber(dateString: string): number {
-  const [year, month, day] = dateString.split('-').map(Number);
-  const currentDate = new Date(Date.UTC(year, month - 1, day));
-
-  const challengeStartDate = new Date(Date.UTC(currentDate.getUTCFullYear(), 5, 21));
-
-  if (currentDate < challengeStartDate) return 0;
-
-  const diffTime = currentDate.getTime() - challengeStartDate.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-  const dayNumber = diffDays + 1;
-  return Math.max(1, Math.min(dayNumber, CHALLENGE_DURATION_DAYS));
-}
 
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -115,22 +99,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       streakResult = await updateUserStreakOnLogin(uid);
       let finalProfile = await getUserProfile(uid);
 
-      const isFirstTimeSignupExperience = isInitialAuthEvent && isPostSignup && !hasSeenWelcomeMigrationModal && finalProfile?.profileComplete;
+      const challengeCurrentlyActive = isChallengeActive(new Date(getTodaysDateClientLocal()));
 
-      if (isFirstTimeSignupExperience) {
-        setShowWelcomeMigrationModal(true);
-        setHasSeenWelcomeMigrationModal(true);
-      } else if (isInitialAuthEvent && !isPostSignup && finalProfile?.profileComplete) {
-        toast({ title: 'Welcome Back!' });
-        if (finalProfile.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER && streakResult.streakProcessedForToday) {
-            setChrysalisJourneyModalContext('login');
-            setShowChrysalisJourneyModalReactState(true); // Show avatar activation
-        } else if (finalProfile.photoURL === CHRYSALIS_AVATAR_IDENTIFIER && streakResult.streakProcessedForToday && !showDailyGoalMetModal && !justCollectedCoin) {
-            // Chrysalis avatar is active, show DailyMotivationModal instead of ChrysalisJourney directly
+
+      if (isInitialAuthEvent && finalProfile?.profileComplete && challengeCurrentlyActive) {
+          if (!hasSeenWelcomeMigrationModal) {
             setShowDailyMotivationModalState(true);
-        }
+            setHasSeenWelcomeMigrationModal(true);
+          } else if (streakResult.streakProcessedForToday && !showDailyGoalMetModal && !justCollectedCoin) {
+             setShowDailyMotivationModalState(true);
+          }
+      } else if (isInitialAuthEvent && finalProfile && !finalProfile.profileComplete && challengeCurrentlyActive) {
+        // No longer show ChrysalisJourneyModal for avatar activation here.
+        // Avatar activation is tied to first theme activation.
+        // ProfileSetupForm will handle incomplete profiles.
       } else if (isInitialAuthEvent && !isPostSignup && finalProfile && !finalProfile.profileComplete) {
-        toast({ title: 'Welcome!', description: "Let's complete your profile setup." });
+         toast({ title: 'Welcome!', description: "Let's complete your profile setup." });
       } else if (isInitialAuthEvent && !isPostSignup && !finalProfile) {
         toast({ title: 'Welcome!', description: "Please set up your profile to get started." });
       }
@@ -166,7 +150,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           finalProfile.badgesEarned = currentEarnedBadges;
         }
 
-        if (!isFirstTimeSignupExperience && !isFirstStepSubmissionViaWelcomeFlow && badgesActuallyAwardedInThisCall.length > 0 && !newlyEarnedBadgeToShow) {
+        if (badgesActuallyAwardedInThisCall.length > 0 && !newlyEarnedBadgeToShow) {
             setNewlyEarnedBadgeToShow(badgesActuallyAwardedInThisCall[0]);
             for (let i = 1; i < badgesActuallyAwardedInThisCall.length; i++) {
                 const badge = badgesActuallyAwardedInThisCall[i];
@@ -290,8 +274,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         setUser(null); setUserProfile(null); setShowChrysalisJourneyModalReactState(false); applyTheme(null);
       }
-      setIsLoggingOut(false); 
-      setLoading(false); 
+      setIsLoggingOut(false);
+      setLoading(false);
     }
   };
 
@@ -314,42 +298,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const activateChrysalisAsAvatar = async () => {
-    if (!auth.currentUser || !userProfile) {
-      toast({ title: 'Error', description: 'You must be logged in and profile loaded.', variant: 'destructive' });
-      return;
-    }
-
-    const goldenChrysalisVariant = getChrysalisVariantByDay(1);
-    if (!goldenChrysalisVariant) {
-      toast({ title: 'Theme Error', description: 'Default Chrysalis theme not found.', variant: 'destructive' });
-      return;
-    }
-    await activateThemeFromCollectedCoin(goldenChrysalisVariant, true);
-  };
-
  const collectDailyChrysalisCoin = async () => {
     if (!user || !userProfile) {
       toast({ title: 'Error', description: 'You must be logged in to collect a coin.', variant: 'destructive' });
+      return;
+    }
+    if (!isChallengeActive(new Date(getTodaysDateClientLocal()))) {
+      toast({ title: 'Challenge Not Active', description: 'Coins can only be collected during the challenge period.', variant: 'default' });
+      setCanCollectTodaysChrysalisCoinState(false);
+      setShowChrysalisJourneyModalReactState(false);
       return;
     }
     const uid = user.uid;
     const currentDate = getTodaysDateClientLocal();
 
     if (userProfile.chrysalisCoinDates?.includes(currentDate)) {
-      const dayNumber = getChallengeDayNumber(currentDate);
+      const dayNumber = getChallengeDayNumberFromDateString(currentDate);
       const variant = getChrysalisVariantByDay(dayNumber);
       if (variant) {
-        // Do not setJustCollectedCoin here if it's already collected
-        // Instead, ensure the modal shows the "already collected" state or theme activation
-        // If modal is opened from profile, this ensures it shows correctly
       }
       setCanCollectTodaysChrysalisCoinState(false);
-      setShowChrysalisJourneyModalReactState(true); // Show the modal to display "already collected" or allow theme activation
+      setShowChrysalisJourneyModalReactState(true);
       setChrysalisJourneyModalContext('login');
       return;
     }
-    
+
     try {
       const userDocRef = doc(db, "users", uid);
       await updateDoc(userDocRef, {
@@ -363,22 +336,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { ...prevProfile, chrysalisCoinDates: newCoinDates };
       });
 
-      const dayNumber = getChallengeDayNumber(currentDate);
+      const dayNumber = getChallengeDayNumberFromDateString(currentDate);
       const variant = getChrysalisVariantByDay(dayNumber);
       if (variant) {
-        setJustCollectedCoin(variant); // This is the key to show gamified view
+        setJustCollectedCoin(variant);
         setShowChrysalisJourneyModalReactState(true);
         setChrysalisJourneyModalContext('login');
       } else {
         console.error(`Could not find Chrysalis variant for day ${dayNumber}`);
         toast({ title: 'Coin Collected!', description: "But couldn't display the special coin details." });
       }
-      setCanCollectTodaysChrysalisCoinState(false); 
+      setCanCollectTodaysChrysalisCoinState(false);
 
     } catch (e) {
       console.error('Failed to collect chrysalis coin:', e);
       toast({ title: 'Collection Failed', description: (e as Error).message, variant: 'destructive' });
-      await fetchUserProfile(uid); 
+      await fetchUserProfile(uid);
     }
   };
 
@@ -388,38 +361,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({ title: 'Error', description: 'User not found.', variant: 'destructive' });
       return;
     }
+    
+    const challengeCurrentlyActive = isChallengeActive(new Date(getTodaysDateClientLocal()));
+    if (!challengeCurrentlyActive && !fromProfileActivation) {
+      toast({ title: 'Challenge Not Active', description: 'Themes can primarily be activated during the challenge.', variant: 'default' });
+      return;
+    }
     const uid = user.uid;
     try {
       const updates: Partial<UserProfile> = {
         activeChrysalisThemeId: coinToActivate.id,
-        photoURL: CHRYSALIS_AVATAR_IDENTIFIER,
       };
+      
+      // Set avatar to chrysalis if it's not already, upon first theme activation
+      if (userProfile.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER) {
+        updates.photoURL = CHRYSALIS_AVATAR_IDENTIFIER;
+      }
 
-      setUser(prevUser => prevUser ? { ...auth.currentUser!, photoURL: CHRYSALIS_AVATAR_IDENTIFIER } : null );
       setUserProfile(prevProfile => {
         if (!prevProfile) return null;
-        return { ...prevProfile, photoURL: CHRYSALIS_AVATAR_IDENTIFIER, activeChrysalisThemeId: coinToActivate.id };
+        return { 
+          ...prevProfile, 
+          photoURL: updates.photoURL !== undefined ? updates.photoURL : prevProfile.photoURL, 
+          activeChrysalisThemeId: coinToActivate.id 
+        };
       });
       applyTheme(coinToActivate.id);
 
-      if (auth.currentUser) {
+      if (updates.photoURL === CHRYSALIS_AVATAR_IDENTIFIER && auth.currentUser && auth.currentUser.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER) {
         await updateProfile(auth.currentUser, { photoURL: CHRYSALIS_AVATAR_IDENTIFIER });
       }
       await updateUserProfileInFirestore(uid, updates);
 
-      toast({ title: 'Theme Activated!', description: `${coinToActivate.name} theme is now active.` });
-      
-      setShowChrysalisJourneyModalReactState(false);
-      clearJustCollectedCoinDetails(); 
+      let toastDescription = `${coinToActivate.name} theme is now active.`;
+      if (updates.photoURL === CHRYSALIS_AVATAR_IDENTIFIER && userProfile.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER) {
+        toastDescription += " Your avatar is now a Chrysalis!";
+      }
+      toast({ title: 'Theme Activated!', description: toastDescription });
 
-      if (!fromProfileActivation) {
+
+      setShowChrysalisJourneyModalReactState(false);
+      clearJustCollectedCoinDetails();
+
+      if (!fromProfileActivation && updates.photoURL === CHRYSALIS_AVATAR_IDENTIFIER) {
          router.push(`/profile/${uid}`);
       }
 
     } catch (e) {
       console.error('Failed to activate theme:', e);
       toast({ title: 'Theme Activation Failed', description: (e as Error).message, variant: 'destructive' });
-      await fetchUserProfile(uid); 
+      await fetchUserProfile(uid);
     }
   };
 
@@ -433,7 +424,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (show) {
       setLogStepsFlowOrigin(origin);
     } else {
-      if (origin === 'direct' || !show) { 
+      if (origin === 'direct' || !show) {
          setLogStepsFlowOrigin(null);
       }
     }
@@ -459,7 +450,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (allRequiredVisited && !hasExplorerBadge) {
         const awardedBadge = await awardSpecificBadgeIfUnearned(user.uid, EXPLORER_BADGE_ID);
         if (awardedBadge) {
-          setShowNewBadgeModal(awardedBadge); 
+          setShowNewBadgeModal(awardedBadge);
           await fetchUserProfile(user.uid);
         }
       }
@@ -467,7 +458,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Failed to record section visit or award explorer badge:", e);
       setUserProfile(prev => prev ? { ...prev, visitedSections: currentVisited } : null);
     }
-  }, [user, userProfile, fetchUserProfile, setShowNewBadgeModal]); 
+  }, [user, userProfile, fetchUserProfile, setShowNewBadgeModal]);
 
   const acceptChallengeInvitation = async (challengeId: string) => {
     if (!user) {
@@ -477,8 +468,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
         await acceptChallengeService(challengeId, user.uid);
         toast({ title: "Challenge Accepted!", description: "Let the friendly competition begin!" });
-        setPendingChallengeInvitationToShow(null); 
-        await fetchUserProfile(user.uid); 
+        setPendingChallengeInvitationToShow(null);
+        await fetchUserProfile(user.uid);
     } catch (e) {
         toast({ title: "Failed to Accept Challenge", description: (e as Error).message, variant: "destructive" });
         console.error("Failed to accept challenge:", e);
@@ -493,8 +484,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
         await declineChallengeService(challengeId, user.uid);
         toast({ title: "Challenge Declined", description: "The challenge invitation has been declined." });
-        setPendingChallengeInvitationToShow(null); 
-        await fetchUserProfile(user.uid); 
+        setPendingChallengeInvitationToShow(null);
+        await fetchUserProfile(user.uid);
     } catch (e) {
         toast({ title: "Failed to Decline Challenge", description: (e as Error).message, variant: "destructive" });
         console.error("Failed to decline challenge:", e);
@@ -512,6 +503,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const controlledSetShowDailyMotivationModal = (show: boolean) => {
     setShowDailyMotivationModalState(show);
   };
+
+  const TEST_ONLY_triggerDailyMotivationModal = useCallback(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn("TEST_ONLY_triggerDailyMotivationModal called!");
+      const todayForTest = new Date(getTodaysDateClientLocal());
+      const challengeIsActiveForTest = isChallengeActive(todayForTest);
+
+      if (userProfile?.profileComplete && challengeIsActiveForTest) {
+        setShowDailyMotivationModalState(true);
+      } else {
+        console.warn("Cannot trigger DailyMotivationModal via test function:", {
+          profileComplete: userProfile?.profileComplete,
+          challengeActive: challengeIsActiveForTest,
+          testDate: getTodaysDateClientLocal()
+        });
+        toast({
+          title: "Test Trigger Info",
+          description: `Cannot trigger DailyMotivationModal. Profile complete: ${userProfile?.profileComplete}, Challenge active for ${getTodaysDateClientLocal()}: ${challengeIsActiveForTest}`,
+          variant: "default",
+          duration: 5000,
+        });
+      }
+    }
+  }, [userProfile, toast]); // Removed setShowDailyMotivationModalState from deps, it's stable
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && user && TEST_ONLY_triggerDailyMotivationModal) {
+      (window as any).triggerDM = TEST_ONLY_triggerDailyMotivationModal;
+      console.log("AuthContext: Test function 'window.triggerDM()' is now available to show DailyMotivationModal.");
+    } else if ((window as any).triggerDM) {
+      delete (window as any).triggerDM;
+    }
+    return () => {
+      if ((window as any).triggerDM) {
+        delete (window as any).triggerDM;
+      }
+    };
+  }, [user, TEST_ONLY_triggerDailyMotivationModal]);
 
 
   return (
@@ -532,7 +561,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setShowDailyGoalMetModal,
       newlyEarnedBadgeToShow,
       setShowNewBadgeModal,
-      activateChrysalisAsAvatar,
       collectDailyChrysalisCoin,
       applyTheme,
       activeChrysalisThemeId,
@@ -553,6 +581,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setCanCollectTodaysChrysalisCoin,
       showDailyMotivationModal: showDailyMotivationModal,
       setShowDailyMotivationModal: controlledSetShowDailyMotivationModal,
+      TEST_ONLY_triggerDailyMotivationModal,
     }}>
       {children}
     </AuthContext.Provider>

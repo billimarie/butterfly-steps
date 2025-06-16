@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Dialog, DialogContent, DialogOverlay, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Target, CheckCircle, Sparkles, Gift, X } from 'lucide-react';
+import { isChallengeActive } from '@/lib/dateUtils'; // Updated import
 import { getTodaysDateClientLocal } from '@/lib/firebaseService';
 
 export default function DailyGoalMetModal() {
@@ -21,9 +22,10 @@ export default function DailyGoalMetModal() {
     return null;
   }
 
+  const challengeIsCurrentlyActive = isChallengeActive(); 
   const today = getTodaysDateClientLocal();
   const coinAlreadyCollectedToday = userProfile.chrysalisCoinDates?.includes(today) ?? false;
-  const showUnlockButton = canCollectTodaysChrysalisCoin && !coinAlreadyCollectedToday;
+  const showUnlockButton = canCollectTodaysChrysalisCoin && !coinAlreadyCollectedToday && challengeIsCurrentlyActive;
 
   const handleUnlockCoin = () => {
     collectDailyChrysalisCoin();
@@ -33,14 +35,13 @@ export default function DailyGoalMetModal() {
   const handleClose = () => {
     setShowDailyGoalMetModal(false);
     if (canCollectTodaysChrysalisCoin) {
-      // If they close without unlocking, reset the flag so it doesn't persist incorrectly
       setCanCollectTodaysChrysalisCoin(false);
     }
   };
 
   return (
     <Dialog open={showDailyGoalMetModal} onOpenChange={(isOpen) => {
-      if (!isOpen) handleClose(); // Ensure flag is reset if closed via overlay click etc.
+      if (!isOpen) handleClose();
       else setShowDailyGoalMetModal(true);
     }}>
       <DialogOverlay className="bg-black/60 backdrop-blur-sm" />
@@ -68,11 +69,21 @@ export default function DailyGoalMetModal() {
                 You've met your step target for today.
               </p>
             </div>
-            {showUnlockButton && (
+            {showUnlockButton ? (
               <Button onClick={handleUnlockCoin} size="lg" className="w-full">
                 <Gift className="mr-2 h-5 w-5" />
                 Unlock Today's Chrysalis Coin
               </Button>
+            ) : !challengeIsCurrentlyActive && canCollectTodaysChrysalisCoin ? (
+              <p className="text-sm text-muted-foreground italic">
+                Chrysalis Coin collection is only available during the challenge period (June 21 - Oct 31).
+              </p>
+            ) : (
+               challengeIsCurrentlyActive && !showUnlockButton && coinAlreadyCollectedToday && (
+                 <p className="text-sm text-muted-foreground italic">
+                    You've already collected today's Chrysalis Coin. Great job!
+                 </p>
+               )
             )}
         </div>
         <DialogFooter className="px-6 py-4 bg-muted/30 flex justify-center items-center space-x-2">

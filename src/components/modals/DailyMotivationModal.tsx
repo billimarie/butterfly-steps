@@ -5,28 +5,21 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogOverlay } from '@/components/ui/dialog';
 import { useAuth } from '@/context/AuthContext';
 import { Footprints, Sparkles, X } from 'lucide-react';
-import Logo from '@/components/ui/Logo';
+// Logo import removed
 
-// Remove isOpen and onOpenChange from props definition
-// interface DailyMotivationModalProps {
-//   isOpen: boolean;
-//   onOpenChange: (isOpen: boolean) => void;
-// }
-
-export default function DailyMotivationModal(/* Remove props from function signature */) {
-  const { 
-    userProfile, 
-    showDailyMotivationModal, // Get from context
-    setShowDailyMotivationModal, // Get from context
-    setShowLogStepsModal 
+export default function DailyMotivationModal() {
+  const {
+    userProfile,
+    showDailyMotivationModal,
+    setShowDailyMotivationModal,
+    setShowLogStepsModal
   } = useAuth();
 
   const handleLogSteps = () => {
-    setShowDailyMotivationModal(false); // Use context setter
-    setShowLogStepsModal(true, 'direct'); 
+    setShowDailyMotivationModal(false);
+    setShowLogStepsModal(true, 'direct');
   };
 
-  // Use context setter for onOpenChange
   const handleOnOpenChange = (open: boolean) => {
     setShowDailyMotivationModal(open);
   };
@@ -36,10 +29,8 @@ export default function DailyMotivationModal(/* Remove props from function signa
       <DialogOverlay className="bg-black/60 backdrop-blur-sm" />
       <DialogContent className="sm:max-w-md p-0 overflow-hidden shadow-2xl rounded-lg">
         <DialogHeader className="p-6 pb-4 text-center bg-gradient-to-br from-primary via-orange-500 to-accent items-center relative">
-          <div className="mb-3">
-            <Logo />
-          </div>
-          <DialogTitle className="font-headline text-3xl text-primary-foreground flex flex-col items-center justify-center">
+          {/* Logo component removed from here */}
+          <DialogTitle className="font-headline text-3xl text-primary-foreground flex flex-col items-center justify-center pt-6"> {/* Added pt-6 for spacing */}
             Welcome Back, {userProfile?.displayName || 'Explorer'}!
             <Sparkles className="h-7 w-7 text-yellow-300 mt-2" />
           </DialogTitle>
@@ -67,4 +58,3 @@ export default function DailyMotivationModal(/* Remove props from function signa
     </Dialog>
   );
 }
-
