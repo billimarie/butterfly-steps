@@ -12,8 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ALL_BADGES, type BadgeData } from '@/lib/badges';
 import type { BadgeId } from '@/lib/badges';
-import { leaveTeam, getUserDailySteps, getTodaysDateClientLocal } from '@/lib/firebaseService';
-import { isChallengeActive, getChallengeDayNumberFromDateString, getChallengeDateStringByDayNumber, CHALLENGE_START_YEAR } from '@/lib/dateUtils'; // Updated imports
+import { leaveTeam, getTodaysDateClientLocal, getChallengeDayNumberFromDateString, getChallengeDateStringByDayNumber, getUserDailySteps, isChallengeActive, CHALLENGE_START_YEAR } from '@/lib/firebaseService';
 import { useState, useEffect, useCallback } from 'react';
 import StepSubmissionForm from '@/components/dashboard/StepSubmissionForm';
 import { Separator } from '@/components/ui/separator';
@@ -96,7 +95,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   };
 
   const handleChrysalisAvatarClick = () => {
-    if (isOwnProfile && isChallengeActive()) { 
+    if (isOwnProfile && isChallengeActive()) { // Only allow re-engaging with current day if challenge is active
       setChrysalisJourneyModalContext('login');
       setShowChrysalisJourneyModal(true);
     } else if (isOwnProfile && !isChallengeActive()) {
@@ -105,6 +104,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   };
 
   const handleCoinGalleryItemClick = (variant: ChrysalisVariantData) => {
+    // This function is now only for collected coins that are clickable
     if (isOwnProfile) {
         setSelectedCoinForModal(variant);
         setIsCoinDetailModalOpen(true);
@@ -125,7 +125,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
 
 
   const currentChallengeDay = getChallengeDayNumberFromDateString(getTodaysDateClientLocal());
-  const challengeYearForCoins = CHALLENGE_START_YEAR; 
+  const challengeYearForCoins = CHALLENGE_START_YEAR; // Use fixed challenge year
 
   const MainChrysalisAvatar = () => {
     if (profileData.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER) return null;
@@ -276,13 +276,13 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
             <p className="text-sm text-muted-foreground">
               Collected: <span className="font-bold text-accent">{collectedCoinsCount}</span> / {currentChallengeDay > 0 ? currentChallengeDay : CHALLENGE_DURATION_DAYS} days so far. {isOwnProfile ? "Click a collected coin to view details or activate its theme." : ""}
             </p>
-            {currentChallengeDay > 0 && isChallengeActive() ? ( 
+            {currentChallengeDay > 0 && isChallengeActive() ? ( // Only show gallery if challenge is active and has started
               <div className="flex flex-wrap gap-x-3 gap-y-4 justify-center pt-2">
                 {Array.from({ length: currentChallengeDay }, (_, i) => i + 1).map((dayNum) => {
                   const variant = getChrysalisVariantByDay(dayNum);
                   if (!variant) return null;
 
-                  const challengeDateForDay = getChallengeDateStringByDayNumber(dayNum); 
+                  const challengeDateForDay = getChallengeDateStringByDayNumber(dayNum); // Uses fixed year
                   const isCollected = profileData.chrysalisCoinDates?.includes(challengeDateForDay) ?? false;
                   const CoinIcon = variant.icon || ShellIconLucide;
                   const isMissedAndPastCoin = !isCollected && dayNum < currentChallengeDay;
@@ -300,7 +300,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                         "border",
                         isCollected ? "bg-card border-primary/30" : "bg-muted/40 border-muted-foreground/20 opacity-60",
                         isClickableCoin ? "cursor-pointer hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary hover:opacity-100" : "cursor-default",
-                        isMissedAndPastCoin && "opacity-40 !cursor-not-allowed" 
+                        isMissedAndPastCoin && "opacity-40 !cursor-not-allowed" // Missed coins are distinctly styled and unclickable
                       )}
                       aria-label={isClickableCoin ? `View and activate ${variant.name} theme` : (isCollected ? variant.name : `${variant.name} (Not collected)`)}
                     >
@@ -328,8 +328,8 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                </p>
             )}
             {isOwnProfile && profileData.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER && collectedCoinsCount > 0 && isChallengeActive() && (
-                 <Button variant="outline" size="sm" onClick={() => activateThemeFromCollectedCoin(getChrysalisVariantByDay(1), true)} className="mt-3">
-                    <Palette className="mr-2 h-4 w-4" /> Set Golden Chrysalis Theme & Avatar
+                 <Button variant="outline" size="sm" onClick={handleChrysalisAvatarClick} className="mt-3">
+                    <Replace className="mr-2 h-4 w-4" /> Set Golden Chrysalis Avatar
                 </Button>
             )}
           </div>

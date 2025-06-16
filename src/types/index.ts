@@ -1,10 +1,10 @@
 
 import type { User as FirebaseUser } from 'firebase/auth';
-import type { BadgeId, BadgeData } from '@/lib/badges';
+import type { BadgeId, BadgeData } from '@/lib/badges'; 
 import type { Timestamp } from 'firebase/firestore';
-import type { ChrysalisVariantData } from '@/lib/chrysalisVariants';
+import type { ChrysalisVariantData } from '@/lib/chrysalisVariants'; 
 
-export const CHALLENGE_DURATION_DAYS = 133;
+export const CHALLENGE_DURATION_DAYS = 133; 
 
 export const CHRYSALIS_AVATAR_IDENTIFIER = 'lucide:shell';
 
@@ -12,7 +12,7 @@ export type ActivityStatus = 'Sedentary' | 'Moderately Active' | 'Very Active';
 
 export type ExplorerSectionKey = 'profile' | 'dashboard' | 'community' | 'donate';
 
-export type ChrysalisJourneyModalContext = 'login'; // Removed 'profile_avatar_select'
+export type ChrysalisJourneyModalContext = 'login' | 'profile_avatar_select';
 export type LogStepsModalOrigin = 'chrysalis' | 'direct' | null;
 
 
@@ -30,11 +30,11 @@ export interface UserProfile {
   teamId?: string | null;
   teamName?: string | null;
   currentStreak: number;
-  lastStreakLoginDate: string | null;
+  lastStreakLoginDate: string | null; 
   lastLoginTimestamp: Timestamp | null;
-  chrysalisCoinDates?: string[];
+  chrysalisCoinDates?: string[]; 
   timezone?: string | null;
-  activeChrysalisThemeId?: string | null;
+  activeChrysalisThemeId?: string | null; 
   dashboardLayout?: {
     dashboardOrder?: string[];
     communityOrder?: string[];
@@ -59,22 +59,22 @@ export interface ChallengeCreationData {
 }
 
 export interface Challenge {
-  id: string;
+  id: string; 
   name: string;
-  structuredDescription: string;
-  creatorMessage?: string;
+  structuredDescription: string; 
+  creatorMessage?: string; 
   challengeType: 'directUser' | 'teamChallenge' | 'openChallenge';
-  creatorUid: string;
-  creatorName?: string;
+  creatorUid: string; 
+  creatorName?: string; 
 
-  opponentUid?: string;
-  opponentName?: string;
-  opponentStatus?: 'pending' | 'accepted' | 'declined';
+  opponentUid?: string; 
+  opponentName?: string; 
+  opponentStatus?: 'pending' | 'accepted' | 'declined'; 
 
-  participantUids: string[];
-
-  goalType: 'steps' | 'activeDays';
-  goalValue: number;
+  participantUids: string[]; 
+  
+  goalType: 'steps' | 'activeDays'; 
+  goalValue: number; 
 
   startDate: Timestamp;
   endDate: Timestamp;
@@ -83,16 +83,16 @@ export interface Challenge {
 
   participantProgress?: {
     [uid: string]: {
-      currentValue: number;
+      currentValue: number; 
       lastUpdated: Timestamp;
     };
   };
+  
+  winnerUids?: string[]; 
+  badgeToAwardOnCompletion?: BadgeId; 
+  badgeToAwardOnWin?: BadgeId; 
 
-  winnerUids?: string[];
-  badgeToAwardOnCompletion?: BadgeId;
-  badgeToAwardOnWin?: BadgeId;
-
-  stakes?: string;
+  stakes?: string; 
 
   repetition?: {
     type: 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -110,7 +110,7 @@ export interface CommunityStats {
 }
 
 export interface DailyStep {
-  date: string;
+  date: string; 
   steps: number;
   dailyGoalMetOnThisDate?: boolean;
 }
@@ -142,7 +142,7 @@ export interface AuthContextType {
   user: FirebaseUser | null;
   userProfile: UserProfile | null;
   loading: boolean;
-  isLoggingOut: boolean;
+  isLoggingOut: boolean; 
   error: Error | null;
   logout: () => Promise<void>;
   fetchUserProfile: (
@@ -160,6 +160,7 @@ export interface AuthContextType {
   setShowDailyGoalMetModal: (show: boolean) => void;
   newlyEarnedBadgeToShow: BadgeData | null;
   setShowNewBadgeModal: (badge: BadgeData | null) => void;
+  activateChrysalisAsAvatar: () => Promise<void>;
   collectDailyChrysalisCoin: () => Promise<void>;
   applyTheme: (themeId: string | null) => void;
   activeChrysalisThemeId: string | null | undefined;
@@ -180,5 +181,4 @@ export interface AuthContextType {
   setCanCollectTodaysChrysalisCoin: (can: boolean) => void;
   showDailyMotivationModal: boolean;
   setShowDailyMotivationModal: (show: boolean) => void;
-  TEST_ONLY_triggerDailyMotivationModal?: () => void; // Added for testing
 }

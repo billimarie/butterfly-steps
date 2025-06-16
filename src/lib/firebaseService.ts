@@ -23,12 +23,10 @@ import {
   addDoc
 } from 'firebase/firestore';
 import type { UserProfile, CommunityStats, Team, DailyStep, StreakUpdateResults, StepSubmissionResult, ExplorerSectionKey, Challenge, ChallengeCreationData } from '@/types';
-import { CHALLENGE_DURATION_DAYS } from '@/types'; // Keep this if used by functions remaining in this file
+import { CHALLENGE_DURATION_DAYS } from '@/types'; // Import the constant
 import type { User as FirebaseUser } from 'firebase/auth';
 import { ALL_BADGES, type BadgeData, type BadgeId, getBadgeDataById } from '@/lib/badges';
-import { format as formatDate } from 'date-fns';
-import { isChallengeActive, CHALLENGE_START_YEAR, getChallengeDayNumberFromDateString, getChallengeDateStringByDayNumber } from './dateUtils'; // Import from new location
-
+import { format as formatDate } from 'date-fns'; // Aliased to avoid conflict
 
 // Define Firestore collection/document constants
 const USERS_COLLECTION = "users";
@@ -38,27 +36,67 @@ const COMMUNITY_STATS_DOC = "stats";
 const TEAMS_COLLECTION = "teams";
 const CHALLENGES_COLLECTION = "challenges";
 
-// A global variable for testing purposes.
-// IMPORTANT: THIS SHOULD ONLY BE USED FOR DEVELOPMENT/TESTING.
-// IT SHOULD BE NULL OR UNDEFINED IN PRODUCTION.
-if (typeof window !== 'undefined') {
-  (window as any).__TEST_OVERRIDE_DATE__ = null;
+// Challenge Date Configuration (Fixed to 2025 as per user prompt)
+export const CHALLENGE_START_YEAR = 2025;
+export const CHALLENGE_START_MONTH_JS = 5; // 0-indexed for June
+export const CHALLENGE_START_DAY_JS = 21;
+export const CHALLENGE_END_MONTH_JS = 9; // 0-indexed for October
+export const CHALLENGE_END_DAY_JS = 31;
+
+export function isChallengeActive(currentDate: Date = new Date()): boolean {
+  const startDate = new Date(CHALLENGE_START_YEAR, CHALLENGE_START_MONTH_JS, CHALLENGE_START_DAY_JS, 0, 0, 0, 0);
+  const endDate = new Date(CHALLENGE_START_YEAR, CHALLENGE_END_MONTH_JS, CHALLENGE_END_DAY_JS, 23, 59, 59, 999);
+  return currentDate >= startDate && currentDate <= endDate;
+}
+
+// Helper function to get the challenge start date for a given year (UTC)
+export function getChallengeStartDateForYear(year: number): Date {
+  return new Date(Date.UTC(year, CHALLENGE_START_MONTH_JS, CHALLENGE_START_DAY_JS)); // June 21st, UTC (Month is 0-indexed, so 5 is June)
+}
+
+// Helper function to get the date string for a specific challenge day number
+export function getChallengeDateStringByDayNumber(dayNumber: number): string {
+  // Uses the fixed CHALLENGE_START_YEAR
+  const startDate = getChallengeStartDateForYear(CHALLENGE_START_YEAR);
+  const targetDate = new Date(startDate.getTime());
+  targetDate.setUTCDate(startDate.getUTCDate() + dayNumber - 1);
+
+  const y = targetDate.getUTCFullYear();
+  const m = (targetDate.getUTCMonth() + 1).toString().padStart(2, '0');
+  const d = targetDate.getUTCDate().toString().padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export function getChallengeDayNumberFromDateString(dateString: string): number {
+  const [year, month, day] = dateString.split('-').map(Number);
+  // Ensure we are comparing against the correct challenge year's start date
+  if (year !== CHALLENGE_START_YEAR) return 0; // Or handle as an error/invalid if date is outside challenge year
+
+  const currentDate = new Date(Date.UTC(year, month - 1, day));
+  const challengeStartDate = getChallengeStartDateForYear(CHALLENGE_START_YEAR);
+
+  if (currentDate < challengeStartDate) return 0;
+
+  const diffTime = currentDate.getTime() - challengeStartDate.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  const dayNumber = diffDays + 1;
+  return Math.max(1, Math.min(dayNumber, CHALLENGE_DURATION_DAYS));
 }
 
 
+// Helper to get today's date in YYYY-MM-DD format (Local to the client)
 export function getTodaysDateClientLocal(): string {
-  // Check if a test override date is set
-  if (typeof window !== 'undefined' && (window as any).__TEST_OVERRIDE_DATE__) {
-    console.warn(`USING TEST OVERRIDE DATE: ${(window as any).__TEST_OVERRIDE_DATE__}`);
-    return (window as any).__TEST_OVERRIDE_DATE__;
-  }
+  // FOR TESTING CHRYSALIS VARIANTS:
+  return "2025-06-21"; // << EDIT THIS LINE FOR TESTING SPECIFIC DAYS
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = (now.getMonth() + 1).toString().padStart(2, '0');
-  const day = now.getDate().toString().padStart(2, '0');
-  const localDateString = `${year}-${month}-${day}`;
-  return localDateString;
+  // ORIGINAL IMPLEMENTATION (Revert to this after testing):
+  // const now = new Date(); // Current moment in client's local timezone
+  // const year = now.getFullYear();
+  // const month = (now.getMonth() + 1).toString().padStart(2, '0'); // JS months are 0-indexed
+  // const day = now.getDate().toString().padStart(2, '0');
+  // const localDateString = `${year}-${month}-${day}`;
+  // return localDateString;
 }
 
 

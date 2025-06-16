@@ -7,10 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogOverlay, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Shell as ShellIconLucide, RefreshCw, Palette, Check, Sparkle as SparkleIconLucide, MoveRight, X, Gift, Footprints, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getDailyStepForDate, getTodaysDateClientLocal } from '@/lib/firebaseService';
-import { getChallengeDayNumberFromDateString } from '@/lib/dateUtils';
+import { getTodaysDateClientLocal, getDailyStepForDate, getChallengeDayNumberFromDateString, CHALLENGE_DURATION_DAYS } from '@/lib/firebaseService';
 import type { ChrysalisVariantData, UserProfile } from '@/types';
-import { CHRYSALIS_AVATAR_IDENTIFIER, CHALLENGE_DURATION_DAYS } from '@/types';
+import { CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
 import { getChrysalisVariantByDay, getChrysalisVariantById } from '@/lib/chrysalisVariants';
 import { useRouter } from 'next/navigation';
 
@@ -33,14 +32,16 @@ export default function ChrysalisJourneyModal() {
     setShowChrysalisJourneyModal,
     chrysalisJourneyModalContext,
     setChrysalisJourneyModalContext,
+    activateChrysalisAsAvatar,
     activateThemeFromCollectedCoin,
     justCollectedCoin,
     clearJustCollectedCoinDetails,
     setShowLogStepsModal,
-    showDailyGoalMetModal,
+    showDailyGoalMetModal, 
   } = authContext;
 
   const router = useRouter();
+  const [isActivatingAvatar, setIsActivatingAvatar] = useState(false);
   const [isActivatingTheme, setIsActivatingTheme] = useState(false);
 
   const [stepsLoggedToday, setStepsLoggedToday] = useState(false);
@@ -55,7 +56,7 @@ export default function ChrysalisJourneyModal() {
     if (
         !showChrysalisJourneyModal ||
         !userProfile ||
-        justCollectedCoin
+        justCollectedCoin 
     ) {
         setIsLoadingCoinStatus(false);
         return;
@@ -80,14 +81,14 @@ export default function ChrysalisJourneyModal() {
         };
         checkStatus();
     } else {
-        setIsLoadingCoinStatus(false);
+        setIsLoadingCoinStatus(false); 
     }
-
+    
   }, [showChrysalisJourneyModal, userProfile, currentDate, chrysalisJourneyModalContext, justCollectedCoin]);
 
 
   const handleDialogClose = (isOpen: boolean) => {
-    if (isActivatingTheme) return;
+    if (isActivatingAvatar || isActivatingTheme) return;
 
     if (!isOpen) {
         if (justCollectedCoin) {
@@ -100,16 +101,22 @@ export default function ChrysalisJourneyModal() {
     }
   };
 
+  const handleActivateDefaultChrysalis = async () => {
+    setIsActivatingAvatar(true);
+    await activateChrysalisAsAvatar();
+    setIsActivatingAvatar(false);
+  };
+
   const handleActivateCollectedCoinTheme = async () => {
     if (!justCollectedCoin) return;
     setIsActivatingTheme(true);
-    await activateThemeFromCollectedCoin(justCollectedCoin); 
+    await activateThemeFromCollectedCoin(justCollectedCoin);
     setIsActivatingTheme(false);
   };
-
+  
   const handleLogStepsPrompt = () => {
     setShowChrysalisJourneyModal(false);
-    setShowLogStepsModal(true, 'chrysalis');
+    setShowLogStepsModal(true, 'chrysalis'); 
   };
 
 
@@ -118,7 +125,7 @@ export default function ChrysalisJourneyModal() {
 
     if (
       !coinVariantToDisplay ||
-      typeof coinVariantToDisplay.id !== 'string' || !coinVariantToDisplay.id ||
+      typeof coinVariantToDisplay.id !== 'string' || !coinVariantToDisplay.id || // Added check for ID
       typeof coinVariantToDisplay.dayNumber !== 'number' ||
       typeof coinVariantToDisplay.name !== 'string' || !coinVariantToDisplay.name ||
       typeof coinVariantToDisplay.themePrimaryHSL !== 'string' || !coinVariantToDisplay.themePrimaryHSL ||
@@ -146,38 +153,19 @@ export default function ChrysalisJourneyModal() {
     const dynamicHeaderStyle: React.CSSProperties = {
         background: `linear-gradient(to bottom right, hsl(${coinVariantToDisplay.themePrimaryHSL}), hsl(${coinVariantToDisplay.themeAccentHSL}))`,
     };
-    const dynamicTitleStyle: React.CSSProperties = {
+    const dynamicTitleStyle: React.CSSProperties = { 
         color: `hsl(${coinVariantToDisplay.themePrimaryForegroundHSL})`,
     };
     const dynamicDescriptionStyle: React.CSSProperties = {
-      color: `hsl(${coinVariantToDisplay.themePrimaryForegroundHSL}, 0.9)`
+      color: `hsl(${coinVariantToDisplay.themePrimaryForegroundHSL}, 0.9)` 
     };
-
-    let dynamicActionButtonHoverStyle: React.CSSProperties;
-    const primaryHSLPartsForHover = coinVariantToDisplay.themePrimaryHSL.split(' ');
-    if (primaryHSLPartsForHover.length === 3) {
-        const hValue = primaryHSLPartsForHover[0];
-        const sValue = primaryHSLPartsForHover[1];
-        const lValueCurrent = parseFloat(primaryHSLPartsForHover[2]);
-        if (!isNaN(lValueCurrent)) {
-            const lValueHover = Math.max(0, lValueCurrent - 10);
-            dynamicActionButtonHoverStyle = {
-                backgroundColor: `hsl(${hValue} ${sValue} ${lValueHover}%)`,
-            };
-        } else {
-            console.warn(`ChrysalisJourneyModal: Could not parse L value for hover from themePrimaryHSL: '${coinVariantToDisplay.themePrimaryHSL}'. Using fallback hover style.`);
-            dynamicActionButtonHoverStyle = { filter: 'brightness(0.9)' }; 
-        }
-    } else {
-        console.warn(`ChrysalisJourneyModal: themePrimaryHSL '${coinVariantToDisplay.themePrimaryHSL}' is malformed for hover. Using fallback hover style.`);
-        dynamicActionButtonHoverStyle = { filter: 'brightness(0.9)' }; 
-    }
-
-
     const dynamicActionButtonStyle: React.CSSProperties = {
         backgroundColor: `hsl(${coinVariantToDisplay.themePrimaryHSL})`,
         color: `hsl(${coinVariantToDisplay.themePrimaryForegroundHSL})`,
         borderColor: `hsl(${coinVariantToDisplay.themePrimaryHSL})`
+    };
+    const dynamicActionButtonHoverStyle: React.CSSProperties = {
+        backgroundColor: `hsl(${coinVariantToDisplay.themePrimaryHSL.split(' ')[0]} ${coinVariantToDisplay.themePrimaryHSL.split(' ')[1]} ${Math.max(0, parseFloat(coinVariantToDisplay.themePrimaryHSL.split(' ')[2]) - 10)}%)`,
     };
 
     return (
@@ -218,8 +206,8 @@ export default function ChrysalisJourneyModal() {
               <span className="text-xl font-semibold">{coinVariantToDisplay.name}</span>
             </DialogDescription>
         </DialogHeader>
-
-        <DialogFooter
+        
+        <DialogFooter 
             className="px-6 py-4 border-t flex flex-col sm:flex-row justify-center gap-3 rounded-b-lg"
             style={{backgroundColor: `hsl(${coinVariantToDisplay.themeAccentHSL}, 0.3)`, borderColor: `hsl(${coinVariantToDisplay.themeAccentHSL})`}}
         >
@@ -251,6 +239,42 @@ export default function ChrysalisJourneyModal() {
             </Button>
         </DialogFooter>
       </>
+    );
+  };
+
+
+  const renderActivateAvatarContent = () => {
+    const displayedVariantData = getChrysalisVariantByDay(1); 
+    const DisplayedIcon = displayedVariantData.icon || ShellIconLucide;
+    
+    return (
+    <>
+      <DialogHeader className={cn(
+          "p-6 pb-4 text-center items-center justify-center rounded-t-lg",
+          "bg-gradient-to-br from-primary/90 via-primary/80 to-accent/70" 
+      )}>
+        <DialogTitle className="font-headline text-3xl text-primary-foreground flex items-center justify-center">
+           Chrysalis Unlocked!
+        </DialogTitle>
+      </DialogHeader>
+      <div className="pt-8 pb-8 px-6 space-y-4 text-center">
+          <DisplayedIcon 
+            className="!h-28 !w-28 mx-auto mb-5 animate-pulse"
+            style={{color: `hsl(${displayedVariantData.themePrimaryHSL})`}} 
+            data-ai-hint={displayedVariantData.name.toLowerCase().includes("shell") ? "chrysalis shell gold" : "icon nature"}
+          />
+          <DialogDescription className="text-muted-foreground text-md mt-2 max-w-xs mx-auto">
+             Activate your Chrysalis Avatar! Then, collect unique Chrysalis Coins by reaching your daily step goal.
+          </DialogDescription>
+      </div>
+      
+      <DialogFooter className="px-6 py-4 bg-muted/30 border-t rounded-b-lg flex flex-col sm:flex-row justify-center items-center gap-3">
+          <Button onClick={handleActivateDefaultChrysalis} className="w-full sm:w-auto" size="lg" disabled={isActivatingAvatar}>
+            {isActivatingAvatar ? ( <><RefreshCw className="mr-2 h-5 w-5 animate-spin" /> Activating...</> ) : ( 'Set Golden Chrysalis as Avatar' )}
+          </Button>
+          <Button onClick={() => handleDialogClose(false)} variant="outline" className="w-full sm:w-auto" size="lg">Later</Button>
+      </DialogFooter>
+    </>
     );
   };
 
@@ -324,7 +348,7 @@ export default function ChrysalisJourneyModal() {
         </>
       );
     }
-
+    
     return (
       <>
         <DialogHeader className="p-6 pb-4 text-center bg-green-50 dark:bg-green-900/30 rounded-t-lg">
@@ -347,25 +371,18 @@ export default function ChrysalisJourneyModal() {
 
 
   let contentToRender;
-  const currentJustCollectedCoin = authContext.justCollectedCoin;
 
-  if (
-    currentJustCollectedCoin &&
-    typeof currentJustCollectedCoin.id === 'string' && // Check for id
-    typeof currentJustCollectedCoin.themePrimaryHSL === 'string' && // Check for essential HSL string
-    typeof currentJustCollectedCoin.themeAccentHSL === 'string' && // Check for essential HSL string
-    chrysalisJourneyModalContext === 'login'
-  ) {
+  if (authContext.justCollectedCoin && typeof authContext.justCollectedCoin.id === 'string' && chrysalisJourneyModalContext === 'login') { 
       contentToRender = renderGamifiedCoinCollectedView();
-  }
-  else if (userProfile && chrysalisJourneyModalContext === 'login') {
-      contentToRender = renderCollectCoinContent();
-  }
-  else {
+  } else if (chrysalisJourneyModalContext === 'profile_avatar_select' || (chrysalisJourneyModalContext === 'login' && userProfile && userProfile.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER)) { 
+      contentToRender = renderActivateAvatarContent();
+  } else if (userProfile && chrysalisJourneyModalContext === 'login') { 
+      contentToRender = renderCollectCoinContent(); 
+  } else { 
     contentToRender = (
         <div className="p-4 text-center">
             <DialogHeader><DialogTitle>Information</DialogTitle></DialogHeader>
-            <DialogDescription>Loading information or state not determined...</DialogDescription>
+            <DialogDescription>Loading information...</DialogDescription>
             <Button onClick={() => handleDialogClose(false)} variant="outline" className="mt-4">Close</Button>
         </div>
     );
