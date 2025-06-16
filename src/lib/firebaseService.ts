@@ -84,21 +84,16 @@ export function getChallengeDayNumberFromDateString(dateString: string): number 
   return Math.max(1, Math.min(dayNumber, CHALLENGE_DURATION_DAYS));
 }
 
-
 // Helper to get today's date in YYYY-MM-DD format (Local to the client)
 export function getTodaysDateClientLocal(): string {
-  // FOR TESTING CHRYSALIS VARIANTS:
-  return "2025-06-21"; // << EDIT THIS LINE FOR TESTING SPECIFIC DAYS
-
-  // ORIGINAL IMPLEMENTATION (Revert to this after testing):
-  // const now = new Date(); // Current moment in client's local timezone
-  // const year = now.getFullYear();
-  // const month = (now.getMonth() + 1).toString().padStart(2, '0'); // JS months are 0-indexed
-  // const day = now.getDate().toString().padStart(2, '0');
-  // const localDateString = `${year}-${month}-${day}`;
-  // return localDateString;
+  //  ORIGINAL IMPLEMENTATION (Revert to this after testing):
+  const now = new Date(); // Current moment in client's local timezone
+  const year = now.getFullYear();
+  const month = (now.getMonth() + 1).toString().padStart(2, '0'); // JS months are 0-indexed
+  const day = now.getDate().toString().padStart(2, '0');
+  const localDateString = `${year}-${month}-${day}`;
+  return localDateString;
 }
-
 
 function mapDocToUserProfile(docSnap: DocumentSnapshot): UserProfile {
   const data = docSnap.data();
