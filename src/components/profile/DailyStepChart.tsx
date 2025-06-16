@@ -2,7 +2,7 @@
 'use client';
 
 import { TrendingUp, Footprints, Target, Users } from 'lucide-react';
-import { BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from 'recharts'; // Removed ResponsiveContainer
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import type { DailyStep, UserProfile } from '@/types';
@@ -31,8 +31,8 @@ export default function DailyStepChart({
   userProfile,
   chartType = 'user',
 }: DailyStepChartProps) {
-  // console.log(`[DailyStepChart] Rendering. Type: ${chartType}. Received dailyStepsData prop:`, JSON.stringify(dailyStepsData, null, 2).substring(0, 200) + "...");
-  // console.log(`[DailyStepChart] isLoading: ${isLoading}, userProfile UID: ${userProfile?.uid}`);
+  // // console.log(`[DailyStepChart] Rendering. Type: ${chartType}. Received dailyStepsData prop:`, JSON.stringify(dailyStepsData, null, 2).substring(0, 200) + "...");
+  // // console.log(`[DailyStepChart] isLoading: ${isLoading}, userProfile UID: ${userProfile?.uid}`);
 
   const chartConfig = useMemo(() => {
     const config: ChartConfig = {
@@ -53,7 +53,7 @@ export default function DailyStepChart({
 
 
   const formattedData = useMemo(() => {
-    // console.log(`[DailyStepChart useMemo ${chartType}] Calculating formattedData. Input dailyStepsData:`, JSON.stringify(dailyStepsData, null, 2).substring(0, 200) + "...");
+    // // console.log(`[DailyStepChart useMemo ${chartType}] Calculating formattedData. Input dailyStepsData:`, JSON.stringify(dailyStepsData, null, 2).substring(0, 200) + "...");
     
     const dailyCalculatedGoal = (chartType === 'user' && userProfile?.stepGoal && userProfile.stepGoal > 0)
       ? userProfile.stepGoal / CHALLENGE_DURATION_DAYS
@@ -70,7 +70,7 @@ export default function DailyStepChart({
       const displayDateObj = new Date(Number(dateParts[0]), Number(dateParts[1]) - 1, Number(dateParts[2]));
       const displayDateStr = displayDateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
       
-      // console.log(`[DailyStepChart useMemo ${chartType} item ${index}] original date: ${item.date}, displayDateStr: ${displayDateStr}, logged: ${logged}, remaining: ${Math.round(remaining)}, dailyCalculatedGoal: ${Math.round(dailyCalculatedGoal)}`);
+      // // console.log(`[DailyStepChart useMemo ${chartType} item ${index}] original date: ${item.date}, displayDateStr: ${displayDateStr}, logged: ${logged}, remaining: ${Math.round(remaining)}, dailyCalculatedGoal: ${Math.round(dailyCalculatedGoal)}`);
 
       return {
         date: item.date, 
@@ -80,7 +80,7 @@ export default function DailyStepChart({
         dailyCalculatedGoal: chartType === 'user' ? Math.round(dailyCalculatedGoal) : undefined, // Only for user chart
       };
     });
-    // console.log(`[DailyStepChart useMemo ${chartType}] Output formattedData:`, JSON.stringify(result, null, 2).substring(0,200) + "...");
+    // // console.log(`[DailyStepChart useMemo ${chartType}] Output formattedData:`, JSON.stringify(result, null, 2).substring(0,200) + "...");
     return result;
   }, [dailyStepsData, userProfile?.stepGoal, chartType]);
 
@@ -147,64 +147,64 @@ export default function DailyStepChart({
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={formattedData}
-              margin={{
-                top: 5,
-                right: 20,
-                left: -10, 
-                bottom: 5,
-              }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis
-                dataKey="displayDate"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                fontSize={12}
-              />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                fontSize={12}
-                width={50} 
-                tickFormatter={(value) => (value >= 1000 ? `${value / 1000}k` : value.toString())}
-              />
-              <ChartTooltip
-                cursor={true}
-                content={
-                  <ChartTooltipContent
-                    indicator="dot" 
-                    labelFormatter={(label, entries) => {
-                       if (!entries || entries.length === 0) return label; 
-                       const originalPayload = entries[0].payload;
-                       const dateStr = originalPayload.date; 
-                       const dailyGoal = originalPayload.dailyCalculatedGoal; // Only present for user chart
+          {/* Removed explicit ResponsiveContainer here */}
+          <BarChart
+            data={formattedData}
+            margin={{
+              top: 5,
+              right: 20,
+              left: -10, 
+              bottom: 5,
+            }}
+          >
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis
+              dataKey="displayDate"
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
+              fontSize={12}
+            />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
+              fontSize={12}
+              width={50} 
+              tickFormatter={(value) => (value >= 1000 ? `${value / 1000}k` : value.toString())}
+            />
+            <ChartTooltip
+              cursor={true}
+              content={
+                <ChartTooltipContent
+                  indicator="dot" 
+                  labelFormatter={(label, entries) => {
+                     if (!entries || entries.length === 0) return label; 
+                     const originalPayload = entries[0].payload;
+                     const dateStr = originalPayload.date; 
+                     const dailyGoal = originalPayload.dailyCalculatedGoal; // Only present for user chart
 
-                       const dateParts = dateStr.split('-');
-                       const tempDate = new Date(Number(dateParts[0]), Number(dateParts[1]) - 1, Number(dateParts[2]));
-                       const formattedDate = tempDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+                     const dateParts = dateStr.split('-');
+                     const tempDate = new Date(Number(dateParts[0]), Number(dateParts[1]) - 1, Number(dateParts[2]));
+                     const formattedDate = tempDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
-                       if (chartType === 'user' && dailyGoal && dailyGoal > 0) {
-                         return `${formattedDate} (Target: ${dailyGoal.toLocaleString()})`;
-                       }
-                       return formattedDate;
-                    }}
-                  />
-                }
-              />
-              <Legend />
-              <Bar dataKey="loggedSteps" stackId="a" name={chartConfig.loggedSteps.label} fill={`var(--color-loggedSteps)`} radius={[0, 0, 0, 0]} />
-              { chartType === 'user' && dailyGoalValueForTitle > 0 && chartConfig.remainingToGoal && (
-                <Bar dataKey="remainingToGoal" stackId="a" name={chartConfig.remainingToGoal.label} fill="var(--color-remainingToGoal)" radius={[4, 4, 0, 0]} />
-              )}
-            </BarChart>
-          </ResponsiveContainer>
+                     if (chartType === 'user' && dailyGoal && dailyGoal > 0) {
+                       return `${formattedDate} (Target: ${dailyGoal.toLocaleString()})`;
+                     }
+                     return formattedDate;
+                  }}
+                />
+              }
+            />
+            <Legend />
+            <Bar dataKey="loggedSteps" stackId="a" name={chartConfig.loggedSteps.label} fill={`var(--color-loggedSteps)`} radius={[0, 0, 0, 0]} />
+            { chartType === 'user' && dailyGoalValueForTitle > 0 && chartConfig.remainingToGoal && (
+              <Bar dataKey="remainingToGoal" stackId="a" name={chartConfig.remainingToGoal.label} fill="var(--color-remainingToGoal)" radius={[4, 4, 0, 0]} />
+            )}
+          </BarChart>
         </ChartContainer>
       </CardContent>
     </Card>
   );
 }
+
