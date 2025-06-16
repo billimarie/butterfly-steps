@@ -10,14 +10,13 @@ import { Palette, RefreshCw, Shell, CheckCircle, Gift, ExternalLink } from 'luci
 import { useState } from 'react';
 import { useRouter } from 'next/navigation'; 
 
-interface CoinDetailActivationModalProps {
+interface CoinThemeActivationModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   coinVariant: ChrysalisVariantData | null;
-  // isMissedAndPast prop is removed
 }
 
-export default function CoinDetailActivationModal({ isOpen, onOpenChange, coinVariant }: CoinDetailActivationModalProps) {
+export default function CoinThemeActivationModal({ isOpen, onOpenChange, coinVariant }: CoinThemeActivationModalProps) {
   const { activateThemeFromCollectedCoin, userProfile } = useAuth();
   const [isActivating, setIsActivating] = useState(false);
   const router = useRouter(); 
@@ -110,3 +109,4 @@ export default function CoinDetailActivationModal({ isOpen, onOpenChange, coinVa
     </Dialog>
   );
 }
+

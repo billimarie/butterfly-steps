@@ -22,9 +22,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import BadgeDetailModal from '@/components/profile/BadgeDetailModal';
 import { getChrysalisVariantByDay, getChrysalisVariantById } from '@/lib/chrysalisVariants';
-import CoinDetailActivationModal from './CoinDetailActivationModal';
+import CoinThemeActivationModal from '@/components/chrysalis/CoinThemeActivationModal'; 
 import DailyStepChart from '@/components/profile/DailyStepChart';
-import ChallengeDefinitionModal from '@/components/challenges/ChallengeDefinitionModal'; // New import
+import ChallengeDefinitionModal from '@/components/challenges/ChallengeDefinitionModal'; 
 import { Shell as ShellIconLucide } from 'lucide-react';
 
 
@@ -34,7 +34,7 @@ interface ProfileDisplayProps {
 }
 
 export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDisplayProps) {
-  const { user: authUser, fetchUserProfile: fetchAuthUserProfile, setShowStreakModal, setStreakModalContext, activateThemeFromCollectedCoin } = useAuth();
+  const { user: authUser, fetchUserProfile: fetchAuthUserProfile, setShowChrysalisJourneyModal, setChrysalisJourneyModalContext, activateThemeFromCollectedCoin } = useAuth(); // Renamed
   const { toast } = useToast();
   const [leavingTeam, setLeavingTeam] = useState(false);
 
@@ -43,12 +43,11 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
 
   const [isCoinDetailModalOpen, setIsCoinDetailModalOpen] = useState(false);
   const [selectedCoinForModal, setSelectedCoinForModal] = useState<ChrysalisVariantData | null>(null);
-  const [isViewingMissedCoin, setIsViewingMissedCoin] = useState(false);
 
   const [dailyStepsData, setDailyStepsData] = useState<DailyStep[]>([]);
   const [isLoadingChart, setIsLoadingChart] = useState(true);
 
-  const [showChallengeModal, setShowChallengeModal] = useState(false); // State for challenge modal
+  const [showChallengeModal, setShowChallengeModal] = useState(false); 
 
 
   const progressPercentage = profileData.stepGoal ? (profileData.currentSteps / profileData.stepGoal) * 100 : 0;
@@ -97,15 +96,19 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
 
   const handleChrysalisAvatarClick = () => {
     if (isOwnProfile) {
-      setStreakModalContext('profile_avatar_select');
-      setShowStreakModal(true);
+      setChrysalisJourneyModalContext('profile_avatar_select'); // Renamed
+      setShowChrysalisJourneyModal(true); // Renamed
     }
   };
 
   const handleCoinGalleryItemClick = (variant: ChrysalisVariantData, isMissedAndPastCoin: boolean) => {
-    setSelectedCoinForModal(variant);
-    setIsViewingMissedCoin(isMissedAndPastCoin);
-    setIsCoinDetailModalOpen(true);
+    if (isMissedAndPastCoin && isOwnProfile) {
+        return; 
+    }
+    if (isOwnProfile && !isMissedAndPastCoin) { 
+        setSelectedCoinForModal(variant);
+        setIsCoinDetailModalOpen(true);
+    }
   };
 
 
@@ -117,7 +120,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
       if (badge.type === 'streak') {
         return profileData.currentStreak >= badge.milestone;
       }
-      return true; // Include all other badge types if they are in badgesEarned
+      return true; 
     }) as BadgeData[];
 
 
@@ -222,7 +225,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
         </CardHeader>
 
         <CardContent className="space-y-6">
-        <div className="rounded-lg border bg-card text-card-foreground shadow-sm space-y-3"> {/* Main container for step info + progress bar */}
+        <div className="rounded-lg border bg-card text-card-foreground shadow-sm space-y-3"> 
             <div className="flex flex-col space-y-1.5 p-6 pb-0">
               <div className="font-semibold tracking-tight font-headline text-xl flex items-center"><Footprints className="mr-2 h-5 w-5 text-primary"/>Your Steps</div>
               <div className="text-sm text-muted-foreground">How close you are to your goal.</div>
@@ -236,9 +239,8 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                 </div>              
               </div>
 
-              {/* Progress Bar and Percentage (if goal exists) */}
               {profileData.stepGoal && profileData.stepGoal > 0 && (
-                <div className="mt-0"> {/* Small margin top to separate from numbers */}
+                <div className="mt-0"> 
                   <Progress value={progressPercentage} className="w-full h-3" />
                   <p className="text-sm text-muted-foreground text-left mt-1">
                     {Math.min(100, Math.round(progressPercentage))}%
@@ -272,7 +274,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
               <Layers className="mr-2 h-5 w-5 text-primary" /> Chrysalis Coins
             </h3>
             <p className="text-sm text-muted-foreground">
-              Collected: <span className="font-bold text-accent">{collectedCoinsCount}</span> / {currentChallengeDay > 0 ? currentChallengeDay : CHALLENGE_DURATION_DAYS} days so far. {isOwnProfile ? "Click a coin to view details or activate its theme." : ""}
+              Collected: <span className="font-bold text-accent">{collectedCoinsCount}</span> / {currentChallengeDay > 0 ? currentChallengeDay : CHALLENGE_DURATION_DAYS} days so far. {isOwnProfile ? "Click a collected coin to view details or activate its theme." : ""}
             </p>
             {currentChallengeDay > 0 ? (
               <div className="flex flex-wrap gap-x-3 gap-y-4 justify-center pt-2">
@@ -284,22 +286,23 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                   const isCollected = profileData.chrysalisCoinDates?.includes(challengeDateForDay) ?? false;
                   const CoinIcon = variant.icon || ShellIconLucide;
                   const isMissedAndPastCoin = !isCollected && variant.dayNumber < currentChallengeDay;
+                  
+                  const isClickableCoin = isOwnProfile && isCollected && !isMissedAndPastCoin;
+
 
                   return (
                     <button
                       key={variant.id}
-                      onClick={() => isOwnProfile && handleCoinGalleryItemClick(variant, isMissedAndPastCoin)}
+                      onClick={() => isClickableCoin && handleCoinGalleryItemClick(variant, false)}
+                      disabled={!isClickableCoin || isMissedAndPastCoin} // Ensure missed is unclickable
                       className={cn(
                         "p-3 rounded-lg flex flex-col items-center w-28 min-h-[8.5rem] text-center shadow-sm transition-all justify-between",
-                        "border hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary",
-                        isCollected ? "bg-card border-primary/30" : "bg-muted/40 border-muted-foreground/20",
-                        isOwnProfile ? "cursor-pointer hover:opacity-100" : (isCollected ? "cursor-default" : "cursor-not-allowed opacity-50"),
-                        !isCollected && !isMissedAndPastCoin && "opacity-50 cursor-not-allowed", // Not collected, not missed yet (i.e. today or future)
-                        isMissedAndPastCoin && isOwnProfile && "hover:border-accent cursor-pointer opacity-75 hover:opacity-100", // Missed, own profile
-                        isMissedAndPastCoin && !isOwnProfile && "opacity-50 cursor-not-allowed" // Missed, not own profile
+                        "border",
+                        isCollected ? "bg-card border-primary/30" : "bg-muted/40 border-muted-foreground/20 opacity-60",
+                        isClickableCoin ? "cursor-pointer hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary hover:opacity-100" : "cursor-default",
+                        isMissedAndPastCoin && "opacity-40 !cursor-not-allowed"
                       )}
-                      aria-label={`View ${variant.name}`}
-                      disabled={!isOwnProfile && !isCollected && !isMissedAndPastCoin }
+                      aria-label={isClickableCoin ? `View ${variant.name}` : (isCollected ? variant.name : `${variant.name} (Not collected)`)}
                     >
                       <CoinIcon className={cn(
                         "h-12 w-12 mb-1.5 flex-shrink-0",
@@ -342,7 +345,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                   const commonBadgeClasses = "p-3 bg-muted/30 rounded-lg flex flex-col items-center w-28 text-center shadow-sm transition-all";
                   const interactiveBadgeClasses = "hover:shadow-md hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer";
                   
-                  const isClickable = true; // All badges are clickable to see details
+                  const isClickable = true; 
 
                   return (
                     <div
@@ -396,11 +399,10 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
           badge={selectedExistingBadge}
       />
       {isOwnProfile && (
-        <CoinDetailActivationModal
+        <CoinThemeActivationModal
           isOpen={isCoinDetailModalOpen}
           onOpenChange={setIsCoinDetailModalOpen}
           coinVariant={selectedCoinForModal}
-          isMissedAndPast={isViewingMissedCoin}
         />
       )}
       {!isOwnProfile && profileData && (
@@ -414,4 +416,3 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     </>
   );
 }
-

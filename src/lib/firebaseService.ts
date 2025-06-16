@@ -72,12 +72,22 @@ export function getChallengeDayNumberFromDateString(dateString: string): number 
 
 
 export function getTodaysDateClientLocal(): string {
-  const now = new Date(); 
+  // FOR TESTING CHRYSALIS VARIANTS:
+  // To test a specific day's Chrysalis variant:
+  // 1. Determine the target day number (1-133).
+  // 2. Calculate the date (June 21st is Day 1, Oct 31st is Day 133 for current year).
+  // 3. Uncomment the line below and update the string to "YYYY-MM-DD" for that date.
+  //    Example: For Day 1 (June 21st, 2024), use "2024-06-21".
+  //             For Day 5 (June 25th, 2024), use "2024-06-25".
+  return "2024-06-22"; // << EDIT THIS LINE FOR TESTING SPECIFIC DAYS
+
+  // ORIGINAL IMPLEMENTATION (Revert to this after testing):
+  /* const now = new Date(); 
   const year = now.getFullYear();
   const month = (now.getMonth() + 1).toString().padStart(2, '0'); 
   const day = now.getDate().toString().padStart(2, '0');
   const localDateString = `${year}-${month}-${day}`;
-  return localDateString;
+  return localDateString; */
 }
 
 
@@ -109,6 +119,38 @@ function mapDocToUserProfile(docSnap: DocumentSnapshot): UserProfile {
     visitedSections: Array.isArray(data.visitedSections) ? data.visitedSections : [],
   };
 }
+
+function mapDocToChallenge(docSnap: DocumentSnapshot): Challenge {
+  const data = docSnap.data();
+  if (!data) {
+    throw new Error(`Document data not found for challenge ${docSnap.id}`);
+  }
+  return {
+    id: docSnap.id,
+    name: data.name,
+    structuredDescription: data.structuredDescription,
+    creatorMessage: data.creatorMessage,
+    challengeType: data.challengeType,
+    creatorUid: data.creatorUid,
+    creatorName: data.creatorName,
+    opponentUid: data.opponentUid,
+    opponentName: data.opponentName,
+    opponentStatus: data.opponentStatus,
+    participantUids: Array.isArray(data.participantUids) ? data.participantUids : [],
+    goalType: data.goalType,
+    goalValue: data.goalValue,
+    startDate: data.startDate,
+    endDate: data.endDate,
+    status: data.status,
+    participantProgress: data.participantProgress,
+    winnerUids: Array.isArray(data.winnerUids) ? data.winnerUids : [],
+    stakes: data.stakes,
+    repetition: data.repetition,
+    createdAt: data.createdAt,
+    updatedAt: data.updatedAt,
+  };
+}
+
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   const docRef = doc(db, USERS_COLLECTION, uid);
@@ -640,19 +682,26 @@ export async function issueDirectChallenge(
 
   const { startDate, goalValue, name, structuredDescription, creatorMessage, stakes } = challengeCreationDetails;
 
-  const challengeStartDateUTC = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate()));
+  const jsStartDate = new Date(startDate); 
+  const challengeStartDateUTC = new Date(Date.UTC(jsStartDate.getFullYear(), jsStartDate.getMonth(), jsStartDate.getDate()));
   
   const challengeEndDateUTC = new Date(challengeStartDateUTC);
   challengeEndDateUTC.setUTCHours(23, 59, 59, 999);
 
+  if (!creatorUid) {
+    throw new Error("Creator UID is missing or invalid.");
+  }
+  if (!opponentUid) {
+    throw new Error("Opponent UID is missing or invalid.");
+  }
 
   const newChallengeData: Omit<Challenge, 'id'> = {
     name: name || `${creatorDisplayName || 'Challenger'} vs ${opponentDisplayName}: Daily Step Battle!`,
     structuredDescription: structuredDescription,
     creatorMessage: creatorMessage,
     challengeType: 'directUser',
-    creatorUid: creatorUid, // Use the passed creatorUid
-    creatorName: creatorDisplayName, // Use the passed creatorDisplayName
+    creatorUid: creatorUid,
+    creatorName: creatorDisplayName,
     opponentUid: opponentUid,
     opponentName: opponentDisplayName,
     opponentStatus: 'pending',
@@ -669,14 +718,68 @@ export async function issueDirectChallenge(
     updatedAt: Timestamp.now(),
   };
 
-  if (!creatorUid) {
-    throw new Error("Creator UID is undefined in issueDirectChallenge.");
-  }
-  if (!opponentUid) {
-    throw new Error("Opponent UID is undefined in issueDirectChallenge.");
-  }
-
-
   const docRef = await addDoc(challengesRef, newChallengeData);
   return docRef.id;
+}
+
+export async function getPendingChallengeInvitations(userId: string): Promise<Challenge[]> {
+  const challengesRef = collection(db, CHALLENGES_COLLECTION);
+  const q = query(
+    challengesRef,
+    where("opponentUid", "==", userId),
+    where("opponentStatus", "==", "pending"),
+    orderBy("createdAt", "desc")
+  );
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(docSnap => mapDocToChallenge(docSnap));
+}
+
+export async function acceptChallenge(challengeId: string, opponentUid: string): Promise<void> {
+  const challengeRef = doc(db, CHALLENGES_COLLECTION, challengeId);
+  const challengeSnap = await getDoc(challengeRef);
+
+  if (!challengeSnap.exists()) {
+    throw new Error("Challenge not found.");
+  }
+  const challengeData = mapDocToChallenge(challengeSnap);
+
+  if (challengeData.opponentUid !== opponentUid || challengeData.opponentStatus !== 'pending') {
+    throw new Error("Cannot accept this challenge. It may not be for you or is no longer pending.");
+  }
+
+  const updates: Partial<Challenge> = {
+    opponentStatus: 'accepted',
+    participantUids: arrayUnion(challengeData.creatorUid, opponentUid) as unknown as string[],
+    updatedAt: Timestamp.now(),
+  };
+
+  const now = new Date();
+  const startDate = challengeData.startDate.toDate();
+  if (startDate <= now) {
+    updates.status = 'active';
+  } else {
+    updates.status = 'accepted';
+  }
+
+  await updateDoc(challengeRef, updates);
+}
+
+export async function declineChallenge(challengeId: string, opponentUid: string): Promise<void> {
+  const challengeRef = doc(db, CHALLENGES_COLLECTION, challengeId);
+  const challengeSnap = await getDoc(challengeRef);
+
+  if (!challengeSnap.exists()) {
+    throw new Error("Challenge not found.");
+  }
+  const challengeData = mapDocToChallenge(challengeSnap);
+
+  if (challengeData.opponentUid !== opponentUid || challengeData.opponentStatus !== 'pending') {
+    throw new Error("Cannot decline this challenge. It may not be for you or is no longer pending.");
+  }
+
+  await updateDoc(challengeRef, {
+    opponentStatus: 'declined',
+    status: 'cancelled', 
+    updatedAt: Timestamp.now(),
+  });
 }
