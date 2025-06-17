@@ -1,12 +1,19 @@
 
-import type { Metadata } from 'next';
+import type { Metadata, ResolvingMetadata } from 'next'; // Import ResolvingMetadata
 import { Suspense } from 'react';
 import ProfilePageContent from '@/components/profile/ProfilePageContent';
 import { Skeleton } from "@/components/ui/skeleton";
 
 // This function can be used to generate metadata dynamically based on params
-export async function generateMetadata({ params }: { params: { userId: string } }): Promise<Metadata> {
-  const userId = params.userId; // Explicit access
+export async function generateMetadata(
+  { params }: { params: { userId: string } },
+  parent: ResolvingMetadata // Add and type the parent parameter
+): Promise<Metadata> {
+  // Await the parent metadata promise before accessing params.
+  // This ensures that any asynchronous operations in parent layouts/segments are complete.
+  await parent;
+
+  const userId = params.userId;
   return {
     title: `Profile: ${userId} | Butterfly Steps`, // Dynamic title
     description: `View user profile (${userId}), progress, and badges in the Butterfly Steps challenge.`,
@@ -39,3 +46,4 @@ export default function UserProfilePage({ params }: { params: { userId: string }
     </Suspense>
   );
 }
+
