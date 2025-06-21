@@ -26,7 +26,7 @@ import CoinThemeActivationModal from '@/components/chrysalis/CoinThemeActivation
 import DailyStepChart from '@/components/profile/DailyStepChart';
 import ChallengeDefinitionModal from '@/components/challenges/ChallengeDefinitionModal';
 import { Shell as ShellIconLucide } from 'lucide-react';
-
+import { format as formatDate } from 'date-fns';
 
 interface ProfileDisplayProps {
   profileData: UserProfile;
@@ -34,7 +34,7 @@ interface ProfileDisplayProps {
 }
 
 export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDisplayProps) {
-  const { user: authUser, fetchUserProfile: fetchAuthUserProfile, setShowChrysalisJourneyModal, setChrysalisJourneyModalContext, activateThemeFromCollectedCoin } = useAuth();
+  const { user: authUser, fetchUserProfile: fetchAuthUserProfile, setShowChrysalisJourneyModal, setChrysalisJourneyModalContext } = useAuth();
   const { toast } = useToast();
   const [leavingTeam, setLeavingTeam] = useState(false);
 
@@ -53,6 +53,25 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   const progressPercentage = profileData.stepGoal ? (profileData.currentSteps / profileData.stepGoal) * 100 : 0;
   const collectedCoinsCount = profileData.chrysalisCoinDates?.length || 0;
 
+  const effectiveDateString = getTodaysDateClientLocal(); // "YYYY-MM-DD" string
+
+  const getEffectiveUTCDate = useCallback(() => {
+    const parts = effectiveDateString.split('-').map(Number); // [YYYY, MM, DD]
+    // Return a Date object representing the start of this day in UTC
+    return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0));
+  }, [effectiveDateString]);
+
+  const effectiveUTCDate = getEffectiveUTCDate();
+
+  const challengeIsCurrentlyActiveBasedOnEffectiveDate = isChallengeActive(effectiveUTCDate);
+  const currentChallengeDay = getChallengeDayNumberFromDateString(effectiveDateString);
+
+  // // console.log('[ProfileDisplay] effectiveDateString:', effectiveDateString);
+  // // console.log('[ProfileDisplay] effectiveUTCDate:', effectiveUTCDate.toISOString());
+  // // console.log('[ProfileDisplay] challengeIsCurrentlyActiveBasedOnEffectiveDate:', challengeIsCurrentlyActiveBasedOnEffectiveDate);
+  // // console.log('[ProfileDisplay] currentChallengeDay:', currentChallengeDay);
+  // // console.log('[ProfileDisplay] CHALLENGE_START_YEAR (from firebaseService->dateUtils):', CHALLENGE_START_YEAR);
+
   useEffect(() => {
     const fetchChartData = async () => {
       if (isOwnProfile && profileData.uid) {
@@ -61,7 +80,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
           const data = await getUserDailySteps(profileData.uid, 30);
           setDailyStepsData(data);
         } catch (error) {
-          console.error("Failed to fetch daily steps data for chart:", error);
+          // // console.error("Failed to fetch daily steps data for chart:", error);
           setDailyStepsData([]);
         } finally {
           setIsLoadingChart(false);
@@ -95,16 +114,15 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   };
 
   const handleChrysalisAvatarClick = () => {
-    if (isOwnProfile && isChallengeActive()) { // Only allow re-engaging with current day if challenge is active
+    if (isOwnProfile && challengeIsCurrentlyActiveBasedOnEffectiveDate) {
       setChrysalisJourneyModalContext('login');
       setShowChrysalisJourneyModal(true);
-    } else if (isOwnProfile && !isChallengeActive()) {
+    } else if (isOwnProfile && !challengeIsCurrentlyActiveBasedOnEffectiveDate) {
       toast({ title: "Challenge Not Active", description: "Chrysalis features are available during the challenge period." });
     }
   };
 
   const handleCoinGalleryItemClick = (variant: ChrysalisVariantData) => {
-    // This function is now only for collected coins that are clickable
     if (isOwnProfile) {
         setSelectedCoinForModal(variant);
         setIsCoinDetailModalOpen(true);
@@ -123,9 +141,6 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
       return true;
     }) as BadgeData[];
 
-
-  const currentChallengeDay = getChallengeDayNumberFromDateString(getTodaysDateClientLocal());
-  const challengeYearForCoins = CHALLENGE_START_YEAR; // Use fixed challenge year
 
   const MainChrysalisAvatar = () => {
     if (profileData.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER) return null;
@@ -149,13 +164,9 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
         iconColorStyle = { color: 'hsl(var(--muted-foreground))' };
     }
 
+    const shouldAnimate = isOwnProfile && challengeIsCurrentlyActiveBasedOnEffectiveDate;
 
-    const iconClassName = cn(
-      "h-32 w-32 md:h-36 md:h-36",
-      isOwnProfile && isChallengeActive() ? "animate-chrysalis-glow" : "opacity-90"
-    );
-
-    const buttonAriaLabel = isOwnProfile && isChallengeActive()
+    const buttonAriaLabel = shouldAnimate
       ? "View current day Chrysalis Coin status"
       : `${variantToShow?.name || 'Chrysalis'} Avatar`;
 
@@ -165,12 +176,17 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
           onClick={handleChrysalisAvatarClick}
           className={cn(
             "p-2 rounded-full focus:outline-none",
-            isOwnProfile && isChallengeActive() ? "cursor-pointer focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-card" : "cursor-default"
+            shouldAnimate ? "cursor-pointer focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-card" : "cursor-default"
           )}
           aria-label={buttonAriaLabel}
-          disabled={!isOwnProfile || !isChallengeActive()}
+          disabled={!shouldAnimate}
         >
-          <IconComponent className={iconClassName} style={iconColorStyle} data-ai-hint={variantToShow?.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"}/>
+            <div className={cn(
+                "w-36 h-36 md:w-40 md:h-40 bg-gradient-to-br from-yellow-300 to-yellow-400 rounded-full flex items-center justify-center border-8 border-yellow-400 ring-4 ring-orange-700/10 ring-inset",
+                shouldAnimate && "animate-chrysalis-glow"
+            )}>
+                <IconComponent className="h-20 w-20 md:h-24 md:h-24" style={iconColorStyle} data-ai-hint={variantToShow?.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"}/>
+            </div>
         </button>
       </div>
     );
@@ -276,13 +292,13 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
             <p className="text-sm text-muted-foreground">
               Collected: <span className="font-bold text-accent">{collectedCoinsCount}</span> / {currentChallengeDay > 0 ? currentChallengeDay : CHALLENGE_DURATION_DAYS} days so far. {isOwnProfile ? "Click a collected coin to view details or activate its theme." : ""}
             </p>
-            {currentChallengeDay > 0 && isChallengeActive() ? ( // Only show gallery if challenge is active and has started
+            {currentChallengeDay > 0 && challengeIsCurrentlyActiveBasedOnEffectiveDate ? (
               <div className="flex flex-wrap gap-x-3 gap-y-4 justify-center pt-2">
                 {Array.from({ length: currentChallengeDay }, (_, i) => i + 1).map((dayNum) => {
                   const variant = getChrysalisVariantByDay(dayNum);
                   if (!variant) return null;
 
-                  const challengeDateForDay = getChallengeDateStringByDayNumber(dayNum); // Uses fixed year
+                  const challengeDateForDay = getChallengeDateStringByDayNumber(dayNum);
                   const isCollected = profileData.chrysalisCoinDates?.includes(challengeDateForDay) ?? false;
                   const CoinIcon = variant.icon || ShellIconLucide;
                   const isMissedAndPastCoin = !isCollected && dayNum < currentChallengeDay;
@@ -300,7 +316,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                         "border",
                         isCollected ? "bg-card border-primary/30" : "bg-muted/40 border-muted-foreground/20 opacity-60",
                         isClickableCoin ? "cursor-pointer hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary hover:opacity-100" : "cursor-default",
-                        isMissedAndPastCoin && "opacity-40 !cursor-not-allowed" // Missed coins are distinctly styled and unclickable
+                        isMissedAndPastCoin && "opacity-40 !cursor-not-allowed"
                       )}
                       aria-label={isClickableCoin ? `View and activate ${variant.name} theme` : (isCollected ? variant.name : `${variant.name} (Not collected)`)}
                     >
@@ -308,7 +324,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                         "h-12 w-12 mb-1.5 flex-shrink-0",
                         isCollected ? "text-primary" : "text-muted-foreground"
                       )} data-ai-hint={variant.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"} />
-                      <div className="flex-grow flex flex-col justify-end w-full">
+                      <div className="flex-grow flex flex-col justify-center w-full">
                         <span className={cn(
                           "text-xs font-medium block truncate w-full leading-tight",
                           isCollected ? "text-foreground" : "text-muted-foreground"
@@ -324,10 +340,10 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
               </div>
             ) : (
                <p className="text-muted-foreground text-center py-4">
-                 {isChallengeActive() ? "The challenge hasn't started yet. Coins will appear here once it begins!" : "The Chrysalis Coin challenge is not currently active."}
+                 {challengeIsCurrentlyActiveBasedOnEffectiveDate ? "The challenge hasn't started yet. Coins will appear here once it begins!" : "The Chrysalis Coin challenge is not currently active."}
                </p>
             )}
-            {isOwnProfile && profileData.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER && collectedCoinsCount > 0 && isChallengeActive() && (
+            {isOwnProfile && profileData.photoURL !== CHRYSALIS_AVATAR_IDENTIFIER && collectedCoinsCount > 0 && challengeIsCurrentlyActiveBasedOnEffectiveDate && (
                  <Button variant="outline" size="sm" onClick={handleChrysalisAvatarClick} className="mt-3">
                     <Replace className="mr-2 h-4 w-4" /> Set Golden Chrysalis Avatar
                 </Button>
@@ -418,3 +434,5 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     </>
   );
 }
+
+

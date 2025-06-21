@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogOverlay, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -283,24 +284,36 @@ export default function ChrysalisJourneyModal() {
 
     if (coinAlreadyCollectedThisSessionOrInDB) {
       const todaysCoinVariant = getChrysalisVariantByDay(currentDayNumberForCoin);
+      const TodaysCoinIcon = todaysCoinVariant.icon || ShellIconLucide;
       return (
         <>
-          <DialogHeader className="p-6 pb-4 text-center bg-slate-100 dark:bg-slate-800 rounded-t-lg">
-            <DialogTitle className="font-headline text-2xl text-slate-700 dark:text-slate-200 flex items-center justify-center">
-              <Check className="mr-2 h-7 w-7 text-green-500"/> Coin Already Collected!
+          <DialogHeader className="p-6 pb-4 text-center bg-slate-100 dark:bg-slate-800 rounded-t-lg items-center">
+            <TodaysCoinIcon className="h-10 w-10 text-primary mb-2" />
+            <DialogTitle className="font-headline text-2xl text-slate-700 dark:text-slate-200">
+              {todaysCoinVariant.name}
             </DialogTitle>
           </DialogHeader>
-          <div className="p-6 text-center space-y-3">
-            <DialogDescription className="text-muted-foreground">You've already collected the Chrysalis Coin for today ({currentDate}).</DialogDescription>
+          <div className="p-6 text-center space-y-4">
+             <Image
+              src="https://res.cloudinary.com/djrhjkkvm/image/upload/v1750371519/Cartoons/catti-the-caterpillar-in-sneakers_kcz05b.png"
+              alt="Catti the Caterpillar in sneakers"
+              width={120}
+              height={120}
+              className="mx-auto"
+              data-ai-hint="caterpillar cartoon sneakers"
+            />
+            <DialogDescription className="text-muted-foreground text-base">
+              You collected the <strong>{todaysCoinVariant.name}</strong> on day {todaysCoinVariant.dayNumber}.
+            </DialogDescription>
             {todaysCoinVariant && userProfile && userProfile.activeChrysalisThemeId !== todaysCoinVariant.id && userProfile.photoURL === CHRYSALIS_AVATAR_IDENTIFIER && (
                 <Button onClick={() => activateThemeFromCollectedCoin(todaysCoinVariant, true)} disabled={isActivatingTheme} size="sm">
                     {isActivatingTheme ? <RefreshCw className="mr-2 h-4 w-4 animate-spin"/> : <Palette className="mr-2 h-4 w-4"/>}
-                     Activate Today's Theme ({todaysCoinVariant.name})
+                     Activate Theme
                 </Button>
             )}
           </div>
           <DialogFooter className="px-6 py-4 bg-muted/30 border-t rounded-b-lg">
-            <Button onClick={() => handleDialogClose(false)} className="w-full">Keep Stepping!</Button>
+            <Button onClick={() => handleDialogClose(false)} className="w-full">Close</Button>
           </DialogFooter>
         </>
       );
