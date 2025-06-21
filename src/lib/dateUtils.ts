@@ -18,25 +18,30 @@ export function isChallengeActive(currentDateOverride?: Date): boolean {
   const today = currentDateOverride || new Date(); // Use override if provided, else current date
   const currentYear = today.getUTCFullYear(); // Use UTC year from the effective "today"
 
-  // If testing with an override, and the override year is different from CHALLENGE_START_YEAR,
-  // then the challenge should be considered inactive unless the override year IS the CHALLENGE_START_YEAR.
-  // This ensures tests for specific days in 2025 work, but dates outside 2025 are inactive.
+  // console.log('[isChallengeActive] Input currentDateOverride:', currentDateOverride?.toISOString());
+  // console.log('[isChallengeActive] Effective today for checks:', today.toISOString());
+  // console.log('[isChallengeActive] CHALLENGE_START_YEAR:', CHALLENGE_START_YEAR);
+
   if (currentYear !== CHALLENGE_START_YEAR) {
+    // console.log(`[isChallengeActive] currentYear (${currentYear}) !== CHALLENGE_START_YEAR (${CHALLENGE_START_YEAR}). Returning false.`);
     return false;
   }
 
-  // Use CHALLENGE_START_YEAR for start and end date comparisons
   const challengeStartDate = new Date(Date.UTC(CHALLENGE_START_YEAR, CHALLENGE_START_MONTH_JS, CHALLENGE_START_DAY_JS, 0, 0, 0, 0));
   const challengeEndDate = new Date(Date.UTC(CHALLENGE_START_YEAR, CHALLENGE_END_MONTH_JS, CHALLENGE_END_DAY_JS, 23, 59, 59, 999));
 
+  // For comparison, we need to ensure 'today' is treated as the start of its day in UTC.
+  // If 'today' is already a UTC date object (like our modified effectiveUTCDate), this is fine.
+  // If 'today' was a local date, its UTC components are used.
   const todayAtStartOfDayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
 
-  // // console.log(`[isChallengeActive] Effective Today (UTC start): ${todayAtStartOfDayUTC.toISOString()}`);
-  // // console.log(`[isChallengeActive] Challenge Start (UTC): ${challengeStartDate.toISOString()}`);
-  // // console.log(`[isChallengeActive] Challenge End (UTC): ${challengeEndDate.toISOString()}`);
-  // // console.log(`[isChallengeActive] Is Active: ${todayAtStartOfDayUTC >= challengeStartDate && todayAtStartOfDayUTC <= challengeEndDate}`);
+  const isActive = todayAtStartOfDayUTC >= challengeStartDate && todayAtStartOfDayUTC <= challengeEndDate;
+  // console.log(`[isChallengeActive] Challenge Start (UTC): ${challengeStartDate.toISOString()}`);
+  // console.log(`[isChallengeActive] Challenge End (UTC): ${challengeEndDate.toISOString()}`);
+  // console.log(`[isChallengeActive] todayAtStartOfDayUTC for comparison: ${todayAtStartOfDayUTC.toISOString()}`);
+  // console.log(`[isChallengeActive] Is Active Check: ${todayAtStartOfDayUTC.toISOString()} >= ${challengeStartDate.toISOString()} && ${todayAtStartOfDayUTC.toISOString()} <= ${challengeEndDate.toISOString()}  Result: ${isActive}`);
 
-  return todayAtStartOfDayUTC >= challengeStartDate && todayAtStartOfDayUTC <= challengeEndDate;
+  return isActive;
 }
 
 
@@ -58,7 +63,7 @@ export function getChallengeDayNumberFromDateString(dateString: string): number 
 
 export function getChallengeDateStringByDayNumber(dayNumber: number): string {
   if (dayNumber < 1 || dayNumber > CHALLENGE_DURATION_DAYS) {
-    // // console.warn(`[getChallengeDateStringByDayNumber] Invalid dayNumber: ${dayNumber}. Returning placeholder.`);
+    // console.warn(`[getChallengeDateStringByDayNumber] Invalid dayNumber: ${dayNumber}. Returning placeholder.`);
     // Fallback to day 1 if out of range, though this indicates an issue.
     const fallbackDate = getChallengeStartDateForYear(CHALLENGE_START_YEAR);
     return `${fallbackDate.getUTCFullYear()}-${String(fallbackDate.getUTCMonth() + 1).padStart(2, '0')}-${String(fallbackDate.getUTCDate()).padStart(2, '0')}`;
@@ -70,3 +75,5 @@ export function getChallengeDateStringByDayNumber(dayNumber: number): string {
 
   return `${targetDate.getUTCFullYear()}-${String(targetDate.getUTCMonth() + 1).padStart(2, '0')}-${String(targetDate.getUTCDate()).padStart(2, '0')}`;
 }
+
+    

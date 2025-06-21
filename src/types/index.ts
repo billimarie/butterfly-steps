@@ -54,7 +54,7 @@ export interface Team {
 export interface ChallengeCreationData {
   startDate: Date;
   goalValue: number;
-  creatorMessage?: string;
+  // creatorMessage removed
   stakes?: string;
 }
 

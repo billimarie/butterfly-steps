@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { submitSteps } from '@/lib/firebaseService';
+import { submitSteps, getTodaysDateClientLocal } from '@/lib/firebaseService'; // Import getTodaysDateClientLocal
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlusCircle, Footprints } from 'lucide-react';
 import type { StepSubmissionResult } from '@/types';
@@ -25,12 +25,12 @@ const stepSubmissionSchema = z.object({
 type StepSubmissionFormInputs = z.infer<typeof stepSubmissionSchema>;
 
 interface StepSubmissionFormProps {
-  onStepSubmit?: () => void | Promise<void>; 
-  isModalVersion?: boolean; 
+  onStepSubmit?: () => void | Promise<void>;
+  isModalVersion?: boolean;
 }
 
 export default function StepSubmissionForm({ onStepSubmit, isModalVersion = false }: StepSubmissionFormProps) {
-  const { user, userProfile, setShowDailyGoalMetModal, setShowNewBadgeModal, setCanCollectTodaysChrysalisCoin } = useAuth();
+  const { user, userProfile, setShowNewBadgeModal, collectDailyChrysalisCoin } = useAuth(); // Removed setShowDailyGoalMetModal, setCanCollectTodaysChrysalisCoin
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { register, handleSubmit, reset, formState: { errors } } = useForm<StepSubmissionFormInputs>({
@@ -47,13 +47,20 @@ export default function StepSubmissionForm({ onStepSubmit, isModalVersion = fals
       const result: StepSubmissionResult = await submitSteps(user.uid, data.steps);
       // console.log('[StepSubmissionForm] Result from submitSteps:', result);
 
-
       if (result.dailyGoalAchieved) {
-        // console.log('[StepSubmissionForm] Daily goal achieved! Attempting to show DailyGoalMetModal.');
-        setShowDailyGoalMetModal(true);
-        setCanCollectTodaysChrysalisCoin(true); // Set flag for DailyGoalMetModal
+        // console.log('[StepSubmissionForm] Daily goal achieved! Checking if coin already collected.');
+        const today = getTodaysDateClientLocal();
+        const coinAlreadyCollectedForToday = userProfile.chrysalisCoinDates?.includes(today) ?? false;
+
+        if (!coinAlreadyCollectedForToday) {
+          // console.log('[StepSubmissionForm] Coin not yet collected for today. Calling collectDailyChrysalisCoin.');
+          await collectDailyChrysalisCoin(); // This will trigger the ChrysalisJourneyModal (gamified view)
+        } else {
+          // console.log('[StepSubmissionForm] Coin already collected for today. Toasting.');
+          toast({ title: 'Daily Goal Met!', description: "Great job! You've already collected today's Chrysalis Coin." });
+        }
       } else {
-         toast({ title: 'Steps Submitted!', description: `${data.steps.toLocaleString()} steps added to your total.` });
+        toast({ title: 'Steps Submitted!', description: `${data.steps.toLocaleString()} steps added to your total.` });
       }
 
       if (result.newlyAwardedBadges && result.newlyAwardedBadges.length > 0) {
@@ -72,7 +79,7 @@ export default function StepSubmissionForm({ onStepSubmit, isModalVersion = fals
 
       reset();
       if (onStepSubmit) {
-        await onStepSubmit(); 
+        await onStepSubmit();
       }
     } catch (error) {
       // console.error('Step submission error:', error);
@@ -123,9 +130,9 @@ export default function StepSubmissionForm({ onStepSubmit, isModalVersion = fals
 
   if (isModalVersion) {
     return (
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2"> 
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
         {formContent}
-        <div className="pt-2"> 
+        <div className="pt-2">
          {formFooter}
         </div>
       </form>

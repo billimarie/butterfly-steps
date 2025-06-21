@@ -571,7 +571,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setShowDailyGoalMetModal,
       newlyEarnedBadgeToShow,
       setShowNewBadgeModal,
-      // activateChrysalisAsAvatar removed
       collectDailyChrysalisCoin,
       applyTheme,
       activeChrysalisThemeId,

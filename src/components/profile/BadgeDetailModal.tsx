@@ -54,12 +54,6 @@ export default function BadgeDetailModal({ isOpen, onOpenChange, badge }: BadgeD
           <DialogDescription className="text-muted-foreground text-base">
             {badge.description}
           </DialogDescription>
-          <div className="p-3 bg-muted/30 rounded-md border">
-            <p className="text-sm font-semibold text-foreground">Milestone Reached:</p>
-            <p className="text-sm text-muted-foreground">
-              {milestoneText}
-            </p>
-          </div>
         </div>
         <DialogFooter className="px-6 py-4 bg-muted/20 border-t rounded-b-lg flex flex-col sm:flex-row items-center justify-center gap-4">
           <Button onClick={() => onOpenChange(false)} variant="outline" className="order-2 sm:order-1 w-full sm:w-auto">Close</Button>
