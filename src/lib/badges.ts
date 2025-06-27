@@ -19,6 +19,7 @@ export type BadgeId =
   | 'team-player'
   | 'social-butterfly'
   | 'explorer-award' // New badge ID
+  | 'streak-week-1'
   | 'streak-egg'          // 30 days
   | 'streak-caterpillar'  // 60 days
   | 'streak-chrysalis'    // 90 days
@@ -52,6 +53,7 @@ export const ALL_BADGES: BadgeData[] = [
 
 
   // Streak Badges
+  { id: 'streak-week-1', name: 'First Week Flourish', milestone: 7, description: 'You\'ve maintained a 7-day login streak!', icon: Award, type: 'streak' },
   { id: 'streak-egg', name: 'Persistent Egg', milestone: 30, description: 'Logged in for 30 consecutive days! Hatching potential!', icon: Egg, type: 'streak' },
   { id: 'streak-caterpillar', name: 'Curious Caterpillar', milestone: 60, description: '60 day streak! Munching through the days!', icon: WormIcon, type: 'streak' },
   { id: 'streak-chrysalis', name: 'Committed Chrysalis', milestone: 90, description: '90 days of consistency! Transformation is near.', icon: ShellIconLucide, type: 'streak' },

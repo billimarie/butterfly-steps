@@ -34,13 +34,6 @@ export default function DailyMotivationModal() {
             Welcome Back, {userProfile?.displayName || 'Explorer'}!
             <Sparkles className="h-7 w-7 text-yellow-300 mt-2" />
           </DialogTitle>
-          <button
-            onClick={() => handleOnOpenChange(false)}
-            className="absolute top-3 right-3 p-1 rounded-full bg-white/20 hover:bg-white/40 text-primary-foreground hover:text-white transition-colors z-10"
-            aria-label="Close dialog"
-          >
-            <X className="h-5 w-5" />
-          </button>
         </DialogHeader>
         <DialogDescription className="pt-6 pb-8 px-6 space-y-4 text-center text-muted-foreground text-lg">
           Log your steps today to reveal and collect this day's unique Chrysalis Coin!

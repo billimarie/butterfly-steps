@@ -86,13 +86,13 @@ export const ALL_CHRYSALIS_VARIANTS: ChrysalisVariantData[] = [
   {
     id: 'coin_day_7', // June 27
     dayNumber: 7,
-    name: 'First Week Flourish',
-    description: 'Celebrating a full week of dedication to the Butterfly Steps!',
-    themePrimaryHSL: '300 70% 60%', // Bright Magenta
+    name: 'Summer Stamina Coin',
+    description: 'A coin representing the stamina built over the first week.',
+    themePrimaryHSL: '120 50% 55%', // A nice green
     themePrimaryForegroundHSL: '0 0% 100%',   // White
-    themeAccentHSL: '330 80% 75%', // Soft Pink
-    themeAccentForegroundHSL: '300 70% 20%',  // Dark Magenta
-    icon: Award,
+    themeAccentHSL: '100 60% 70%', // A lighter green
+    themeAccentForegroundHSL: '120 50% 20%',  // Darker green
+    icon: Shell,
   },
   {
     id: 'coin_day_8', // June 28
