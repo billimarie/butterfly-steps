@@ -1,5 +1,6 @@
 
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/AuthContext';
@@ -9,10 +10,11 @@ import Footer from '@/components/layout/Footer';
 import ChrysalisJourneyModal from '@/components/chrysalis/ChrysalisJourneyModal';
 import DailyGoalMetModal from '@/components/modals/DailyGoalMetModal';
 import BadgeDetailModalRenderer from '@/components/profile/BadgeDetailModalRenderer';
-import FloatingLogStepsButton from '@/components/modals/FloatingLogStepsButton';
 import WelcomeMigrationModal from '@/components/modals/WelcomeMigrationModal'; 
 import ChallengeInvitationModalRenderer from '@/components/modals/ChallengeInvitationModalRenderer'; 
 import DailyMotivationModal from '@/components/modals/DailyMotivationModal';
+import MobileNav from '@/components/layout/MobileNav';
+import LogStepsModal from '@/components/modals/LogStepsModal';
 
 
 export const metadata: Metadata = {
@@ -42,7 +44,7 @@ export default function RootLayout({
         >
           <AuthProvider>
             <Navbar />
-            <main className="flex-grow container mx-auto px-4 py-8">
+            <main className="flex-grow container mx-auto px-4 py-8 md:pb-8 pb-24">
               {children}
             </main>
             <Footer />
@@ -52,9 +54,12 @@ export default function RootLayout({
             <DailyGoalMetModal />
             <BadgeDetailModalRenderer />
             <ChallengeInvitationModalRenderer /> 
-            <DailyMotivationModal /> {/* Removed isOpen and onOpenChange props */}
+            <DailyMotivationModal />
+            <LogStepsModal />
             
-            <FloatingLogStepsButton />
+            <Suspense fallback={null}>
+              <MobileNav />
+            </Suspense>
           </AuthProvider>
         </ThemeProvider>
       </body>
