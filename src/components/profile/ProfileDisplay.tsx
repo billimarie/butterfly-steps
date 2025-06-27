@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
-import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIconLucide, Users as TeamIcon, LogOut, PlusCircle, CalendarDays, Layers, Replace, Palette, Gift, Swords } from 'lucide-react';
+import { User, Activity, Target, Footprints, ExternalLink, Mail, Edit3, Share2, Award as AwardIconLucide, Users as TeamIcon, LogOut, PlusCircle, CalendarDays, Layers, Replace, Palette, Gift, Swords, Sparkles, AlertTriangle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ALL_BADGES, type BadgeData } from '@/lib/badges';
 import type { BadgeId } from '@/lib/badges';
-import { leaveTeam, getTodaysDateClientLocal, getChallengeDayNumberFromDateString, getChallengeDateStringByDayNumber, getUserDailySteps, isChallengeActive, CHALLENGE_START_YEAR } from '@/lib/firebaseService';
+import { leaveTeam, getTodaysDateClientLocal, getChallengeDayNumberFromDateString, getChallengeDateStringByDayNumber, getUserDailySteps, isChallengeActive, CHALLENGE_START_YEAR, redeemMissedDay } from '@/lib/firebaseService';
 import { useState, useEffect, useCallback } from 'react';
 import StepSubmissionForm from '@/components/dashboard/StepSubmissionForm';
 import { Separator } from '@/components/ui/separator';
@@ -27,6 +27,9 @@ import DailyStepChart from '@/components/profile/DailyStepChart';
 import ChallengeDefinitionModal from '@/components/challenges/ChallengeDefinitionModal';
 import { Shell as ShellIconLucide } from 'lucide-react';
 import { format as formatDate } from 'date-fns';
+import MissedDayRestorationModal from '@/components/modals/MissedDayRestorationModal';
+import GiftDayRestorationModal from '@/components/modals/GiftDayRestorationModal';
+
 
 interface ProfileDisplayProps {
   profileData: UserProfile;
@@ -48,6 +51,12 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
   const [isLoadingChart, setIsLoadingChart] = useState(true);
 
   const [showChallengeModal, setShowChallengeModal] = useState(false);
+  
+  const [isRestorationModalOpen, setIsRestorationModalOpen] = useState(false);
+  const [selectedMissedDate, setSelectedMissedDate] = useState<string | null>(null);
+
+  const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
+  const [selectedDateToGift, setSelectedDateToGift] = useState<string | null>(null);
 
 
   const progressPercentage = profileData.stepGoal ? (profileData.currentSteps / profileData.stepGoal) * 100 : 0;
@@ -65,12 +74,6 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
 
   const challengeIsCurrentlyActiveBasedOnEffectiveDate = isChallengeActive(effectiveUTCDate);
   const currentChallengeDay = getChallengeDayNumberFromDateString(effectiveDateString);
-
-  // // console.log('[ProfileDisplay] effectiveDateString:', effectiveDateString);
-  // // console.log('[ProfileDisplay] effectiveUTCDate:', effectiveUTCDate.toISOString());
-  // // console.log('[ProfileDisplay] challengeIsCurrentlyActiveBasedOnEffectiveDate:', challengeIsCurrentlyActiveBasedOnEffectiveDate);
-  // // console.log('[ProfileDisplay] currentChallengeDay:', currentChallengeDay);
-  // // console.log('[ProfileDisplay] CHALLENGE_START_YEAR (from firebaseService->dateUtils):', CHALLENGE_START_YEAR);
 
   useEffect(() => {
     const fetchChartData = async () => {
@@ -122,10 +125,20 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     }
   };
 
-  const handleCoinGalleryItemClick = (variant: ChrysalisVariantData) => {
+  const handleCoinGalleryItemClick = (variant: ChrysalisVariantData, isCollected: boolean, isMissed: boolean, dateString: string) => {
     if (isOwnProfile) {
+      if (isCollected) {
         setSelectedCoinForModal(variant);
         setIsCoinDetailModalOpen(true);
+      } else if (isMissed) {
+        setSelectedMissedDate(dateString);
+        setIsRestorationModalOpen(true);
+      }
+    } else { // Viewing another profile
+      if (isMissed) {
+        setSelectedDateToGift(dateString);
+        setIsGiftModalOpen(true);
+      }
     }
   };
 
@@ -185,7 +198,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                 "w-36 h-36 md:w-40 md:h-40 bg-gradient-to-br from-yellow-300 to-yellow-400 rounded-full flex items-center justify-center border-8 border-yellow-400 ring-4 ring-orange-700/10 ring-inset",
                 shouldAnimate && "animate-chrysalis-glow"
             )}>
-                <IconComponent className="h-20 w-20 md:h-24 md:h-24" style={iconColorStyle} data-ai-hint={variantToShow?.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"}/>
+                <IconComponent className="w-24 h-24" style={iconColorStyle} data-ai-hint={variantToShow?.name.toLowerCase().includes("shell") ? "chrysalis shell" : "icon nature"}/>
             </div>
         </button>
       </div>
@@ -290,7 +303,7 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
               <Layers className="mr-2 h-5 w-5 text-primary" /> Chrysalis Coins
             </h3>
             <p className="text-sm text-muted-foreground">
-              Collected: <span className="font-bold text-accent">{collectedCoinsCount}</span> / {currentChallengeDay > 0 ? currentChallengeDay : CHALLENGE_DURATION_DAYS} days so far. {isOwnProfile ? "Click a collected coin to view details or activate its theme." : ""}
+              Collected: <span className="font-bold text-accent">{collectedCoinsCount}</span> / {currentChallengeDay > 0 ? currentChallengeDay : CHALLENGE_DURATION_DAYS} days so far.
             </p>
             {currentChallengeDay > 0 && challengeIsCurrentlyActiveBasedOnEffectiveDate ? (
               <div className="flex flex-wrap gap-x-3 gap-y-4 justify-center pt-2">
@@ -300,25 +313,25 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
 
                   const challengeDateForDay = getChallengeDateStringByDayNumber(dayNum);
                   const isCollected = profileData.chrysalisCoinDates?.includes(challengeDateForDay) ?? false;
-                  const CoinIcon = variant.icon || ShellIconLucide;
                   const isMissedAndPastCoin = !isCollected && dayNum < currentChallengeDay;
+                  const CoinIcon = variant.icon || ShellIconLucide;
 
-                  const isClickableCoin = isOwnProfile && isCollected && !isMissedAndPastCoin;
-
+                  const isClickableCoin = isOwnProfile || isMissedAndPastCoin;
 
                   return (
                     <button
                       key={variant.id}
-                      onClick={() => isClickableCoin && handleCoinGalleryItemClick(variant)}
+                      onClick={() => handleCoinGalleryItemClick(variant, isCollected, isMissedAndPastCoin, challengeDateForDay)}
                       disabled={!isClickableCoin}
                       className={cn(
                         "p-3 rounded-lg flex flex-col items-center w-28 min-h-[8.5rem] text-center shadow-sm transition-all justify-between",
                         "border",
-                        isCollected ? "bg-card border-primary/30" : "bg-muted/40 border-muted-foreground/20 opacity-60",
+                        isCollected ? "bg-card border-primary/30" : "bg-muted/40 border-muted-foreground/20",
                         isClickableCoin ? "cursor-pointer hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary hover:opacity-100" : "cursor-default",
-                        isMissedAndPastCoin && "opacity-40 !cursor-not-allowed"
+                        isMissedAndPastCoin && !isOwnProfile && "hover:border-green-500", // Gifting hint
+                        isMissedAndPastCoin && isOwnProfile && "hover:border-amber-500" // Restoration hint
                       )}
-                      aria-label={isClickableCoin ? `View and activate ${variant.name} theme` : (isCollected ? variant.name : `${variant.name} (Not collected)`)}
+                      aria-label={isClickableCoin ? (isCollected ? `View and activate ${variant.name} theme` : isOwnProfile ? `Restore missed coin for ${variant.name}` : `Gift coin for ${variant.name}`) : (isCollected ? variant.name : `${variant.name} (Not collected)`)}
                     >
                       <CoinIcon className={cn(
                         "h-12 w-12 mb-1.5 flex-shrink-0",
@@ -331,7 +344,14 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
                         )}>
                           {variant.name}
                         </span>
-                        {isMissedAndPastCoin && <span className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">(Missed)</span>}
+                        {isMissedAndPastCoin && (
+                          <span className={cn(
+                            "text-xs mt-0.5",
+                             isOwnProfile ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"
+                          )}>
+                             {isOwnProfile ? '(Restore)' : '(Gift)'}
+                          </span>
+                        )}
                         {!isCollected && !isMissedAndPastCoin && dayNum <= currentChallengeDay && <span className="text-xs text-muted-foreground/80 mt-0.5">(Not Collected)</span>}
                       </div>
                     </button>
@@ -416,13 +436,35 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
           onOpenChange={setIsExistingBadgeModalOpen}
           badge={selectedExistingBadge}
       />
-      {isOwnProfile && (
-        <CoinThemeActivationModal
-          isOpen={isCoinDetailModalOpen}
-          onOpenChange={setIsCoinDetailModalOpen}
-          coinVariant={selectedCoinForModal}
+      
+      {isOwnProfile ? (
+        <>
+            <CoinThemeActivationModal
+                isOpen={isCoinDetailModalOpen}
+                onOpenChange={setIsCoinDetailModalOpen}
+                coinVariant={selectedCoinForModal}
+            />
+            <MissedDayRestorationModal
+                isOpen={isRestorationModalOpen}
+                onOpenChange={setIsRestorationModalOpen}
+                missedDate={selectedMissedDate}
+                userProfile={profileData}
+                onRedemptionComplete={() => {
+                    if (authUser?.uid) {
+                        fetchAuthUserProfile(authUser.uid);
+                    }
+                }}
+            />
+        </>
+      ) : (
+        <GiftDayRestorationModal
+          isOpen={isGiftModalOpen}
+          onOpenChange={setIsGiftModalOpen}
+          recipientProfile={profileData}
+          dateToGift={selectedDateToGift}
         />
       )}
+
       {!isOwnProfile && profileData && (
         <ChallengeDefinitionModal
             isOpen={showChallengeModal}
@@ -434,5 +476,3 @@ export default function ProfileDisplay({ profileData, isOwnProfile }: ProfileDis
     </>
   );
 }
-
-

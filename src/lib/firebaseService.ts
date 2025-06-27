@@ -26,7 +26,7 @@ import type { UserProfile, CommunityStats, Team, DailyStep, StreakUpdateResults,
 import { CHALLENGE_DURATION_DAYS } from '@/types'; // Import the constant
 import type { User as FirebaseUser } from 'firebase/auth';
 import { ALL_BADGES, type BadgeData, type BadgeId, getBadgeDataById } from '@/lib/badges';
-import { format as formatDate } from 'date-fns'; // Aliased to avoid conflict
+import { format as formatDate, subDays, formatISO } from 'date-fns'; // Aliased to avoid conflict, added subDays and formatISO
 import {
   isChallengeActive as isChallengeActiveUtil,
   getChallengeDayNumberFromDateString as getChallengeDayNumberFromDateStringUtil,
@@ -64,7 +64,7 @@ export function getTodaysDateClientLocal(): string {
 
   if (typeof window !== 'undefined' && (window as any).__TEST_OVERRIDE_DATE__) {
     const overrideDate = (window as any).__TEST_OVERRIDE_DATE__;
-    console.log(`[firebaseService.getTodaysDateClientLocal] USING TEST OVERRIDE DATE: ${overrideDate}`);
+    // // console.log(`[firebaseService.getTodaysDateClientLocal] USING TEST OVERRIDE DATE: ${overrideDate}`);
     return overrideDate;
   }
 
@@ -797,5 +797,60 @@ export async function declineChallenge(challengeId: string, opponentUid: string)
     opponentStatus: 'declined',
     status: 'cancelled',
     updatedAt: Timestamp.now(),
+  });
+}
+
+export async function redeemMissedDay(userId: string, dateToRedeem: string): Promise<void> {
+  const userRef = doc(db, USERS_COLLECTION, userId);
+
+  await runTransaction(db, async (transaction) => {
+    const userSnap = await transaction.get(userRef);
+    if (!userSnap.exists()) {
+      throw new Error("User profile not found.");
+    }
+
+    const userProfile = mapDocToUserProfile(userSnap);
+    const { chrysalisCoinDates = [], currentStreak = 0, lastStreakLoginDate } = userProfile;
+
+    if (chrysalisCoinDates.includes(dateToRedeem)) {
+      throw new Error("You have already collected the coin for this day.");
+    }
+    
+    const today = getTodaysDateClientLocal();
+    if (dateToRedeem >= today) {
+        throw new Error("Cannot redeem a coin for today or a future date.");
+    }
+
+    // Update coin collection
+    const newChrysalisCoinDates = [...chrysalisCoinDates, dateToRedeem];
+
+    // --- Streak Repair Logic ---
+    let newStreak = currentStreak;
+    let newLastStreakDate = lastStreakLoginDate;
+
+    // Only attempt to repair if there's a streak history
+    if (lastStreakLoginDate) {
+      const lastLogin = new Date(lastStreakLoginDate + 'T00:00:00Z');
+      const redeemedDate = new Date(dateToRedeem + 'T00:00:00Z');
+
+      // Calculate the day after the last login
+      const nextDayAfterLastLogin = new Date(lastLogin);
+      nextDayAfterLastLogin.setUTCDate(lastLogin.getUTCDate() + 1);
+
+      // If the redeemed day is exactly the day the user missed to continue their streak
+      if (redeemedDate.getTime() === nextDayAfterLastLogin.getTime()) {
+        newStreak = currentStreak + 1;
+        newLastStreakDate = dateToRedeem;
+      }
+    }
+
+    // Prepare final updates
+    const updates: Partial<UserProfile> = {
+      chrysalisCoinDates: newChrysalisCoinDates,
+      currentStreak: newStreak,
+      lastStreakLoginDate: newLastStreakDate,
+    };
+
+    transaction.update(userRef, updates);
   });
 }
