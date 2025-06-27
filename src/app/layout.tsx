@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/AuthContext';
+import { ThemeProvider } from '@/components/layout/ThemeProvider';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import ChrysalisJourneyModal from '@/components/chrysalis/ChrysalisJourneyModal';
@@ -25,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -33,24 +34,30 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased min-h-screen flex flex-col">
-        <AuthProvider>
-          <Navbar />
-          <main className="flex-grow container mx-auto px-4 py-8">
-            {children}
-          </main>
-          <Footer />
-          <Toaster />
-          <WelcomeMigrationModal /> 
-          <ChrysalisJourneyModal /> 
-          <DailyGoalMetModal />
-          <BadgeDetailModalRenderer />
-          <ChallengeInvitationModalRenderer /> 
-          <DailyMotivationModal /> {/* Removed isOpen and onOpenChange props */}
-          
-          <FloatingLogStepsButton />
-        </AuthProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            <Navbar />
+            <main className="flex-grow container mx-auto px-4 py-8">
+              {children}
+            </main>
+            <Footer />
+            <Toaster />
+            <WelcomeMigrationModal /> 
+            <ChrysalisJourneyModal /> 
+            <DailyGoalMetModal />
+            <BadgeDetailModalRenderer />
+            <ChallengeInvitationModalRenderer /> 
+            <DailyMotivationModal /> {/* Removed isOpen and onOpenChange props */}
+            
+            <FloatingLogStepsButton />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
 }
-
