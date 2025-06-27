@@ -1,5 +1,6 @@
 
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/AuthContext';
@@ -56,7 +57,9 @@ export default function RootLayout({
             <DailyMotivationModal />
             <LogStepsModal />
             
-            <MobileNav />
+            <Suspense fallback={null}>
+              <MobileNav />
+            </Suspense>
           </AuthProvider>
         </ThemeProvider>
       </body>
