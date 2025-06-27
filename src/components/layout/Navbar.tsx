@@ -24,9 +24,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, X, User, LogOut, LayoutDashboard, Gift, Plus, Settings as SettingsIcon, BarChart3, Shell } from 'lucide-react';
+import { Menu, X, User, LogOut, LayoutDashboard, Gift, Plus, SettingsIcon, BarChart3, Shell } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { CHRYSALIS_AVATAR_IDENTIFIER } from '@/types';
+import { ThemeToggleButton } from '@/components/layout/ThemeToggleButton';
 
 export default function Navbar() {
   const { user, userProfile, logout, loading, fetchUserProfile } = useAuth();
@@ -102,6 +103,7 @@ export default function Navbar() {
           {isMobile ? (
             // Mobile View
             <>
+              <ThemeToggleButton />
               <LogStepsButton />
               {loading ? (
                 <div className="h-9 w-9 bg-muted rounded-full animate-pulse"></div>
@@ -136,6 +138,7 @@ export default function Navbar() {
               <div className="h-8 w-32 bg-muted rounded animate-pulse"></div>
             ) : user ? (
               <>
+                <ThemeToggleButton />
                 <LogStepsButton />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -178,6 +181,7 @@ export default function Navbar() {
               </>
             ) : (
               <>
+                <ThemeToggleButton />
                 <Button variant="ghost" asChild>
                   <Link href="/login">Login</Link>
                 </Button>
